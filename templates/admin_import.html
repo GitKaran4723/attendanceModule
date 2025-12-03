@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bulk Import - BCA BUB Admin</title>
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <meta name="theme-color" content="#2196F3">
+    <style>
+        .import-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .import-card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .card-title {
+            font-size: 20px;
+            font-weight: 500;
+            margin-bottom: 16px;
+            color: #333;
+        }
+        
+        .upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 32px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #fafafa;
+        }
+        
+        .upload-area:hover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+        
+        .upload-area.dragover {
+            border-color: #667eea;
+            background: #e8f0ff;
+        }
+        
+        .upload-icon {
+            font-size: 64px;
+            color: #999;
+            margin-bottom: 16px;
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        .import-type-selector {
+            margin: 20px 0;
+        }
+        
+        .type-option {
+            display: block;
+            padding: 16px;
+            margin: 8px 0;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: white;
+        }
+        
+        .type-option:hover {
+            border-color: #667eea;
+            background: #f5f7ff;
+        }
+        
+        .type-option input[type="radio"] {
+            margin-right: 12px;
+        }
+        
+        .type-option.selected {
+            border-color: #667eea;
+            background: #e8f0ff;
+        }
+        
+        .import-info {
+            background: #e3f2fd;
+            padding: 16px;
+            border-radius: 8px;
+            margin: 16px 0;
+            font-size: 14px;
+        }
+        
+        .import-log {
+            margin-top: 24px;
+        }
+        
+        .log-item {
+            padding: 12px;
+            background: white;
+            border-left: 4px solid #ccc;
+            margin-bottom: 8px;
+            border-radius: 4px;
+        }
+        
+        .log-item.success {
+            border-left-color: #4caf50;
+        }
+        
+        .log-item.error {
+            border-left-color: #f44336;
+        }
+        
+        .log-item.warning {
+            border-left-color: #ff9800;
+        }
+        
+        .btn-upload {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: transform 0.2s;
+            margin-top: 16px;
+        }
+        
+        .btn-upload:hover {
+            transform: translateY(-2px);
+        }
+        
+        .btn-upload:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .progress-bar {
+            height: 4px;
+            background: #e0e0e0;
+            border-radius: 2px;
+            margin: 16px 0;
+            overflow: hidden;
+            display: none;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.3s;
+        }
+        
+        .template-download {
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .template-link {
+            color: #667eea;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .history-table th {
+            background: #f5f5f5;
+            padding: 12px;
+            text-align: left;
+            font-weight: 500;
+        }
+        
+        .history-table td {
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .badge-success { background: #e8f5e9; color: #388e3c; }
+        .badge-error { background: #ffebee; color: #d32f2f; }
+        .badge-warning { background: #fff3e0; color: #f57c00; }
+    </style>
+</head>
+<body>
+    <!-- App Bar -->
+    <header class="app-bar">
+        <button class="menu-btn" onclick="window.history.back()">
+            <i class="material-icons">arrow_back</i>
+        </button>
+        <h1 class="app-title">Bulk Import Data</h1>
+        <button class="icon-btn" onclick="location.href='{{ url_for('logout') }}'">
+            <i class="material-icons">logout</i>
+        </button>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="import-container">
+            <!-- Upload Section -->
+            <div class="import-card">
+                <h2 class="card-title">Import Data from File</h2>
+                
+                <div class="import-type-selector">
+                    <label class="type-option" onclick="selectType(this, 'students')">
+                        <input type="radio" name="import_type" value="students">
+                        <strong>Students</strong> - Import student records (enrollment_no, first_name, last_name, email)
+                    </label>
+                    
+                    <label class="type-option" onclick="selectType(this, 'faculty')">
+                        <input type="radio" name="import_type" value="faculty">
+                        <strong>Faculty</strong> - Import faculty members (employee_id, first_name, last_name, email)
+                    </label>
+                    
+                    <label class="type-option" onclick="selectType(this, 'subjects')">
+                        <input type="radio" name="import_type" value="subjects">
+                        <strong>Subjects</strong> - Import subject records (subject_code, subject_name, semester, credits)
+                    </label>
+                    
+                    <label class="type-option" onclick="selectType(this, 'schedules')">
+                        <input type="radio" name="import_type" value="schedules">
+                        <strong>Schedules</strong> - Import class schedules (subject_code, faculty_employee_id, day_of_week, start_time, end_time, room_number)
+                    </label>
+                </div>
+                
+                <div class="template-download">
+                    <a href="#" class="template-link" id="downloadTemplate" style="display: none;">
+                        <i class="material-icons">download</i>
+                        Download Sample Template
+                    </a>
+                </div>
+                
+                <form id="uploadForm" enctype="multipart/form-data">
+                    <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
+                        <i class="material-icons upload-icon">cloud_upload</i>
+                        <h3>Drop file here or click to browse</h3>
+                        <p>Supported formats: CSV, Excel (.xlsx, .xls)</p>
+                        <p id="selectedFile" style="color: #667eea; margin-top: 8px;"></p>
+                    </div>
+                    
+                    <input type="file" id="fileInput" class="file-input" accept=".csv,.xlsx,.xls" onchange="handleFileSelect(event)">
+                    
+                    <div class="progress-bar" id="progressBar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    
+                    <button type="submit" class="btn-upload" id="uploadBtn" disabled>
+                        <i class="material-icons" style="vertical-align: middle;">upload</i>
+                        Start Import
+                    </button>
+                </form>
+                
+                <div class="import-info">
+                    <strong>📝 Important Notes:</strong>
+                    <ul style="margin: 8px 0 0 20px; padding: 0;">
+                        <li>First row must contain column headers</li>
+                        <li>Required fields must not be empty</li>
+                        <li>Duplicate records will be skipped</li>
+                        <li>Maximum 1000 rows per import</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- Recent Imports -->
+            <div class="import-card">
+                <h2 class="card-title">Recent Imports</h2>
+                
+                {% if imports %}
+                <table class="history-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th>File</th>
+                            <th>Status</th>
+                            <th>Records</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for imp in imports %}
+                        <tr>
+                            <td>{{ imp.created_at.strftime('%d %b %Y %H:%M') }}</td>
+                            <td>{{ imp.import_type.title() }}</td>
+                            <td>{{ imp.file_name }}</td>
+                            <td>
+                                <span class="status-badge 
+                                    {% if imp.status == 'completed' %}badge-success
+                                    {% elif imp.status == 'failed' %}badge-error
+                                    {% else %}badge-warning{% endif %}">
+                                    {{ imp.status.replace('_', ' ').title() }}
+                                </span>
+                            </td>
+                            <td>{{ imp.successful_rows }}/{{ imp.total_rows }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p style="text-align: center; color: #999; padding: 20px;">No imports yet</p>
+                {% endif %}
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let selectedType = null;
+        let selectedFile = null;
+        
+        function selectType(element, type) {
+            // Remove previous selection
+            document.querySelectorAll('.type-option').forEach(el => el.classList.remove('selected'));
+            
+            // Add selection
+            element.classList.add('selected');
+            element.querySelector('input').checked = true;
+            selectedType = type;
+            
+            // Enable upload button if file is selected
+            updateUploadButton();
+            
+            // Show template download link
+            document.getElementById('downloadTemplate').style.display = 'inline-flex';
+        }
+        
+        function handleFileSelect(event) {
+            selectedFile = event.target.files[0];
+            if (selectedFile) {
+                document.getElementById('selectedFile').textContent = `Selected: ${selectedFile.name}`;
+                updateUploadButton();
+            }
+        }
+        
+        function updateUploadButton() {
+            const btn = document.getElementById('uploadBtn');
+            btn.disabled = !(selectedType && selectedFile);
+        }
+        
+        // Drag and drop
+        const uploadArea = document.getElementById('uploadArea');
+        
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                document.getElementById('fileInput').files = files;
+                handleFileSelect({target: {files: files}});
+            }
+        });
+        
+        // Form submission
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            if (!selectedType || !selectedFile) return;
+            
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            formData.append('import_type', selectedType);
+            
+            // Show progress bar
+            const progressBar = document.getElementById('progressBar');
+            const progressFill = document.getElementById('progressFill');
+            const uploadBtn = document.getElementById('uploadBtn');
+            
+            progressBar.style.display = 'block';
+            progressFill.style.width = '30%';
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = 'Importing...';
+            
+            try {
+                const response = await fetch('/api/admin/import', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                progressFill.style.width = '100%';
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert(`✅ Import completed!\n\nSuccessful: ${result.successful}\nFailed: ${result.failed}`);
+                    
+                    if (result.errors && result.errors.length > 0) {
+                        console.log('Import errors:', result.errors);
+                    }
+                    
+                    // Reload page to show updated history
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    alert(`❌ Import failed:\n${result.error}`);
+                }
+            } catch (error) {
+                alert('Failed to upload file. Please try again.');
+                console.error(error);
+            } finally {
+                progressBar.style.display = 'none';
+                progressFill.style.width = '0%';
+                uploadBtn.disabled = false;
+                uploadBtn.innerHTML = '<i class="material-icons" style="vertical-align: middle;">upload</i> Start Import';
+            }
+        });
+    </script>
+</body>
+</html>

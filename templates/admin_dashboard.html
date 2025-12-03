@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - BCA BUB</title>
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <meta name="theme-color" content="#2196F3">
+    <style>
+        body {
+            background: #f5f5f5;
+        }
+
+        .container {
+            padding: 16px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 36px;
+            font-weight: 700;
+            color: #667eea;
+            margin: 8px 0;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .admin-sections {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            padding-bottom: 80px;
+        }
+        
+        .admin-card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            cursor: pointer;
+            transition: transform 0.2s;
+            text-decoration: none;
+            color: inherit;
+        }
+        
+        .admin-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+        }
+        
+        .admin-card-icon {
+            font-size: 48px;
+            color: #667eea;
+            margin-bottom: 16px;
+        }
+        
+        .admin-card-title {
+            font-size: 20px;
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: #333;
+        }
+        
+        .admin-card-desc {
+            color: #666;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        /* Navigation Drawer */
+        .drawer {
+            position: fixed;
+            top: 0;
+            left: -280px;
+            width: 280px;
+            height: 100vh;
+            background: white;
+            box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+            transition: left 0.3s;
+            z-index: 1100;
+            overflow-y: auto;
+        }
+
+        .drawer.open {
+            left: 0;
+        }
+
+        .drawer-header {
+            padding: 24px 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .drawer-header h2 {
+            margin: 0 0 4px 0;
+            font-size: 24px;
+        }
+
+        .drawer-header p {
+            margin: 0;
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .nav-list {
+            list-style: none;
+            padding: 8px 0;
+            margin: 0;
+        }
+
+        .nav-item a {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            color: #333;
+            text-decoration: none;
+            transition: background 0.2s;
+        }
+
+        .nav-item a:hover {
+            background: rgba(102, 126, 234, 0.1);
+        }
+
+        .nav-item.active a {
+            background: rgba(102, 126, 234, 0.15);
+            color: #667eea;
+            font-weight: 500;
+        }
+
+        .nav-item i {
+            margin-right: 16px;
+            color: #666;
+        }
+
+        .nav-item.active i {
+            color: #667eea;
+        }
+
+        @media (max-width: 768px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .admin-sections {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- App Bar -->
+    <header class="app-bar">
+        <button class="menu-btn" onclick="toggleMenu()">
+            <i class="material-icons">menu</i>
+        </button>
+        <h1 class="app-title">Admin Dashboard</h1>
+        <button class="icon-btn" onclick="location.href='{{ url_for('logout') }}'">
+            <i class="material-icons">logout</i>
+        </button>
+    </header>
+
+    <!-- Navigation Drawer -->
+    <nav class="drawer" id="drawer">
+        <div class="drawer-header">
+            <h2>BCA BUB</h2>
+            <p>Admin Panel</p>
+        </div>
+        <ul class="nav-list">
+            <li class="nav-item active">
+                <a href="{{ url_for('admin_dashboard') }}">
+                    <i class="material-icons">dashboard</i>
+                    <span>Dashboard</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{{ url_for('admin_faculty') }}">
+                    <i class="material-icons">school</i>
+                    <span>Faculty</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{{ url_for('admin_students') }}">
+                    <i class="material-icons">people</i>
+                    <span>Students</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{{ url_for('admin_subjects') }}">
+                    <i class="material-icons">book</i>
+                    <span>Subjects</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{{ url_for('admin_batches') }}">
+                    <i class="material-icons">groups</i>
+                    <span>Batches & Sections</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{{ url_for('admin_import') }}">
+                    <i class="material-icons">upload_file</i>
+                    <span>Bulk Import</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{{ url_for('work_diary_list') }}">
+                    <i class="material-icons">book</i>
+                    <span>Work Diaries</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <!-- Statistics -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <i class="material-icons stat-icon" style="font-size: 36px; color: #667eea;">school</i>
+                    <div class="stat-number">{{ faculty_count }}</div>
+                    <div class="stat-label">Faculty Members</div>
+                </div>
+                
+                <div class="stat-card">
+                    <i class="material-icons stat-icon" style="font-size: 36px; color: #4caf50;">people</i>
+                    <div class="stat-number">{{ student_count }}</div>
+                    <div class="stat-label">Students</div>
+                </div>
+                
+                <div class="stat-card">
+                    <i class="material-icons stat-icon" style="font-size: 36px; color: #ff9800;">book</i>
+                    <div class="stat-number">{{ subject_count }}</div>
+                    <div class="stat-label">Subjects</div>
+                </div>
+                
+                <div class="stat-card">
+                    <i class="material-icons stat-icon" style="font-size: 36px; color: #f44336;">groups</i>
+                    <div class="stat-number">{{ section_count }}</div>
+                    <div class="stat-label">Sections</div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <h2 style="margin: 24px 0 16px 0;">Quick Actions</h2>
+            <div class="admin-sections">
+                <div class="admin-card" onclick="location.href='{{ url_for('admin_faculty') }}'">
+                    <i class="material-icons admin-card-icon">school</i>
+                    <div class="admin-card-title">Manage Faculty</div>
+                    <div class="admin-card-desc">Add, edit, and manage faculty members and their subjects</div>
+                </div>
+                
+                <div class="admin-card" onclick="location.href='{{ url_for('admin_students') }}'">
+                    <i class="material-icons admin-card-icon">people</i>
+                    <div class="admin-card-title">Manage Students</div>
+                    <div class="admin-card-desc">Add, edit, and assign students to batches and sections</div>
+                </div>
+                
+                <div class="admin-card" onclick="location.href='{{ url_for('admin_subjects') }}'">
+                    <i class="material-icons admin-card-icon">book</i>
+                    <div class="admin-card-title">Manage Subjects</div>
+                    <div class="admin-card-desc">Add subjects, units, chapters, and concepts</div>
+                </div>
+                
+                <div class="admin-card" onclick="location.href='{{ url_for('admin_batches') }}'">
+                    <i class="material-icons admin-card-icon">groups</i>
+                    <div class="admin-card-title">Batches & Sections</div>
+                    <div class="admin-card-desc">Create academic year batches and manage sections</div>
+                </div>
+                
+                <div class="admin-card" onclick="location.href='{{ url_for('admin_import') }}'">
+                    <i class="material-icons admin-card-icon">upload_file</i>
+                    <div class="admin-card-title">Bulk Import</div>
+                    <div class="admin-card-desc">Import data from Excel/CSV files</div>
+                </div>
+                
+                <div class="admin-card" onclick="location.href='{{ url_for('work_diary_list') }}'">
+                    <i class="material-icons admin-card-icon">assignment</i>
+                    <div class="admin-card-title">Work Diaries</div>
+                    <div class="admin-card-desc">Review and approve faculty work diaries</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav">
+        <a href="{{ url_for('admin_dashboard') }}" class="nav-item active">
+            <i class="material-icons">dashboard</i>
+            <span>Dashboard</span>
+        </a>
+        <a href="{{ url_for('admin_faculty') }}" class="nav-item">
+            <i class="material-icons">school</i>
+            <span>Faculty</span>
+        </a>
+        <a href="{{ url_for('admin_students') }}" class="nav-item">
+            <i class="material-icons">people</i>
+            <span>Students</span>
+        </a>
+        <a href="{{ url_for('admin_subjects') }}" class="nav-item">
+            <i class="material-icons">book</i>
+            <span>Subjects</span>
+        </a>
+    </nav>
+
+    <script>
+        function toggleMenu() {
+            document.getElementById('drawer').classList.toggle('open');
+        }
+
+        document.addEventListener('click', function(event) {
+            const drawer = document.getElementById('drawer');
+            const menuBtn = document.querySelector('.menu-btn');
+            
+            if (!drawer.contains(event.target) && !menuBtn.contains(event.target)) {
+                drawer.classList.remove('open');
+            }
+        });
+    </script>
+</body>
+</html>

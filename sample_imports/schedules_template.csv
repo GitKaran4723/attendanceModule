@@ -1,0 +1,11 @@
+subject_code,faculty_employee_id,day_of_week,start_time,end_time,room_number
+BCA101,FAC001,Monday,09:00:00,10:30:00,Room-101
+BCA101,FAC001,Wednesday,09:00:00,10:30:00,Room-101
+BCA102,FAC001,Tuesday,11:00:00,13:00:00,Lab-1
+BCA103,FAC002,Monday,11:00:00,12:30:00,Room-102
+BCA103,FAC002,Thursday,11:00:00,12:30:00,Room-102
+BCA104,FAC003,Tuesday,09:00:00,10:30:00,Room-103
+BCA201,FAC002,Monday,14:00:00,15:30:00,Room-201
+BCA202,FAC002,Wednesday,14:00:00,16:00:00,Lab-2
+BCA203,FAC004,Tuesday,14:00:00,15:30:00,Room-202
+BCA204,FAC004,Friday,11:00:00,13:00:00,Lab-2

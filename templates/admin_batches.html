@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Batches & Sections - BCA BUB Admin</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        .program-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .program-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        
+        .program-name {
+            font-size: 18px;
+            font-weight: 500;
+            color: #333;
+        }
+        
+        .program-code {
+            font-size: 14px;
+            color: #667eea;
+            font-weight: 500;
+        }
+        
+        .btn-add-section {
+            padding: 8px 16px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .sections-grid {
+            display: grid;
+            gap: 12px;
+        }
+        
+        .section-card {
+            background: #f8f9fa;
+            border-radius: 6px;
+            padding: 16px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 8px;
+        }
+        
+        .section-name {
+            font-size: 16px;
+            font-weight: 500;
+            color: #333;
+        }
+        
+        .section-info {
+            font-size: 13px;
+            color: #666;
+            margin: 4px 0;
+        }
+        
+        .section-stats {
+            display: flex;
+            gap: 16px;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #e0e0e0;
+        }
+        
+        .stat {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 13px;
+            color: #666;
+        }
+        
+        .section-actions {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .btn-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .btn-edit {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+        
+        .btn-delete {
+            background: #ffebee;
+            color: #d32f2f;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 24px;
+            color: #999;
+            font-size: 14px;
+        }
+        
+        .fab {
+            position: fixed;
+            bottom: 80px;
+            right: 20px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal.active {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .modal-header {
+            font-size: 18px;
+            font-weight: 500;
+            margin-bottom: 20px;
+            color: #333;
+        }
+        
+        .form-group {
+            margin-bottom: 16px;
+        }
+        
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: #333;
+            margin-bottom: 8px;
+        }
+        
+        .form-input, .form-select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        
+        .btn-group {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+        }
+        
+        .btn-primary {
+            flex: 1;
+            padding: 12px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        
+        .btn-secondary {
+            flex: 1;
+            padding: 12px;
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <header class="app-bar">
+        <button class="menu-btn" onclick="window.history.back()">
+            <i class="material-icons">arrow_back</i>
+        </button>
+        <h1 class="app-title">Batches & Sections</h1>
+        <button class="icon-btn" onclick="location.href='{{ url_for('logout') }}'">
+            <i class="material-icons">logout</i>
+        </button>
+    </header>
+
+    <main class="main-content">
+        <div class="container">
+            {% if programs %}
+                {% for program in programs %}
+                <div class="program-card">
+                    <div class="program-header">
+                        <div>
+                            <div class="program-name">{{ program.program_name }}</div>
+                            <div class="program-code">{{ program.program_code }}</div>
+                        </div>
+                        <button class="btn-add-section" onclick="openAddSectionModal('{{ program.program_id }}', '{{ program.program_name }}')">
+                            <i class="material-icons" style="font-size: 18px;">add</i>
+                            Add Section
+                        </button>
+                    </div>
+                    
+                    <div class="sections-grid">
+                        {% if program.sections %}
+                            {% for section in program.sections %}
+                            <div class="section-card">
+                                <div class="section-header">
+                                    <div>
+                                        <div class="section-name">{{ section.section_name }}</div>
+                                        <div class="section-info">
+                                            <i class="material-icons" style="font-size: 14px; vertical-align: middle;">event</i>
+                                            Academic Year: {{ section.academic_year or 'N/A' }}
+                                        </div>
+                                        <div class="section-info">
+                                            <i class="material-icons" style="font-size: 14px; vertical-align: middle;">school</i>
+                                            Semester: {{ section.current_semester or 'N/A' }}
+                                        </div>
+                                    </div>
+                                    <div class="section-actions">
+                                        <button class="btn-icon btn-edit" onclick="editSection('{{ section.section_id }}')" title="Edit">
+                                            <i class="material-icons" style="font-size: 18px;">edit</i>
+                                        </button>
+                                        <button class="btn-icon btn-delete" onclick="deleteSection('{{ section.section_id }}', '{{ section.section_name }}')" title="Delete">
+                                            <i class="material-icons" style="font-size: 18px;">delete</i>
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div class="section-stats">
+                                    <div class="stat">
+                                        <i class="material-icons" style="font-size: 16px;">people</i>
+                                        <span>{{ section.student_count or 0 }} Students</span>
+                                    </div>
+                                    <div class="stat">
+                                        <i class="material-icons" style="font-size: 16px;">schedule</i>
+                                        <span>{{ section.schedule_count or 0 }} Classes</span>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="empty-state">
+                                No sections created yet. Click "Add Section" to create one.
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div style="text-align: center; padding: 48px 20px; color: #999;">
+                    <i class="material-icons" style="font-size: 64px; opacity: 0.3;">school</i>
+                    <h3>No Programs</h3>
+                    <p>Add programs first to create sections</p>
+                </div>
+            {% endif %}
+        </div>
+    </main>
+
+    <button class="fab" onclick="openAddProgramModal()">
+        <i class="material-icons">add</i>
+    </button>
+
+    <nav class="bottom-nav">
+        <a href="{{ url_for('admin_dashboard') }}" class="nav-item">
+            <i class="material-icons">dashboard</i>
+            <span>Dashboard</span>
+        </a>
+        <a href="{{ url_for('admin_faculty') }}" class="nav-item">
+            <i class="material-icons">school</i>
+            <span>Faculty</span>
+        </a>
+        <a href="{{ url_for('admin_students') }}" class="nav-item">
+            <i class="material-icons">people</i>
+            <span>Students</span>
+        </a>
+        <a href="{{ url_for('admin_batches') }}" class="nav-item active">
+            <i class="material-icons">class</i>
+            <span>Batches</span>
+        </a>
+    </nav>
+
+    <!-- Add Program Modal -->
+    <div class="modal" id="addProgramModal">
+        <div class="modal-content">
+            <div class="modal-header">Add New Program</div>
+            <form id="addProgramForm">
+                <div class="form-group">
+                    <label class="form-label">Program Code</label>
+                    <input type="text" name="program_code" class="form-input" required placeholder="e.g., BCA">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Program Name</label>
+                    <input type="text" name="program_name" class="form-input" required placeholder="e.g., Bachelor of Computer Applications">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Duration (Years)</label>
+                    <input type="number" name="duration_years" class="form-input" min="1" max="10" placeholder="3">
+                </div>
+                <div class="btn-group">
+                    <button type="button" class="btn-secondary" onclick="closeModal('addProgramModal')">Cancel</button>
+                    <button type="submit" class="btn-primary">Add Program</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Section Modal -->
+    <div class="modal" id="addSectionModal">
+        <div class="modal-content">
+            <div class="modal-header">Add Section to <span id="modalProgramName"></span></div>
+            <form id="addSectionForm">
+                <input type="hidden" name="program_id" id="modalProgramId">
+                <div class="form-group">
+                    <label class="form-label">Section Name</label>
+                    <input type="text" name="section_name" class="form-input" required placeholder="e.g., Semester 1 - A">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Academic Year</label>
+                    <input type="text" name="academic_year" class="form-input" placeholder="e.g., 2024-2025">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Current Semester</label>
+                    <select name="current_semester" class="form-select">
+                        <option value="">Select Semester</option>
+                        {% for i in range(1, 9) %}
+                        <option value="{{ i }}">Semester {{ i }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="btn-group">
+                    <button type="button" class="btn-secondary" onclick="closeModal('addSectionModal')">Cancel</button>
+                    <button type="submit" class="btn-primary">Add Section</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function openAddProgramModal() {
+            document.getElementById('addProgramModal').classList.add('active');
+        }
+
+        function openAddSectionModal(programId, programName) {
+            document.getElementById('modalProgramId').value = programId;
+            document.getElementById('modalProgramName').textContent = programName;
+            document.getElementById('addSectionModal').classList.add('active');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+
+        document.getElementById('addProgramForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            
+            try {
+                const response = await fetch('/api/admin/programs', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(Object.fromEntries(formData))
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('Program added successfully');
+                    location.reload();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Failed to add program');
+                console.error(error);
+            }
+        });
+
+        document.getElementById('addSectionForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            
+            try {
+                const response = await fetch('/api/admin/sections', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(Object.fromEntries(formData))
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('Section added successfully');
+                    location.reload();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Failed to add section');
+                console.error(error);
+            }
+        });
+
+        function editSection(sectionId) {
+            window.location.href = `/admin/sections/${sectionId}/edit`;
+        }
+
+        async function deleteSection(sectionId, sectionName) {
+            if (!confirm(`Delete ${sectionName}? This will affect all students in this section.`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/admin/sections/${sectionId}`, {
+                    method: 'DELETE',
+                    headers: {'Content-Type': 'application/json'}
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('Section deleted successfully');
+                    location.reload();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Failed to delete section');
+                console.error(error);
+            }
+        }
+
+        // Close modal when clicking outside
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.addEventListener('click', function(e) {
+                if (e.target === this) {
+                    this.classList.remove('active');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

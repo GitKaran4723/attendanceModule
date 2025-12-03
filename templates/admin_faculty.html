@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Faculty - BCA BUB Admin</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        .faculty-grid {
+            display: grid;
+            gap: 16px;
+        }
+        
+        .faculty-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .faculty-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 12px;
+        }
+        
+        .faculty-name {
+            font-size: 18px;
+            font-weight: 500;
+            color: #333;
+        }
+        
+        .faculty-id {
+            font-size: 14px;
+            color: #667eea;
+            font-weight: 500;
+        }
+        
+        .faculty-info {
+            font-size: 14px;
+            color: #666;
+            margin: 4px 0;
+        }
+        
+        .faculty-subjects {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #eee;
+        }
+        
+        .subject-tag {
+            display: inline-block;
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            margin: 4px 4px 4px 0;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        
+        .btn-small {
+            padding: 6px 16px;
+            font-size: 14px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .btn-edit {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+        
+        .btn-delete {
+            background: #ffebee;
+            color: #d32f2f;
+        }
+        
+        .fab {
+            position: fixed;
+            bottom: 80px;
+            right: 20px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .search-box {
+            background: white;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .search-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+    <header class="app-bar">
+        <button class="menu-btn" onclick="window.history.back()">
+            <i class="material-icons">arrow_back</i>
+        </button>
+        <h1 class="app-title">Faculty Management</h1>
+        <button class="icon-btn" onclick="location.href='{{ url_for('logout') }}'">
+            <i class="material-icons">logout</i>
+        </button>
+    </header>
+
+    <main class="main-content">
+        <div class="container">
+            <div class="search-box">
+                <input type="text" class="search-input" id="searchInput" placeholder="Search faculty by name, employee ID, or department..." onkeyup="filterFaculty()">
+            </div>
+
+            <div class="faculty-grid" id="facultyGrid">
+                {% if faculty_list %}
+                    {% for faculty in faculty_list %}
+                    <div class="faculty-card" data-name="{{ faculty.first_name }} {{ faculty.last_name }}" data-id="{{ faculty.employee_id }}" data-dept="{{ faculty.department or '' }}">
+                        <div class="faculty-header">
+                            <div>
+                                <div class="faculty-name">{{ faculty.first_name }} {{ faculty.last_name }}</div>
+                                <div class="faculty-id">{{ faculty.employee_id }}</div>
+                            </div>
+                        </div>
+                        
+                        <div class="faculty-info">
+                            <i class="material-icons" style="font-size: 16px; vertical-align: middle;">work</i>
+                            {{ faculty.designation or 'Faculty' }}
+                        </div>
+                        
+                        <div class="faculty-info">
+                            <i class="material-icons" style="font-size: 16px; vertical-align: middle;">business</i>
+                            {{ faculty.department or 'N/A' }}
+                        </div>
+                        
+                        <div class="faculty-info">
+                            <i class="material-icons" style="font-size: 16px; vertical-align: middle;">email</i>
+                            {{ faculty.email }}
+                        </div>
+                        
+                        <div class="faculty-info">
+                            <i class="material-icons" style="font-size: 16px; vertical-align: middle;">phone</i>
+                            {{ faculty.phone or 'N/A' }}
+                        </div>
+                        
+                        {% if faculty.subjects %}
+                        <div class="faculty-subjects">
+                            <strong style="font-size: 13px; color: #666;">Subjects:</strong><br>
+                            {% for subject in faculty.subjects %}
+                            <span class="subject-tag">{{ subject.subject_name }}</span>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                        
+                        <div class="action-buttons">
+                            <button class="btn-small btn-edit" onclick="editFaculty('{{ faculty.faculty_id }}')">
+                                <i class="material-icons" style="font-size: 16px;">edit</i>
+                                Edit
+                            </button>
+                            <button class="btn-small btn-delete" onclick="deleteFaculty('{{ faculty.faculty_id }}', '{{ faculty.first_name }} {{ faculty.last_name }}')">
+                                <i class="material-icons" style="font-size: 16px;">delete</i>
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div style="text-align: center; padding: 48px 20px; color: #999;">
+                        <i class="material-icons" style="font-size: 64px; opacity: 0.3;">school</i>
+                        <h3>No Faculty Members</h3>
+                        <p>Click the + button to add faculty</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </main>
+
+    <button class="fab" onclick="location.href='{{ url_for('admin_faculty_add') }}'">
+        <i class="material-icons">add</i>
+    </button>
+
+    <nav class="bottom-nav">
+        <a href="{{ url_for('admin_dashboard') }}" class="nav-item">
+            <i class="material-icons">dashboard</i>
+            <span>Dashboard</span>
+        </a>
+        <a href="{{ url_for('admin_faculty') }}" class="nav-item active">
+            <i class="material-icons">school</i>
+            <span>Faculty</span>
+        </a>
+        <a href="{{ url_for('admin_students') }}" class="nav-item">
+            <i class="material-icons">people</i>
+            <span>Students</span>
+        </a>
+        <a href="{{ url_for('admin_subjects') }}" class="nav-item">
+            <i class="material-icons">book</i>
+            <span>Subjects</span>
+        </a>
+    </nav>
+
+    <script>
+        function filterFaculty() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const cards = document.querySelectorAll('.faculty-card');
+            
+            cards.forEach(card => {
+                const name = card.getAttribute('data-name').toLowerCase();
+                const id = card.getAttribute('data-id').toLowerCase();
+                const dept = card.getAttribute('data-dept').toLowerCase();
+                
+                if (name.includes(searchTerm) || id.includes(searchTerm) || dept.includes(searchTerm)) {
+                    card.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        }
+
+        function editFaculty(facultyId) {
+            window.location.href = `/admin/faculty/${facultyId}/edit`;
+        }
+
+        async function deleteFaculty(facultyId, facultyName) {
+            if (!confirm(`Are you sure you want to delete ${facultyName}? This action cannot be undone.`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/admin/faculty/${facultyId}`, {
+                    method: 'DELETE',
+                    headers: {'Content-Type': 'application/json'}
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('Faculty deleted successfully');
+                    location.reload();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Failed to delete faculty');
+                console.error(error);
+            }
+        }
+    </script>
+</body>
+</html>

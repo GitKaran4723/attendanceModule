@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ 'Edit' if faculty else 'Add' }} Faculty - BCA BUB Admin</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        .form-container {
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .form-section {
+            margin-bottom: 24px;
+        }
+        
+        .section-title {
+            font-size: 16px;
+            font-weight: 500;
+            color: #667eea;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #667eea;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: #333;
+            margin-bottom: 8px;
+        }
+        
+        .form-label .required {
+            color: #d32f2f;
+        }
+        
+        .form-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            box-sizing: border-box;
+            transition: border-color 0.3s;
+        }
+        
+        .form-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .form-select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            box-sizing: border-box;
+            background: white;
+        }
+        
+        .subject-selector {
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .subject-item {
+            display: flex;
+            align-items: center;
+            padding: 8px;
+            margin: 4px 0;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+        
+        .subject-item:hover {
+            background: #f5f5f5;
+        }
+        
+        .subject-item input[type="checkbox"] {
+            margin-right: 12px;
+            width: 18px;
+            height: 18px;
+        }
+        
+        .subject-item label {
+            flex: 1;
+            cursor: pointer;
+        }
+        
+        .btn-group {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+        
+        .btn-primary {
+            flex: 1;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+        
+        .btn-secondary {
+            flex: 1;
+            padding: 14px;
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+        
+        .error-message {
+            background: #ffebee;
+            color: #d32f2f;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .success-message {
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <header class="app-bar">
+        <button class="menu-btn" onclick="window.history.back()">
+            <i class="material-icons">arrow_back</i>
+        </button>
+        <h1 class="app-title">{{ 'Edit' if faculty else 'Add' }} Faculty</h1>
+        <button class="icon-btn" onclick="location.href='{{ url_for('logout') }}'">
+            <i class="material-icons">logout</i>
+        </button>
+    </header>
+
+    <main class="main-content">
+        <div class="container">
+            <div class="form-container">
+                {% if error %}
+                <div class="error-message">{{ error }}</div>
+                {% endif %}
+                
+                {% if success %}
+                <div class="success-message">{{ success }}</div>
+                {% endif %}
+                
+                <form method="POST" id="facultyForm">
+                    <!-- Basic Information -->
+                    <div class="form-section">
+                        <div class="section-title">Basic Information</div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Employee ID <span class="required">*</span></label>
+                            <input type="text" name="employee_id" class="form-input" 
+                                   value="{{ faculty.employee_id if faculty else '' }}" 
+                                   {{ 'readonly' if faculty else 'required' }}
+                                   placeholder="e.g., FAC001">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">First Name <span class="required">*</span></label>
+                            <input type="text" name="first_name" class="form-input" 
+                                   value="{{ faculty.first_name if faculty else '' }}" 
+                                   required placeholder="First Name">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Last Name <span class="required">*</span></label>
+                            <input type="text" name="last_name" class="form-input" 
+                                   value="{{ faculty.last_name if faculty else '' }}" 
+                                   required placeholder="Last Name">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Email <span class="required">*</span></label>
+                            <input type="email" name="email" class="form-input" 
+                                   value="{{ faculty.email if faculty else '' }}" 
+                                   required placeholder="email@example.com">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Phone</label>
+                            <input type="tel" name="phone" class="form-input" 
+                                   value="{{ faculty.phone if faculty else '' }}" 
+                                   placeholder="+91 9876543210">
+                        </div>
+                    </div>
+                    
+                    <!-- Professional Information -->
+                    <div class="form-section">
+                        <div class="section-title">Professional Information</div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Department</label>
+                            <select name="department" class="form-select">
+                                <option value="">Select Department</option>
+                                <option value="Computer Science" {{ 'selected' if faculty and faculty.department == 'Computer Science' else '' }}>Computer Science</option>
+                                <option value="Information Technology" {{ 'selected' if faculty and faculty.department == 'Information Technology' else '' }}>Information Technology</option>
+                                <option value="BCA" {{ 'selected' if faculty and faculty.department == 'BCA' else '' }}>BCA</option>
+                                <option value="MCA" {{ 'selected' if faculty and faculty.department == 'MCA' else '' }}>MCA</option>
+                                <option value="Electronics" {{ 'selected' if faculty and faculty.department == 'Electronics' else '' }}>Electronics</option>
+                                <option value="Mathematics" {{ 'selected' if faculty and faculty.department == 'Mathematics' else '' }}>Mathematics</option>
+                                <option value="Other" {{ 'selected' if faculty and faculty.department == 'Other' else '' }}>Other</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Designation</label>
+                            <select name="designation" class="form-select">
+                                <option value="">Select Designation</option>
+                                <option value="Professor" {{ 'selected' if faculty and faculty.designation == 'Professor' else '' }}>Professor</option>
+                                <option value="Associate Professor" {{ 'selected' if faculty and faculty.designation == 'Associate Professor' else '' }}>Associate Professor</option>
+                                <option value="Assistant Professor" {{ 'selected' if faculty and faculty.designation == 'Assistant Professor' else '' }}>Assistant Professor</option>
+                                <option value="Lecturer" {{ 'selected' if faculty and faculty.designation == 'Lecturer' else '' }}>Lecturer</option>
+                                <option value="Senior Lecturer" {{ 'selected' if faculty and faculty.designation == 'Senior Lecturer' else '' }}>Senior Lecturer</option>
+                                <option value="Guest Faculty" {{ 'selected' if faculty and faculty.designation == 'Guest Faculty' else '' }}>Guest Faculty</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Qualification</label>
+                            <input type="text" name="qualification" class="form-input" 
+                                   value="{{ faculty.qualification if faculty else '' }}" 
+                                   placeholder="e.g., M.Tech, Ph.D">
+                        </div>
+                    </div>
+                    
+                    <!-- Subject Assignment -->
+                    <div class="form-section">
+                        <div class="section-title">Assign Subjects</div>
+                        
+                        {% if subjects %}
+                        <div class="subject-selector">
+                            {% for subject in subjects %}
+                            <div class="subject-item">
+                                <input type="checkbox" name="subjects" value="{{ subject.subject_id }}" 
+                                       id="subject_{{ subject.subject_id }}"
+                                       {% if faculty and subject.subject_id in faculty_subject_ids %}checked{% endif %}>
+                                <label for="subject_{{ subject.subject_id }}">
+                                    <strong>{{ subject.subject_code }}</strong> - {{ subject.subject_name }}
+                                    <br>
+                                    <small style="color: #666;">
+                                        Sem {{ subject.semester_id }} | Credits: {{ subject.credits }}
+                                    </small>
+                                </label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <p style="color: #999; text-align: center; padding: 20px;">
+                            No subjects available. Add subjects first.
+                        </p>
+                        {% endif %}
+                    </div>
+                    
+                    {% if not faculty %}
+                    <!-- Account Creation -->
+                    <div class="form-section">
+                        <div class="section-title">Account Credentials</div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Username <span class="required">*</span></label>
+                            <input type="text" name="username" class="form-input" 
+                                   required placeholder="Username for login">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Password <span class="required">*</span></label>
+                            <input type="password" name="password" class="form-input" 
+                                   required placeholder="Password (min 6 characters)" minlength="6">
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="btn-group">
+                        <button type="button" class="btn-secondary" onclick="window.history.back()">
+                            Cancel
+                        </button>
+                        <button type="submit" class="btn-primary">
+                            {{ 'Update Faculty' if faculty else 'Add Faculty' }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </main>
+
+    <nav class="bottom-nav">
+        <a href="{{ url_for('admin_dashboard') }}" class="nav-item">
+            <i class="material-icons">dashboard</i>
+            <span>Dashboard</span>
+        </a>
+        <a href="{{ url_for('admin_faculty') }}" class="nav-item active">
+            <i class="material-icons">school</i>
+            <span>Faculty</span>
+        </a>
+        <a href="{{ url_for('admin_students') }}" class="nav-item">
+            <i class="material-icons">people</i>
+            <span>Students</span>
+        </a>
+        <a href="{{ url_for('admin_subjects') }}" class="nav-item">
+            <i class="material-icons">book</i>
+            <span>Subjects</span>
+        </a>
+    </nav>
+</body>
+</html>

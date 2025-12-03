@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ 'Edit' if subject else 'Add' }} Subject - BCA BUB Admin</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        .form-container {
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .form-section {
+            margin-bottom: 24px;
+        }
+        
+        .section-title {
+            font-size: 16px;
+            font-weight: 500;
+            color: #667eea;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #667eea;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: #333;
+            margin-bottom: 8px;
+        }
+        
+        .form-label .required {
+            color: #d32f2f;
+        }
+        
+        .form-input, .form-textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            box-sizing: border-box;
+            transition: border-color 0.3s;
+            font-family: inherit;
+        }
+        
+        .form-input:focus, .form-textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .form-select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            box-sizing: border-box;
+            background: white;
+        }
+        
+        .btn-group {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+        
+        .btn-primary {
+            flex: 1;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+        
+        .btn-secondary {
+            flex: 1;
+            padding: 14px;
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+        
+        .error-message {
+            background: #ffebee;
+            color: #d32f2f;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <header class="app-bar">
+        <button class="menu-btn" onclick="window.history.back()">
+            <i class="material-icons">arrow_back</i>
+        </button>
+        <h1 class="app-title">{{ 'Edit' if subject else 'Add' }} Subject</h1>
+        <button class="icon-btn" onclick="location.href='{{ url_for('logout') }}'">
+            <i class="material-icons">logout</i>
+        </button>
+    </header>
+
+    <main class="main-content">
+        <div class="container">
+            <div class="form-container">
+                {% if error %}
+                <div class="error-message">{{ error }}</div>
+                {% endif %}
+                
+                <form method="POST">
+                    <div class="form-section">
+                        <div class="section-title">Basic Information</div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Subject Code <span class="required">*</span></label>
+                            <input type="text" name="subject_code" class="form-input" 
+                                   value="{{ subject.subject_code if subject else '' }}" 
+                                   {{ 'readonly' if subject else 'required' }}
+                                   placeholder="e.g., BCA101">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Subject Name <span class="required">*</span></label>
+                            <input type="text" name="subject_name" class="form-input" 
+                                   value="{{ subject.subject_name if subject else '' }}" 
+                                   required placeholder="e.g., Data Structures">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Description</label>
+                            <textarea name="description" class="form-textarea" rows="4" 
+                                      placeholder="Brief description of the subject">{{ subject.description if subject else '' }}</textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="form-section">
+                        <div class="section-title">Academic Details</div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Program <span class="required">*</span></label>
+                            <select name="program_id" class="form-select" required>
+                                <option value="">Select Program</option>
+                                {% for program in programs %}
+                                <option value="{{ program.program_id }}" 
+                                        {{ 'selected' if subject and subject.program_id == program.program_id else '' }}>
+                                    {{ program.program_name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Semester <span class="required">*</span></label>
+                            <select name="semester_id" class="form-select" required>
+                                <option value="">Select Semester</option>
+                                {% for i in range(1, 9) %}
+                                <option value="{{ i }}" {{ 'selected' if subject and subject.semester_id == i else '' }}>
+                                    Semester {{ i }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Credits <span class="required">*</span></label>
+                            <input type="number" name="credits" class="form-input" 
+                                   value="{{ subject.credits if subject else '' }}" 
+                                   required min="0" step="0.5" placeholder="e.g., 4">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Subject Type</label>
+                            <select name="subject_type" class="form-select">
+                                <option value="">Select Type</option>
+                                <option value="Theory" {{ 'selected' if subject and subject.subject_type == 'Theory' else '' }}>Theory</option>
+                                <option value="Practical" {{ 'selected' if subject and subject.subject_type == 'Practical' else '' }}>Practical</option>
+                                <option value="Theory + Practical" {{ 'selected' if subject and subject.subject_type == 'Theory + Practical' else '' }}>Theory + Practical</option>
+                                <option value="Project" {{ 'selected' if subject and subject.subject_type == 'Project' else '' }}>Project</option>
+                                <option value="Elective" {{ 'selected' if subject and subject.subject_type == 'Elective' else '' }}>Elective</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Total Hours</label>
+                            <input type="number" name="total_hours" class="form-input" 
+                                   value="{{ subject.total_hours if subject else '' }}" 
+                                   min="0" placeholder="Total teaching hours">
+                        </div>
+                    </div>
+                    
+                    <div class="btn-group">
+                        <button type="button" class="btn-secondary" onclick="window.history.back()">
+                            Cancel
+                        </button>
+                        <button type="submit" class="btn-primary">
+                            {{ 'Update Subject' if subject else 'Add Subject' }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </main>
+</body>
+</html>

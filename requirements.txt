@@ -1,0 +1,31 @@
+# BCA BUB Attendance System - Python Dependencies
+# Install using: pip install -r requirements.txt
+
+# Core Framework (Python 3.13 compatible versions)
+Flask>=3.0.0
+Flask-SQLAlchemy>=3.1.1
+Werkzeug>=3.0.1
+
+# Database (Python 3.13 compatible)
+SQLAlchemy>=2.0.35
+
+# Security (for future authentication)
+Flask-Login==0.6.3
+Flask-Bcrypt==1.0.1
+
+# Forms and validation (optional - add if needed)
+# Flask-WTF==1.2.1
+# WTForms==3.1.1
+
+# For CSV import/export (REQUIRED for bulk import)
+# Using newer versions compatible with Python 3.13
+pandas>=2.2.0
+
+# For PDF generation (optional)
+# reportlab==4.0.7
+
+# For Excel support (REQUIRED for bulk import)
+openpyxl>=3.1.2
+
+# Development dependencies
+python-dotenv==1.0.0

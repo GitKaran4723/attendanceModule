@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#6200ea">
+    <meta name="description" content="Mobile-first Attendance Tracking App">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>BCA BUB</title>
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='icons/icon-192x192.png') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-192x192.png') }}">
+    
+    <!-- Material Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <!-- Top App Bar -->
+    <header class="app-bar">
+        <button class="menu-btn" id="menuBtn">
+            <span class="material-icons">menu</span>
+        </button>
+        <h1 class="app-title">BCA BUB</h1>
+        <button class="more-btn" id="moreBtn">
+            <span class="material-icons">more_vert</span>
+        </button>
+    </header>
+
+    <!-- User Menu Dropdown -->
+    <div class="user-menu" id="userMenu" style="display: none;">
+        {% if current_user %}
+        <div class="user-menu-header">
+            <span class="material-icons" style="font-size: 40px; color: #6200ea;">account_circle</span>
+            <div>
+                <strong>{{ current_user.username }}</strong>
+                {% if current_user.role %}
+                <p style="font-size: 12px; opacity: 0.7; margin: 2px 0 0 0;">{{ current_user.role.role_name.title() }}</p>
+                {% endif %}
+            </div>
+        </div>
+        <div class="user-menu-divider"></div>
+        {% if current_user.role and current_user.role.role_name == 'admin' %}
+        <a href="{{ url_for('admin_dashboard') }}" class="user-menu-item">
+            <span class="material-icons">admin_panel_settings</span>
+            <span>Admin Panel</span>
+        </a>
+        {% endif %}
+        <a href="{{ url_for('logout') }}" class="user-menu-item">
+            <span class="material-icons">logout</span>
+            <span>Logout</span>
+        </a>
+        {% endif %}
+    </div>
+
+    <!-- Navigation Drawer -->
+    <nav class="nav-drawer" id="navDrawer">
+        <div class="drawer-header">
+            <span class="material-icons user-icon">account_circle</span>
+            <h2>BCA BUB</h2>
+            {% if current_user %}
+            <p style="font-size: 14px; opacity: 0.7; margin: 5px 0 0 0;">{{ current_user.username }}</p>
+            {% endif %}
+        </div>
+        <ul class="drawer-menu">
+            <li><a href="/" class="active"><span class="material-icons">dashboard</span> Dashboard</a></li>
+            <li><a href="{{ url_for('faculty') }}"><span class="material-icons">school</span> Faculty</a></li>
+            <li><a href="{{ url_for('students') }}"><span class="material-icons">people</span> Students</a></li>
+            <li><a href="{{ url_for('attendance') }}"><span class="material-icons">check_circle</span> Attendance</a></li>
+            {% if current_user and current_user.role and current_user.role.role_name == 'admin' %}
+            <li><a href="{{ url_for('admin_dashboard') }}"><span class="material-icons">admin_panel_settings</span> Admin Panel</a></li>
+            {% endif %}
+            <li style="margin-top: auto; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;">
+                <a href="{{ url_for('logout') }}"><span class="material-icons">logout</span> Logout</a>
+            </li>
+        </ul>
+    </nav>
+
+    <!-- Overlay for drawer -->
+    <div class="overlay" id="overlay"></div>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Welcome Card -->
+        <div class="card welcome-card">
+            <h2>Welcome to BCA BUB!</h2>
+            <p class="subtitle">{{ faculty_count }} Faculty • {{ student_count }} Students</p>
+        </div>
+
+        <!-- Quick Actions -->
+        <section class="section">
+            <h3 class="section-title">Quick Actions</h3>
+            <div class="action-grid">
+                <button class="action-card" onclick="showCheckInDialog()">
+                    <span class="material-icons">login</span>
+                    <span>Check In</span>
+                </button>
+                <button class="action-card" onclick="showCheckOutDialog()">
+                    <span class="material-icons">logout</span>
+                    <span>Check Out</span>
+                </button>
+                <button class="action-card" onclick="location.href='{{ url_for('faculty') }}'">
+                    <span class="material-icons">person_add</span>
+                    <span>Faculty</span>
+                </button>
+                <button class="action-card" onclick="location.href='{{ url_for('attendance') }}'">
+                    <span class="material-icons">list</span>
+                    <span>View All</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- Quick Links -->
+        <section class="section">
+            <h3 class="section-title">Quick Links</h3>
+            <div class="user-list">
+                <div class="list-item" onclick="location.href='{{ url_for('faculty') }}'">
+                    <span class="material-icons list-icon">school</span>
+                    <div class="list-content">
+                        <div class="list-title">Manage Faculty</div>
+                        <div class="list-subtitle">View and manage faculty members</div>
+                    </div>
+                    <span class="material-icons">chevron_right</span>
+                </div>
+                <div class="list-item" onclick="location.href='{{ url_for('students') }}'">
+                    <span class="material-icons list-icon">people</span>
+                    <div class="list-content">
+                        <div class="list-title">Manage Students</div>
+                        <div class="list-subtitle">View and manage students</div>
+                    </div>
+                    <span class="material-icons">chevron_right</span>
+                </div>
+                <div class="list-item" onclick="location.href='{{ url_for('attendance') }}'">
+                    <span class="material-icons list-icon">check_circle</span>
+                    <div class="list-content">
+                        <div class="list-title">Attendance Records</div>
+                        <div class="list-subtitle">View and manage attendance</div>
+                    </div>
+                    <span class="material-icons">chevron_right</span>
+                </div>
+                {% if session.role == 'faculty' or session.role == 'admin' or session.role == 'hod' %}
+                <div class="list-item" onclick="location.href='{{ url_for('work_diary_list') }}'">
+                    <span class="material-icons list-icon">book</span>
+                    <div class="list-content">
+                        <div class="list-title">Work Diary</div>
+                        <div class="list-subtitle">Track and manage daily activities</div>
+                    </div>
+                    <span class="material-icons">chevron_right</span>
+                </div>
+                {% endif %}
+                {% if session.role == 'admin' %}
+                <div class="list-item" onclick="location.href='{{ url_for('admin_import') }}'">
+                    <span class="material-icons list-icon">upload_file</span>
+                    <div class="list-content">
+                        <div class="list-title">Bulk Import</div>
+                        <div class="list-subtitle">Import data from Excel/CSV files</div>
+                    </div>
+                    <span class="material-icons">chevron_right</span>
+                </div>
+                {% endif %}
+            </div>
+        </section>
+    </main>
+
+    <!-- Floating Action Button -->
+    <button class="fab" onclick="showCheckInDialog()">
+        <span class="material-icons">add</span>
+    </button>
+
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav">
+        <a href="/" class="nav-item active">
+            <span class="material-icons">dashboard</span>
+            <span>Home</span>
+        </a>
+        <a href="{{ url_for('faculty') }}" class="nav-item">
+            <span class="material-icons">school</span>
+            <span>Faculty</span>
+        </a>
+        <a href="{{ url_for('students') }}" class="nav-item">
+            <span class="material-icons">people</span>
+            <span>Students</span>
+        </a>
+        <a href="{{ url_for('attendance') }}" class="nav-item">
+            <span class="material-icons">check_circle</span>
+            <span>Attendance</span>
+        </a>
+    </nav>
+
+    <!-- Snackbar for notifications -->
+    <div class="snackbar" id="snackbar"></div>
+
+    <!-- JavaScript -->
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

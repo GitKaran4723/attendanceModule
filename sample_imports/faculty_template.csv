@@ -1,0 +1,6 @@
+employee_id,first_name,last_name,email,phone,designation,department
+FAC001,Dr. Amit,Verma,amit.verma@bcabub.edu,9876543220,Professor,Computer Science
+FAC002,Dr. Neha,Singh,neha.singh@bcabub.edu,9876543221,Associate Professor,Computer Science
+FAC003,Dr. Rajesh,Kumar,rajesh.kumar@bcabub.edu,9876543222,Assistant Professor,Computer Science
+FAC004,Dr. Priya,Sharma,priya.sharma@bcabub.edu,9876543223,Assistant Professor,Computer Science
+FAC005,Dr. Suresh,Patel,suresh.patel@bcabub.edu,9876543224,Professor,Computer Science

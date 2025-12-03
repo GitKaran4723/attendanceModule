@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Subjects - BCA BUB Admin</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        .subject-card {
+            background: white;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .subject-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            cursor: pointer;
+        }
+        
+        .subject-info {
+            flex: 1;
+        }
+        
+        .subject-name {
+            font-size: 16px;
+            font-weight: 500;
+            color: #333;
+            margin-bottom: 4px;
+        }
+        
+        .subject-code {
+            font-size: 14px;
+            color: #667eea;
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+        
+        .subject-meta {
+            font-size: 13px;
+            color: #666;
+        }
+        
+        .subject-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        
+        .btn-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .btn-expand {
+            background: #f5f5f5;
+            color: #666;
+            transition: transform 0.3s;
+        }
+        
+        .btn-expand.expanded {
+            transform: rotate(180deg);
+        }
+        
+        .btn-edit {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+        
+        .btn-delete {
+            background: #ffebee;
+            color: #d32f2f;
+        }
+        
+        .subject-details {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+        
+        .subject-details.expanded {
+            max-height: 2000px;
+        }
+        
+        .hierarchy-section {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 2px solid #f0f0f0;
+        }
+        
+        .hierarchy-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        
+        .hierarchy-title {
+            font-size: 14px;
+            font-weight: 500;
+            color: #667eea;
+        }
+        
+        .btn-add-small {
+            padding: 6px 12px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 16px;
+            font-size: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .unit-item {
+            background: #f8f9fa;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 8px;
+        }
+        
+        .unit-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        
+        .unit-name {
+            font-size: 14px;
+            font-weight: 500;
+            color: #333;
+        }
+        
+        .chapter-item {
+            background: white;
+            border-radius: 4px;
+            padding: 8px 12px;
+            margin: 6px 0 6px 16px;
+            border-left: 3px solid #667eea;
+        }
+        
+        .chapter-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .chapter-name {
+            font-size: 13px;
+            color: #555;
+        }
+        
+        .concept-list {
+            margin: 6px 0 0 20px;
+        }
+        
+        .concept-item {
+            font-size: 12px;
+            color: #666;
+            padding: 4px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .fab {
+            position: fixed;
+            bottom: 80px;
+            right: 20px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .search-box {
+            background: white;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .search-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+    <header class="app-bar">
+        <button class="menu-btn" onclick="window.history.back()">
+            <i class="material-icons">arrow_back</i>
+        </button>
+        <h1 class="app-title">Subject Management</h1>
+        <button class="icon-btn" onclick="location.href='{{ url_for('logout') }}'">
+            <i class="material-icons">logout</i>
+        </button>
+    </header>
+
+    <main class="main-content">
+        <div class="container">
+            <div class="search-box">
+                <input type="text" class="search-input" id="searchInput" 
+                       placeholder="Search subjects..." onkeyup="filterSubjects()">
+            </div>
+
+            <div id="subjectsList">
+                {% if subjects %}
+                    {% for subject in subjects %}
+                    <div class="subject-card" data-name="{{ subject.subject_name }}" data-code="{{ subject.subject_code }}">
+                        <div class="subject-header" onclick="toggleSubject('{{ subject.subject_id }}')">
+                            <div class="subject-info">
+                                <div class="subject-name">{{ subject.subject_name }}</div>
+                                <div class="subject-code">{{ subject.subject_code }}</div>
+                                <div class="subject-meta">
+                                    Semester {{ subject.semester_id }} | Credits: {{ subject.credits }}
+                                    {% if subject.subject_type %} | {{ subject.subject_type }}{% endif %}
+                                </div>
+                            </div>
+                            <div class="subject-actions">
+                                <button class="btn-icon btn-edit" onclick="event.stopPropagation(); editSubject('{{ subject.subject_id }}')">
+                                    <i class="material-icons" style="font-size: 18px;">edit</i>
+                                </button>
+                                <button class="btn-icon btn-delete" onclick="event.stopPropagation(); deleteSubject('{{ subject.subject_id }}', '{{ subject.subject_name }}')">
+                                    <i class="material-icons" style="font-size: 18px;">delete</i>
+                                </button>
+                                <button class="btn-icon btn-expand" id="expand-{{ subject.subject_id }}">
+                                    <i class="material-icons" style="font-size: 20px;">expand_more</i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="subject-details" id="details-{{ subject.subject_id }}">
+                            <!-- Units Section -->
+                            <div class="hierarchy-section">
+                                <div class="hierarchy-header">
+                                    <span class="hierarchy-title">Units</span>
+                                    <button class="btn-add-small" onclick="addUnit('{{ subject.subject_id }}')">
+                                        <i class="material-icons" style="font-size: 14px;">add</i>
+                                        Add Unit
+                                    </button>
+                                </div>
+                                
+                                <div id="units-{{ subject.subject_id }}">
+                                    {% if subject.units %}
+                                        {% for unit in subject.units %}
+                                        <div class="unit-item">
+                                            <div class="unit-header">
+                                                <span class="unit-name">Unit {{ unit.unit_number }}: {{ unit.unit_name }}</span>
+                                                <div style="display: flex; gap: 8px;">
+                                                    <button class="btn-add-small" onclick="addChapter('{{ unit.unit_id }}')">
+                                                        <i class="material-icons" style="font-size: 12px;">add</i>
+                                                        Chapter
+                                                    </button>
+                                                    <button class="btn-icon btn-delete" style="width: 24px; height: 24px;" 
+                                                            onclick="deleteUnit('{{ unit.unit_id }}')">
+                                                        <i class="material-icons" style="font-size: 16px;">delete</i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Chapters -->
+                                            {% if unit.chapters %}
+                                                {% for chapter in unit.chapters %}
+                                                <div class="chapter-item">
+                                                    <div class="chapter-header">
+                                                        <span class="chapter-name">{{ chapter.chapter_number }}. {{ chapter.chapter_name }}</span>
+                                                        <div style="display: flex; gap: 6px;">
+                                                            <button class="btn-add-small" style="padding: 4px 8px; font-size: 11px;" 
+                                                                    onclick="addConcept('{{ chapter.chapter_id }}')">
+                                                                <i class="material-icons" style="font-size: 11px;">add</i>
+                                                                Concept
+                                                            </button>
+                                                            <button class="btn-icon btn-delete" style="width: 20px; height: 20px;" 
+                                                                    onclick="deleteChapter('{{ chapter.chapter_id }}')">
+                                                                <i class="material-icons" style="font-size: 14px;">delete</i>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <!-- Concepts -->
+                                                    {% if chapter.concepts %}
+                                                    <div class="concept-list">
+                                                        {% for concept in chapter.concepts %}
+                                                        <div class="concept-item">
+                                                            <span>• {{ concept.concept_name }}</span>
+                                                            <button class="btn-icon btn-delete" style="width: 18px; height: 18px;" 
+                                                                    onclick="deleteConcept('{{ concept.concept_id }}')">
+                                                                <i class="material-icons" style="font-size: 12px;">close</i>
+                                                            </button>
+                                                        </div>
+                                                        {% endfor %}
+                                                    </div>
+                                                    {% endif %}
+                                                </div>
+                                                {% endfor %}
+                                            {% endif %}
+                                        </div>
+                                        {% endfor %}
+                                    {% else %}
+                                        <p style="color: #999; font-size: 13px; text-align: center; padding: 20px;">
+                                            No units added yet
+                                        </p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div style="text-align: center; padding: 48px 20px; color: #999;">
+                        <i class="material-icons" style="font-size: 64px; opacity: 0.3;">book</i>
+                        <h3>No Subjects</h3>
+                        <p>Click the + button to add subjects</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </main>
+
+    <button class="fab" onclick="location.href='{{ url_for('admin_subject_add') }}'">
+        <i class="material-icons">add</i>
+    </button>
+
+    <nav class="bottom-nav">
+        <a href="{{ url_for('admin_dashboard') }}" class="nav-item">
+            <i class="material-icons">dashboard</i>
+            <span>Dashboard</span>
+        </a>
+        <a href="{{ url_for('admin_faculty') }}" class="nav-item">
+            <i class="material-icons">school</i>
+            <span>Faculty</span>
+        </a>
+        <a href="{{ url_for('admin_students') }}" class="nav-item">
+            <i class="material-icons">people</i>
+            <span>Students</span>
+        </a>
+        <a href="{{ url_for('admin_subjects') }}" class="nav-item active">
+            <i class="material-icons">book</i>
+            <span>Subjects</span>
+        </a>
+    </nav>
+
+    <script>
+        function toggleSubject(subjectId) {
+            const details = document.getElementById('details-' + subjectId);
+            const expandBtn = document.getElementById('expand-' + subjectId);
+            
+            details.classList.toggle('expanded');
+            expandBtn.classList.toggle('expanded');
+        }
+
+        function filterSubjects() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const cards = document.querySelectorAll('.subject-card');
+            
+            cards.forEach(card => {
+                const name = card.getAttribute('data-name').toLowerCase();
+                const code = card.getAttribute('data-code').toLowerCase();
+                
+                if (name.includes(searchTerm) || code.includes(searchTerm)) {
+                    card.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        }
+
+        function editSubject(subjectId) {
+            window.location.href = `/admin/subjects/${subjectId}/edit`;
+        }
+
+        async function deleteSubject(subjectId, subjectName) {
+            if (!confirm(`Delete ${subjectName}? This will also delete all units, chapters, and concepts.`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/admin/subjects/${subjectId}`, {
+                    method: 'DELETE',
+                    headers: {'Content-Type': 'application/json'}
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('Subject deleted successfully');
+                    location.reload();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Failed to delete subject');
+                console.error(error);
+            }
+        }
+
+        function addUnit(subjectId) {
+            const unitName = prompt('Enter unit name:');
+            const unitNumber = prompt('Enter unit number:');
+            
+            if (unitName && unitNumber) {
+                createUnit(subjectId, unitName, unitNumber);
+            }
+        }
+
+        async function createUnit(subjectId, unitName, unitNumber) {
+            try {
+                const response = await fetch('/api/admin/units', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        subject_id: subjectId,
+                        unit_name: unitName,
+                        unit_number: parseInt(unitNumber)
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    location.reload();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Failed to create unit');
+                console.error(error);
+            }
+        }
+
+        async function deleteUnit(unitId) {
+            if (!confirm('Delete this unit and all its chapters/concepts?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/admin/units/${unitId}`, {
+                    method: 'DELETE',
+                    headers: {'Content-Type': 'application/json'}
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    location.reload();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Failed to delete unit');
+                console.error(error);
+            }
+        }
+
+        function addChapter(unitId) {
+            const chapterName = prompt('Enter chapter name:');
+            const chapterNumber = prompt('Enter chapter number:');
+            
+            if (chapterName && chapterNumber) {
+                createChapter(unitId, chapterName, chapterNumber);
+            }
+        }
+
+        async function createChapter(unitId, chapterName, chapterNumber) {
+            try {
+                const response = await fetch('/api/admin/chapters', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        unit_id: unitId,
+                        chapter_name: chapterName,
+                        chapter_number: parseFloat(chapterNumber)
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    location.reload();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Failed to create chapter');
+                console.error(error);
+            }
+        }
+
+        async function deleteChapter(chapterId) {
+            if (!confirm('Delete this chapter and all its concepts?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/admin/chapters/${chapterId}`, {
+                    method: 'DELETE',
+                    headers: {'Content-Type': 'application/json'}
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    location.reload();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Failed to delete chapter');
+                console.error(error);
+            }
+        }
+
+        function addConcept(chapterId) {
+            const conceptName = prompt('Enter concept name:');
+            
+            if (conceptName) {
+                createConcept(chapterId, conceptName);
+            }
+        }
+
+        async function createConcept(chapterId, conceptName) {
+            try {
+                const response = await fetch('/api/admin/concepts', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        chapter_id: chapterId,
+                        concept_name: conceptName
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    location.reload();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Failed to create concept');
+                console.error(error);
+            }
+        }
+
+        async function deleteConcept(conceptId) {
+            if (!confirm('Delete this concept?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/admin/concepts/${conceptId}`, {
+                    method: 'DELETE',
+                    headers: {'Content-Type': 'application/json'}
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    location.reload();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Failed to delete concept');
+                console.error(error);
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+subject_code,subject_name,semester,credits,subject_type
+BCA101,Introduction to Programming,1,4,theory
+BCA102,Programming Lab,1,2,practical
+BCA103,Digital Electronics,1,4,theory
+BCA104,Mathematics-I,1,4,theory
+BCA201,Data Structures,3,4,theory
+BCA202,Data Structures Lab,3,2,practical
+BCA203,Database Management Systems,3,4,theory
+BCA204,DBMS Lab,3,2,practical
+BCA301,Web Technologies,5,4,theory
+BCA302,Web Development Lab,5,2,practical

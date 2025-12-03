@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#6200ea">
+    <title>Attendance Records - BCA BUB</title>
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <!-- Top App Bar -->
+    <header class="app-bar">
+        <button class="menu-btn" onclick="history.back()">
+            <span class="material-icons">arrow_back</span>
+        </button>
+        <h1 class="app-title">Attendance Records</h1>
+        <button class="more-btn">
+            <span class="material-icons">filter_list</span>
+        </button>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <section class="section">
+            <div class="user-list">
+                {% if sessions %}
+                    {% for session in sessions %}
+                    <div class="list-item attendance-item">
+                        <div class="attendance-indicator {% if session.status == 'finalized' %}completed{% else %}active{% endif %}">
+                            <span class="material-icons">
+                                {% if session.status == 'finalized' %}check_circle{% else %}schedule{% endif %}
+                            </span>
+                        </div>
+                        <div class="list-content">
+                            <div class="list-title">
+                                {% if session.schedule %}
+                                    {{ session.schedule.subject.subject_name if session.schedule.subject else 'Class' }}
+                                {% else %}
+                                    Attendance Session
+                                {% endif %}
+                            </div>
+                            <div class="list-subtitle">
+                                Taken at: {{ session.taken_at.strftime('%I:%M %p') }}
+                                {% if session.status == 'finalized' %}
+                                    <span class="badge-completed">Finalized</span>
+                                {% else %}
+                                    <span class="badge-active">Draft</span>
+                                {% endif %}
+                            </div>
+                            <div class="list-caption">{{ session.taken_at.strftime('%B %d, %Y') }}</div>
+                            <div class="list-caption">{{ session.records.count() }} students marked</div>
+                        </div>
+                        <span class="material-icons">chevron_right</span>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state">
+                        <span class="material-icons">assignment_turned_in</span>
+                        <p>No attendance sessions yet</p>
+                        <p class="list-caption">TODO: Students should implement attendance taking</p>
+                        <p class="list-caption">• Create schedules</p>
+                        <p class="list-caption">• Take attendance</p>
+                        <p class="list-caption">• Generate reports</p>
+                    </div>
+                {% endif %}
+            </div>
+        </section>
+    </main>
+
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav">
+        <a href="/" class="nav-item">
+            <span class="material-icons">dashboard</span>
+            <span>Home</span>
+        </a>
+        <a href="{{ url_for('faculty') }}" class="nav-item">
+            <span class="material-icons">school</span>
+            <span>Faculty</span>
+        </a>
+        <a href="{{ url_for('students') }}" class="nav-item">
+            <span class="material-icons">people</span>
+            <span>Students</span>
+        </a>
+        <a href="{{ url_for('attendance') }}" class="nav-item active">
+            <span class="material-icons">check_circle</span>
+            <span>Attendance</span>
+        </a>
+    </nav>
+
+    <!-- Snackbar -->
+    <div class="snackbar" id="snackbar"></div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

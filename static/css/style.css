@@ -1,0 +1,716 @@
+/**
+ * Material Design inspired CSS for Native Android Look
+ * Mobile-first responsive design
+ */
+
+/* ===================================
+   CSS Variables (Material Design Colors)
+   =================================== */
+:root {
+    --primary-color: #6200ea;
+    --primary-dark: #4a00b8;
+    --primary-light: #9d46ff;
+    --accent-color: #03dac6;
+    --background: #fafafa;
+    --surface: #ffffff;
+    --error: #b00020;
+    --on-primary: #ffffff;
+    --on-background: #000000;
+    --on-surface: #000000;
+    --text-primary: rgba(0, 0, 0, 0.87);
+    --text-secondary: rgba(0, 0, 0, 0.60);
+    --text-disabled: rgba(0, 0, 0, 0.38);
+    --divider: rgba(0, 0, 0, 0.12);
+    --shadow: rgba(0, 0, 0, 0.2);
+    --app-bar-height: 56px;
+    --bottom-nav-height: 56px;
+}
+
+/* ===================================
+   Reset and Base Styles
+   =================================== */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background-color: var(--background);
+    color: var(--text-primary);
+    line-height: 1.5;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* ===================================
+   Top App Bar (Material Design)
+   =================================== */
+.app-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--app-bar-height);
+    background-color: var(--primary-color);
+    color: var(--on-primary);
+    display: flex;
+    align-items: center;
+    padding: 0 4px;
+    z-index: 1000;
+    box-shadow: 0 2px 4px var(--shadow);
+}
+
+.app-bar .menu-btn,
+.app-bar .more-btn {
+    background: none;
+    border: none;
+    color: var(--on-primary);
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s;
+}
+
+.app-bar .menu-btn:active,
+.app-bar .more-btn:active {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.app-title {
+    flex: 1;
+    font-size: 20px;
+    font-weight: 500;
+    margin-left: 12px;
+}
+
+/* ===================================
+   Navigation Drawer
+   =================================== */
+.nav-drawer {
+    position: fixed;
+    top: 0;
+    left: -280px;
+    width: 280px;
+    height: 100vh;
+    background-color: var(--surface);
+    z-index: 1100;
+    transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 2px 0 8px var(--shadow);
+}
+
+.nav-drawer.active {
+    left: 0;
+}
+
+.drawer-header {
+    background-color: var(--primary-color);
+    color: var(--on-primary);
+    padding: 24px 16px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.drawer-header .user-icon {
+    font-size: 48px;
+}
+
+.drawer-header h2 {
+    font-size: 18px;
+    font-weight: 500;
+}
+
+.drawer-menu {
+    list-style: none;
+    padding: 8px 0;
+}
+
+.drawer-menu li a {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    color: var(--text-primary);
+    text-decoration: none;
+    gap: 32px;
+    transition: background-color 0.2s;
+}
+
+.drawer-menu li a:hover,
+.drawer-menu li a.active {
+    background-color: rgba(98, 0, 234, 0.08);
+    color: var(--primary-color);
+}
+
+.drawer-menu .material-icons {
+    color: var(--text-secondary);
+}
+
+.drawer-menu li a.active .material-icons {
+    color: var(--primary-color);
+}
+
+/* ===================================
+   Overlay
+   =================================== */
+.overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1050;
+    display: none;
+}
+
+.overlay.active {
+    display: block;
+}
+
+/* ===================================
+   Main Content
+   =================================== */
+.main-content {
+    margin-top: var(--app-bar-height);
+    margin-bottom: var(--bottom-nav-height);
+    padding: 16px;
+    min-height: calc(100vh - var(--app-bar-height) - var(--bottom-nav-height));
+}
+
+/* ===================================
+   Cards (Material Design)
+   =================================== */
+.card {
+    background-color: var(--surface);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.welcome-card {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-light) 100%);
+    color: var(--on-primary);
+    padding: 24px;
+}
+
+.welcome-card h2 {
+    font-size: 24px;
+    font-weight: 500;
+    margin-bottom: 8px;
+}
+
+.subtitle {
+    opacity: 0.9;
+    font-size: 14px;
+}
+
+/* ===================================
+   Sections
+   =================================== */
+.section {
+    margin-bottom: 24px;
+}
+
+.section-title {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* ===================================
+   Action Grid
+   =================================== */
+.action-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+.action-card {
+    background-color: var(--surface);
+    border: none;
+    border-radius: 8px;
+    padding: 24px 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.action-card:active {
+    transform: scale(0.95);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.action-card .material-icons {
+    font-size: 32px;
+    color: var(--primary-color);
+}
+
+.action-card span:last-child {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+/* ===================================
+   List Items
+   =================================== */
+.user-list {
+    background-color: var(--surface);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.list-item {
+    display: flex;
+    align-items: center;
+    padding: 16px;
+    border-bottom: 1px solid var(--divider);
+    gap: 16px;
+}
+
+.list-item:last-child {
+    border-bottom: none;
+}
+
+.list-icon {
+    font-size: 40px;
+    color: var(--text-secondary);
+}
+
+.list-content {
+    flex: 1;
+}
+
+.list-title {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.list-subtitle {
+    font-size: 14px;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.list-subtitle .material-icons.small {
+    font-size: 16px;
+}
+
+.list-caption {
+    font-size: 12px;
+    color: var(--text-disabled);
+    margin-top: 4px;
+}
+
+.icon-btn {
+    background: none;
+    border: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    color: var(--text-secondary);
+}
+
+.icon-btn:active {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+/* ===================================
+   Attendance Items
+   =================================== */
+.attendance-item {
+    align-items: flex-start;
+}
+
+.attendance-indicator {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.attendance-indicator.active {
+    background-color: rgba(255, 193, 7, 0.1);
+    color: #ff9800;
+}
+
+.attendance-indicator.completed {
+    background-color: rgba(76, 175, 80, 0.1);
+    color: #4caf50;
+}
+
+.badge-active {
+    background-color: #ff9800;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 500;
+    margin-left: 8px;
+}
+
+.badge-completed {
+    background-color: #4caf50;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 500;
+    margin-left: 8px;
+}
+
+/* ===================================
+   Empty State
+   =================================== */
+.empty-state {
+    text-align: center;
+    padding: 48px 24px;
+    color: var(--text-secondary);
+}
+
+.empty-state .material-icons {
+    font-size: 64px;
+    opacity: 0.3;
+    margin-bottom: 16px;
+}
+
+.empty-state p {
+    margin-bottom: 16px;
+}
+
+/* ===================================
+   Buttons
+   =================================== */
+.btn-primary {
+    background-color: var(--primary-color);
+    color: var(--on-primary);
+    border: none;
+    padding: 12px 24px;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 2px 4px var(--shadow);
+}
+
+.btn-primary:active {
+    transform: translateY(1px);
+    box-shadow: 0 1px 2px var(--shadow);
+}
+
+.btn-text {
+    background: none;
+    border: none;
+    color: var(--primary-color);
+    padding: 12px 16px;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.btn-text:active {
+    background-color: rgba(98, 0, 234, 0.08);
+}
+
+/* ===================================
+   Floating Action Button (FAB)
+   =================================== */
+.fab {
+    position: fixed;
+    bottom: calc(var(--bottom-nav-height) + 16px);
+    right: 16px;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background-color: var(--accent-color);
+    color: var(--on-surface);
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    transition: all 0.2s;
+    z-index: 900;
+}
+
+.fab:active {
+    transform: scale(0.9);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* ===================================
+   Bottom Navigation
+   =================================== */
+.bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: var(--bottom-nav-height);
+    background-color: var(--surface);
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+}
+
+.nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    color: var(--text-secondary);
+    padding: 8px;
+    transition: color 0.2s;
+}
+
+.nav-item .material-icons {
+    font-size: 24px;
+    margin-bottom: 4px;
+}
+
+.nav-item span:last-child {
+    font-size: 12px;
+}
+
+.nav-item.active {
+    color: var(--primary-color);
+}
+
+/* ===================================
+   Dialog (Modal)
+   =================================== */
+.dialog-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 2000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+
+.dialog-overlay.active {
+    display: flex;
+}
+
+.dialog {
+    background-color: var(--surface);
+    border-radius: 8px;
+    padding: 24px;
+    max-width: 400px;
+    width: 100%;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+}
+
+.dialog h3 {
+    margin-bottom: 20px;
+    font-size: 20px;
+    font-weight: 500;
+}
+
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--divider);
+    border-radius: 4px;
+    font-size: 16px;
+    font-family: inherit;
+    background-color: var(--surface);
+    color: var(--text-primary);
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 24px;
+}
+
+/* ===================================
+   Snackbar (Toast Notification)
+   =================================== */
+.snackbar {
+    position: fixed;
+    bottom: calc(var(--bottom-nav-height) + 16px);
+    left: 16px;
+    right: 16px;
+    background-color: #323232;
+    color: white;
+    padding: 14px 16px;
+    border-radius: 4px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    z-index: 3000;
+    transform: translateY(100px);
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.snackbar.active {
+    transform: translateY(0);
+    opacity: 1;
+}
+
+/* ===================================
+   Responsive Design (Tablets and Up)
+   =================================== */
+@media (min-width: 768px) {
+    .main-content {
+        max-width: 800px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+    
+    .action-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+    
+    .fab {
+        width: 64px;
+        height: 64px;
+    }
+}
+
+/* ===================================
+   Safe Area (For Devices with Notch)
+   =================================== */
+@supports (padding: max(0px)) {
+    body {
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+    
+    .app-bar {
+        padding-top: env(safe-area-inset-top);
+        height: calc(var(--app-bar-height) + env(safe-area-inset-top));
+    }
+    
+    .bottom-nav {
+        padding-bottom: env(safe-area-inset-bottom);
+        height: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom));
+    }
+}
+
+/* ===================================
+   User Menu Dropdown
+   =================================== */
+.user-menu {
+    position: fixed;
+    top: calc(var(--app-bar-height) + 8px);
+    right: 8px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+    z-index: 1100;
+    min-width: 240px;
+    overflow: hidden;
+    animation: menuSlideIn 0.2s ease-out;
+}
+
+@keyframes menuSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.user-menu-header {
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.user-menu-divider {
+    height: 1px;
+    background: var(--divider);
+    margin: 8px 0;
+}
+
+.user-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 16px;
+    color: var(--text-primary);
+    text-decoration: none;
+    transition: background 0.2s;
+}
+
+.user-menu-item:hover {
+    background: rgba(98, 0, 234, 0.08);
+}
+
+.user-menu-item .material-icons {
+    font-size: 24px;
+    color: var(--text-secondary);
+}

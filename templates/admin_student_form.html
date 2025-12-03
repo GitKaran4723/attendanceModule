@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ 'Edit' if student else 'Add' }} Student - BCA BUB Admin</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        .form-container {
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .form-section {
+            margin-bottom: 24px;
+        }
+        
+        .section-title {
+            font-size: 16px;
+            font-weight: 500;
+            color: #667eea;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #667eea;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: #333;
+            margin-bottom: 8px;
+        }
+        
+        .form-label .required {
+            color: #d32f2f;
+        }
+        
+        .form-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            box-sizing: border-box;
+            transition: border-color 0.3s;
+        }
+        
+        .form-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .form-select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            box-sizing: border-box;
+            background: white;
+        }
+        
+        .btn-group {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+        
+        .btn-primary {
+            flex: 1;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+        
+        .btn-secondary {
+            flex: 1;
+            padding: 14px;
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+        
+        .error-message {
+            background: #ffebee;
+            color: #d32f2f;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <header class="app-bar">
+        <button class="menu-btn" onclick="window.history.back()">
+            <i class="material-icons">arrow_back</i>
+        </button>
+        <h1 class="app-title">{{ 'Edit' if student else 'Add' }} Student</h1>
+        <button class="icon-btn" onclick="location.href='{{ url_for('logout') }}'">
+            <i class="material-icons">logout</i>
+        </button>
+    </header>
+
+    <main class="main-content">
+        <div class="container">
+            <div class="form-container">
+                {% if error %}
+                <div class="error-message">{{ error }}</div>
+                {% endif %}
+                
+                <form method="POST">
+                    <!-- Basic Information -->
+                    <div class="form-section">
+                        <div class="section-title">Basic Information</div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Roll Number <span class="required">*</span></label>
+                            <input type="text" name="roll_number" class="form-input" 
+                                   value="{{ student.roll_number if student else '' }}" 
+                                   {{ 'readonly' if student else 'required' }}
+                                   placeholder="e.g., BCA2024001">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">First Name <span class="required">*</span></label>
+                            <input type="text" name="first_name" class="form-input" 
+                                   value="{{ student.first_name if student else '' }}" 
+                                   required placeholder="First Name">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Last Name <span class="required">*</span></label>
+                            <input type="text" name="last_name" class="form-input" 
+                                   value="{{ student.last_name if student else '' }}" 
+                                   required placeholder="Last Name">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Email <span class="required">*</span></label>
+                            <input type="email" name="email" class="form-input" 
+                                   value="{{ student.email if student else '' }}" 
+                                   required placeholder="student@example.com">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Phone</label>
+                            <input type="tel" name="phone" class="form-input" 
+                                   value="{{ student.phone if student else '' }}" 
+                                   placeholder="+91 9876543210">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Date of Birth</label>
+                            <input type="date" name="date_of_birth" class="form-input" 
+                                   value="{{ student.date_of_birth if student else '' }}">
+                        </div>
+                    </div>
+                    
+                    <!-- Academic Information -->
+                    <div class="form-section">
+                        <div class="section-title">Academic Information</div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Program <span class="required">*</span></label>
+                            <select name="program_id" class="form-select" required id="programSelect">
+                                <option value="">Select Program</option>
+                                {% for program in programs %}
+                                <option value="{{ program.program_id }}" 
+                                        {{ 'selected' if student and student.program_id == program.program_id else '' }}>
+                                    {{ program.program_name }} ({{ program.program_code }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Section</label>
+                            <select name="section_id" class="form-select" id="sectionSelect">
+                                <option value="">Select Section</option>
+                                {% for section in sections %}
+                                <option value="{{ section.section_id }}" 
+                                        data-program="{{ section.program_id }}"
+                                        {{ 'selected' if student and student.section_id == section.section_id else '' }}>
+                                    {{ section.section_name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Admission Year</label>
+                            <input type="number" name="admission_year" class="form-input" 
+                                   value="{{ student.admission_year if student else '' }}" 
+                                   placeholder="2024" min="2000" max="2100">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Current Semester</label>
+                            <select name="current_semester" class="form-select">
+                                <option value="">Select Semester</option>
+                                {% for i in range(1, 9) %}
+                                <option value="{{ i }}" {{ 'selected' if student and student.current_semester == i else '' }}>
+                                    Semester {{ i }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Contact Information -->
+                    <div class="form-section">
+                        <div class="section-title">Contact & Address</div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Address</label>
+                            <textarea name="address" class="form-input" rows="3" 
+                                      placeholder="Enter full address">{{ student.address if student else '' }}</textarea>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Guardian Name</label>
+                            <input type="text" name="guardian_name" class="form-input" 
+                                   value="{{ student.guardian_name if student else '' }}" 
+                                   placeholder="Parent/Guardian Name">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Guardian Phone</label>
+                            <input type="tel" name="guardian_phone" class="form-input" 
+                                   value="{{ student.guardian_phone if student else '' }}" 
+                                   placeholder="+91 9876543210">
+                        </div>
+                    </div>
+                    
+                    {% if not student %}
+                    <!-- Account Creation -->
+                    <div class="form-section">
+                        <div class="section-title">Account Credentials</div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Username <span class="required">*</span></label>
+                            <input type="text" name="username" class="form-input" 
+                                   required placeholder="Username for login">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Password <span class="required">*</span></label>
+                            <input type="password" name="password" class="form-input" 
+                                   required placeholder="Password (min 6 characters)" minlength="6">
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="btn-group">
+                        <button type="button" class="btn-secondary" onclick="window.history.back()">
+                            Cancel
+                        </button>
+                        <button type="submit" class="btn-primary">
+                            {{ 'Update Student' if student else 'Add Student' }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Filter sections based on selected program
+        document.getElementById('programSelect').addEventListener('change', function() {
+            const programId = this.value;
+            const sectionSelect = document.getElementById('sectionSelect');
+            const options = sectionSelect.querySelectorAll('option');
+            
+            options.forEach(option => {
+                if (option.value === '') {
+                    option.style.display = 'block';
+                } else {
+                    const optionProgram = option.getAttribute('data-program');
+                    option.style.display = (programId === '' || optionProgram === programId) ? 'block' : 'none';
+                }
+            });
+            
+            // Reset section selection if hidden
+            const selectedOption = sectionSelect.options[sectionSelect.selectedIndex];
+            if (selectedOption && selectedOption.style.display === 'none') {
+                sectionSelect.value = '';
+            }
+        });
+        
+        // Trigger on load to filter sections
+        document.getElementById('programSelect').dispatchEvent(new Event('change'));
+    </script>
+</body>
+</html>

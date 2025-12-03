@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% if action == 'edit' %}Edit{% else %}Create{% endif %} Work Diary - BCA BUB</title>
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <meta name="theme-color" content="#2196F3">
+    <style>
+        .form-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #333;
+            font-size: 14px;
+        }
+        
+        .form-input, .form-select, .form-textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            font-family: 'Roboto', sans-serif;
+            transition: border-color 0.3s;
+            box-sizing: border-box;
+        }
+        
+        .form-input:focus, .form-select:focus, .form-textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .form-textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+        
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        
+        .btn-primary {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: transform 0.2s;
+            margin-top: 10px;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+        }
+        
+        .btn-secondary {
+            width: 100%;
+            padding: 14px;
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 10px;
+        }
+        
+        .btn-secondary:hover {
+            background: #f5f5f5;
+        }
+        
+        .help-text {
+            font-size: 13px;
+            color: #666;
+            margin-top: 4px;
+        }
+        
+        @media (max-width: 600px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- App Bar -->
+    <header class="app-bar">
+        <button class="menu-btn" onclick="window.history.back()">
+            <i class="material-icons">arrow_back</i>
+        </button>
+        <h1 class="app-title">{% if action == 'edit' %}Edit{% else %}New{% endif %} Work Diary</h1>
+        <button class="icon-btn" onclick="location.href='{{ url_for('logout') }}'">
+            <i class="material-icons">logout</i>
+        </button>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <div class="form-container">
+                <form method="POST" id="diaryForm">
+                    {% if diary %}
+                    <div class="form-group">
+                        <label class="form-label">Diary Number</label>
+                        <input type="text" class="form-input" value="{{ diary.diary_number }}" disabled>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="date">Date *</label>
+                        <input 
+                            type="date" 
+                            id="date" 
+                            name="date" 
+                            class="form-input"
+                            value="{% if diary %}{{ diary.date }}{% else %}{{ today }}{% endif %}"
+                            required>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label" for="start_time">Start Time *</label>
+                            <input 
+                                type="time" 
+                                id="start_time" 
+                                name="start_time" 
+                                class="form-input"
+                                value="{% if diary %}{{ diary.start_time.strftime('%H:%M') }}{% endif %}"
+                                required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label" for="end_time">End Time *</label>
+                            <input 
+                                type="time" 
+                                id="end_time" 
+                                name="end_time" 
+                                class="form-input"
+                                value="{% if diary %}{{ diary.end_time.strftime('%H:%M') }}{% endif %}"
+                                required>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="activity_type">Activity Type *</label>
+                        <select id="activity_type" name="activity_type" class="form-select" required onchange="handleActivityChange()">
+                            <option value="">Select Activity Type</option>
+                            <option value="theory_class" {% if diary and diary.activity_type == 'theory_class' %}selected{% endif %}>Theory Class</option>
+                            <option value="practical_class" {% if diary and diary.activity_type == 'practical_class' %}selected{% endif %}>Practical/Lab Class</option>
+                            <option value="invigilation" {% if diary and diary.activity_type == 'invigilation' %}selected{% endif %}>Invigilation</option>
+                            <option value="exam_duty" {% if diary and diary.activity_type == 'exam_duty' %}selected{% endif %}>Exam Duty</option>
+                            <option value="meeting" {% if diary and diary.activity_type == 'meeting' %}selected{% endif %}>Meeting</option>
+                            <option value="committee_work" {% if diary and diary.activity_type == 'committee_work' %}selected{% endif %}>Committee Work</option>
+                            <option value="counseling" {% if diary and diary.activity_type == 'counseling' %}selected{% endif %}>Counseling</option>
+                            <option value="other" {% if diary and diary.activity_type == 'other' %}selected{% endif %}>Other</option>
+                        </select>
+                    </div>
+                    
+                    <div id="classFields" style="display: none;">
+                        <div class="form-group">
+                            <label class="form-label" for="subject_id">Subject</label>
+                            <select id="subject_id" name="subject_id" class="form-select">
+                                <option value="">Select Subject</option>
+                                <!-- TODO: Populate from database -->
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label" for="section_id">Section</label>
+                            <select id="section_id" name="section_id" class="form-select">
+                                <option value="">Select Section</option>
+                                <!-- TODO: Populate from database -->
+                            </select>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label" for="students_present">Students Present</label>
+                                <input 
+                                    type="number" 
+                                    id="students_present" 
+                                    name="students_present" 
+                                    class="form-input"
+                                    value="{% if diary %}{{ diary.students_present }}{% else %}0{% endif %}"
+                                    min="0">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label" for="students_total">Total Students</label>
+                                <input 
+                                    type="number" 
+                                    id="students_total" 
+                                    name="students_total" 
+                                    class="form-input"
+                                    value="{% if diary %}{{ diary.students_total }}{% else %}0{% endif %}"
+                                    min="0">
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label" for="topics_covered">Topics Covered</label>
+                            <textarea 
+                                id="topics_covered" 
+                                name="topics_covered" 
+                                class="form-textarea"
+                                placeholder="Enter topics discussed in class">{% if diary %}{{ diary.topics_covered }}{% endif %}</textarea>
+                        </div>
+                    </div>
+                    
+                    <div id="activityFields" style="display: none;">
+                        <div class="form-group">
+                            <label class="form-label" for="activity_title">Activity Title *</label>
+                            <input 
+                                type="text" 
+                                id="activity_title" 
+                                name="activity_title" 
+                                class="form-input"
+                                value="{% if diary %}{{ diary.activity_title }}{% endif %}"
+                                placeholder="e.g., Department Meeting, Exam Invigilation">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label" for="activity_description">Description</label>
+                            <textarea 
+                                id="activity_description" 
+                                name="activity_description" 
+                                class="form-textarea"
+                                placeholder="Enter details about the activity">{% if diary %}{{ diary.activity_description }}{% endif %}</textarea>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn-primary">
+                        <i class="material-icons" style="vertical-align: middle; margin-right: 4px;">save</i>
+                        {% if action == 'edit' %}Update{% else %}Create{% endif %} Diary Entry
+                    </button>
+                    
+                    <button type="button" class="btn-secondary" onclick="window.history.back()">
+                        <i class="material-icons" style="vertical-align: middle; margin-right: 4px;">cancel</i>
+                        Cancel
+                    </button>
+                </form>
+            </div>
+        </div>
+    </main>
+
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav">
+        <a href="{{ url_for('index') }}" class="nav-item">
+            <i class="material-icons">home</i>
+            <span>Home</span>
+        </a>
+        <a href="{{ url_for('faculty') }}" class="nav-item">
+            <i class="material-icons">people</i>
+            <span>Faculty</span>
+        </a>
+        <a href="{{ url_for('work_diary_list') }}" class="nav-item active">
+            <i class="material-icons">book</i>
+            <span>Diary</span>
+        </a>
+        <a href="{{ url_for('attendance') }}" class="nav-item">
+            <i class="material-icons">assignment</i>
+            <span>Attendance</span>
+        </a>
+    </nav>
+
+    <script>
+        // Show/hide fields based on activity type
+        function handleActivityChange() {
+            const activityType = document.getElementById('activity_type').value;
+            const classFields = document.getElementById('classFields');
+            const activityFields = document.getElementById('activityFields');
+            const activityTitle = document.getElementById('activity_title');
+            
+            if (activityType === 'theory_class' || activityType === 'practical_class') {
+                classFields.style.display = 'block';
+                activityFields.style.display = 'none';
+                activityTitle.removeAttribute('required');
+            } else if (activityType) {
+                classFields.style.display = 'none';
+                activityFields.style.display = 'block';
+                activityTitle.setAttribute('required', 'required');
+            } else {
+                classFields.style.display = 'none';
+                activityFields.style.display = 'none';
+                activityTitle.removeAttribute('required');
+            }
+        }
+        
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            handleActivityChange();
+            
+            // Set today's date if creating new entry
+            {% if action != 'edit' %}
+            const dateInput = document.getElementById('date');
+            if (!dateInput.value) {
+                dateInput.value = new Date().toISOString().split('T')[0];
+            }
+            {% endif %}
+        });
+        
+        // Form validation
+        document.getElementById('diaryForm').addEventListener('submit', function(e) {
+            const startTime = document.getElementById('start_time').value;
+            const endTime = document.getElementById('end_time').value;
+            
+            if (startTime && endTime && startTime >= endTime) {
+                e.preventDefault();
+                alert('End time must be after start time');
+                return false;
+            }
+            
+            const studentsPresent = parseInt(document.getElementById('students_present').value) || 0;
+            const studentsTotal = parseInt(document.getElementById('students_total').value) || 0;
+            
+            if (studentsPresent > studentsTotal) {
+                e.preventDefault();
+                alert('Students present cannot be more than total students');
+                return false;
+            }
+        });
+    </script>
+</body>
+</html>
