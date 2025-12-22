@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#1a237e">
+    <meta name="description"
+        content="About BCA Department, Bangalore University - Meet our team, learn about our vision and the students who built this project.">
+
+    <!-- PWA Meta Tags -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="BCA BUB">
+
+    <title>About Us - BCA Department | Bangalore University</title>
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='icons/icon-192x192.png') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-192x192.png') }}">
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/public.css') }}">
+
+    <style>
+        /* Additional styles for about page */
+        .vision-mission-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 2rem;
+        }
+
+        .vm-card {
+            background: var(--bg-primary);
+            border-radius: var(--radius-xl);
+            padding: 3rem;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            transition: var(--transition-normal);
+        }
+
+        .vm-card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-xl);
+        }
+
+        .vm-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 5px;
+            background: var(--primary-gradient);
+        }
+
+        .vm-icon {
+            width: 70px;
+            height: 70px;
+            background: linear-gradient(135deg, rgba(26, 35, 126, 0.1) 0%, rgba(255, 111, 0, 0.1) 100%);
+            border-radius: var(--radius-lg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1.5rem;
+            font-size: 2rem;
+            color: var(--primary-color);
+        }
+
+        .vm-card h3 {
+            font-size: 1.5rem;
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+        }
+
+        .vm-card p {
+            color: var(--text-secondary);
+            line-height: 1.8;
+        }
+
+        .team-section-header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        .team-section-header h3 {
+            font-size: 1.25rem;
+            color: var(--primary-color);
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .achievements-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+        }
+
+        .achievement-card {
+            background: var(--bg-primary);
+            border-radius: var(--radius-xl);
+            padding: 2rem;
+            text-align: center;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            transition: var(--transition-normal);
+        }
+
+        .achievement-card:hover {
+            transform: translateY(-8px);
+            box-shadow: var(--shadow-xl);
+        }
+
+        .achievement-icon {
+            width: 80px;
+            height: 80px;
+            background: var(--primary-gradient);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1.5rem;
+            font-size: 2.5rem;
+            color: var(--text-white);
+        }
+
+        .achievement-card h4 {
+            font-size: 1.25rem;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .achievement-card p {
+            color: var(--text-secondary);
+        }
+
+        /* Team member card improvements */
+        .team-card .team-image {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .team-card .team-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: var(--transition-normal);
+        }
+
+        .team-card:hover .team-image img {
+            transform: scale(1.05);
+        }
+
+        .team-avatar {
+            width: 100%;
+            aspect-ratio: 1;
+            background: linear-gradient(135deg, #1a237e 0%, #ff6f00 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 4rem;
+            font-weight: 700;
+        }
+
+        .project-info {
+            background: linear-gradient(135deg, rgba(26, 35, 126, 0.05) 0%, rgba(255, 111, 0, 0.05) 100%);
+            border-radius: var(--radius-xl);
+            padding: 3rem;
+            margin-top: 3rem;
+            text-align: center;
+            border: 1px solid rgba(26, 35, 126, 0.1);
+        }
+
+        .project-info h3 {
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+            font-size: 1.5rem;
+        }
+
+        .project-info p {
+            color: var(--text-secondary);
+            max-width: 700px;
+            margin: 0 auto;
+            line-height: 1.8;
+        }
+
+        .tech-stack {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            justify-content: center;
+            margin-top: 1.5rem;
+        }
+
+        .tech-badge {
+            background: var(--bg-primary);
+            padding: 0.5rem 1rem;
+            border-radius: var(--radius-full);
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--primary-color);
+            border: 1px solid rgba(26, 35, 126, 0.2);
+        }
+
+        @media (max-width: 768px) {
+            .vision-mission-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .vm-card {
+                padding: 2rem;
+            }
+        }
+    </style>
+</head>
+
+<body class="public-page">
+    <!-- Navigation -->
+    <nav class="public-nav" id="navbar">
+        <div class="nav-container">
+            <a href="{{ url_for('public_home') }}" class="nav-logo">
+                <div class="logo-icon">🎓</div>
+                <span>BCA BUB</span>
+            </a>
+
+            <ul class="nav-links">
+                <li><a href="{{ url_for('public_home') }}">Home</a></li>
+                <li><a href="{{ url_for('admissions') }}">Admissions</a></li>
+                <li><a href="{{ url_for('about') }}" class="active">About Us</a></li>
+            </ul>
+
+            <div class="nav-actions">
+                <a href="{{ url_for('login') }}" class="btn btn-glass">
+                    <span class="material-icons">login</span>
+                    Login
+                </a>
+            </div>
+
+            <button class="mobile-menu-toggle" id="mobileMenuToggle">
+                <span class="material-icons">menu</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Mobile Menu -->
+    <div class="mobile-menu" id="mobileMenu">
+        <button class="mobile-menu-close" id="mobileMenuClose">
+            <span class="material-icons">close</span>
+        </button>
+        <ul class="mobile-menu-links">
+            <li><a href="{{ url_for('public_home') }}">Home</a></li>
+            <li><a href="{{ url_for('admissions') }}">Admissions</a></li>
+            <li><a href="{{ url_for('about') }}">About Us</a></li>
+            <li><a href="{{ url_for('login') }}">Login</a></li>
+        </ul>
+    </div>
+
+    <!-- Hero Section -->
+    <section class="hero" style="min-height: 60vh;">
+        <div class="hero-shapes">
+            <div class="shape"></div>
+            <div class="shape"></div>
+            <div class="shape"></div>
+        </div>
+
+        <div class="hero-content">
+            <div class="hero-badge">
+                <span class="material-icons">groups</span>
+                <span>About Us</span>
+            </div>
+
+            <h1 class="hero-title">
+                <span>Our Story & Team</span>
+            </h1>
+
+            <p class="hero-subtitle">
+                Learn about our department's journey, vision, and the talented students who are building the future of
+                technology.
+            </p>
+        </div>
+    </section>
+
+    <!-- Vision & Mission -->
+    <section class="section section-alt">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-badge">Our Purpose</span>
+                <h2 class="section-title">Vision & Mission</h2>
+                <p class="section-subtitle">
+                    Guiding principles that drive our commitment to excellence in education.
+                </p>
+            </div>
+
+            <div class="vision-mission-grid">
+                <div class="vm-card">
+                    <div class="vm-icon">
+                        <span class="material-icons">visibility</span>
+                    </div>
+                    <h3>Our Vision</h3>
+                    <p>To be a premier institution producing globally competent computer professionals who can
+                        contribute to the technological advancement of society while upholding ethical values and
+                        continuous learning.</p>
+                </div>
+
+                <div class="vm-card">
+                    <div class="vm-icon">
+                        <span class="material-icons">rocket_launch</span>
+                    </div>
+                    <h3>Our Mission</h3>
+                    <p>To provide quality education in computer applications through innovative teaching methods,
+                        industry collaboration, and research orientation, nurturing students to become skilled
+                        professionals and responsible citizens.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Timeline / History -->
+    <section class="section">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-badge">Our Journey</span>
+                <h2 class="section-title">Department History</h2>
+                <p class="section-subtitle">
+                    A young department with a vision for the future.
+                </p>
+            </div>
+
+            <div class="timeline">
+                <div class="timeline-item">
+                    <div class="timeline-dot"></div>
+                    <div class="timeline-content">
+                        <span class="timeline-year">2024</span>
+                        <h4 class="timeline-title">Department Established</h4>
+                        <p class="timeline-desc">The BCA Department was established at Bangalore University with a
+                            vision to provide world-class education in computer applications. Started with 60 students
+                            and 10 faculty members.</p>
+                    </div>
+                </div>
+
+                <div class="timeline-item">
+                    <div class="timeline-dot"></div>
+                    <div class="timeline-content">
+                        <span class="timeline-year">2024</span>
+                        <h4 class="timeline-title">Modern Lab Setup</h4>
+                        <p class="timeline-desc">State-of-the-art computer labs were established with the latest
+                            hardware, high-speed internet, and licensed software for practical learning.</p>
+                    </div>
+                </div>
+
+                <div class="timeline-item">
+                    <div class="timeline-dot"></div>
+                    <div class="timeline-content">
+                        <span class="timeline-year">2024</span>
+                        <h4 class="timeline-title">Industry Partnerships</h4>
+                        <p class="timeline-desc">Signed MoUs with leading IT companies for internships, guest lectures,
+                            and placement opportunities for students.</p>
+                    </div>
+                </div>
+
+                <div class="timeline-item">
+                    <div class="timeline-dot"></div>
+                    <div class="timeline-content">
+                        <span class="timeline-year">2025</span>
+                        <h4 class="timeline-title">Growing Strong</h4>
+                        <p class="timeline-desc">Expanded to 200+ students with new batches, enhanced curriculum
+                            covering AI/ML, and launched student-led tech projects like this Attendance Management
+                            System.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Team Section - Project Contributors -->
+    <section class="section section-alt">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-badge">Meet the Team</span>
+                <h2 class="section-title">Project Contributors</h2>
+                <p class="section-subtitle">
+                    The talented students who designed and built this Attendance Management System.
+                </p>
+            </div>
+
+            <div class="team-grid">
+                <div class="team-card">
+                    <div class="team-image">
+                        <div class="team-avatar">SK</div>
+                    </div>
+                    <div class="team-info">
+                        <h4 class="team-name">Student Name 1</h4>
+                        <p class="team-role">Project Lead & Full Stack Developer</p>
+                        <div class="team-socials">
+                            <a href="#" class="social-link"><span class="material-icons">code</span></a>
+                            <a href="#" class="social-link"><span class="material-icons">link</span></a>
+                            <a href="#" class="social-link"><span class="material-icons">mail</span></a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="team-card">
+                    <div class="team-image">
+                        <div class="team-avatar">AR</div>
+                    </div>
+                    <div class="team-info">
+                        <h4 class="team-name">Student Name 2</h4>
+                        <p class="team-role">Frontend Developer & UI Designer</p>
+                        <div class="team-socials">
+                            <a href="#" class="social-link"><span class="material-icons">code</span></a>
+                            <a href="#" class="social-link"><span class="material-icons">link</span></a>
+                            <a href="#" class="social-link"><span class="material-icons">mail</span></a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="team-card">
+                    <div class="team-image">
+                        <div class="team-avatar">PM</div>
+                    </div>
+                    <div class="team-info">
+                        <h4 class="team-name">Student Name 3</h4>
+                        <p class="team-role">Backend Developer & Database</p>
+                        <div class="team-socials">
+                            <a href="#" class="social-link"><span class="material-icons">code</span></a>
+                            <a href="#" class="social-link"><span class="material-icons">link</span></a>
+                            <a href="#" class="social-link"><span class="material-icons">mail</span></a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="team-card">
+                    <div class="team-image">
+                        <div class="team-avatar">RK</div>
+                    </div>
+                    <div class="team-info">
+                        <h4 class="team-name">Student Name 4</h4>
+                        <p class="team-role">Testing & Documentation</p>
+                        <div class="team-socials">
+                            <a href="#" class="social-link"><span class="material-icons">code</span></a>
+                            <a href="#" class="social-link"><span class="material-icons">link</span></a>
+                            <a href="#" class="social-link"><span class="material-icons">mail</span></a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Project Info Box -->
+            <div class="project-info">
+                <h3>🚀 About This Project</h3>
+                <p>
+                    This Attendance Management System is a Progressive Web App (PWA) built as an educational project by
+                    BCA students. It demonstrates full-stack web development skills using modern technologies and best
+                    practices.
+                </p>
+                <div class="tech-stack">
+                    <span class="tech-badge">Python</span>
+                    <span class="tech-badge">Flask</span>
+                    <span class="tech-badge">SQLAlchemy</span>
+                    <span class="tech-badge">HTML5</span>
+                    <span class="tech-badge">CSS3</span>
+                    <span class="tech-badge">JavaScript</span>
+                    <span class="tech-badge">PWA</span>
+                    <span class="tech-badge">Material Design</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Achievements -->
+    <section class="section">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-badge">Our Pride</span>
+                <h2 class="section-title">Achievements & Recognition</h2>
+                <p class="section-subtitle">
+                    Celebrating our milestones and accomplishments.
+                </p>
+            </div>
+
+            <div class="achievements-grid">
+                <div class="achievement-card">
+                    <div class="achievement-icon">
+                        <span class="material-icons">school</span>
+                    </div>
+                    <h4>Quality Education</h4>
+                    <p>Recognized for excellence in computer education with modern curriculum</p>
+                </div>
+
+                <div class="achievement-card">
+                    <div class="achievement-icon">
+                        <span class="material-icons">emoji_events</span>
+                    </div>
+                    <h4>Tech Competitions</h4>
+                    <p>Students regularly participate and win in hackathons and coding contests</p>
+                </div>
+
+                <div class="achievement-card">
+                    <div class="achievement-icon">
+                        <span class="material-icons">work</span>
+                    </div>
+                    <h4>Industry Connect</h4>
+                    <p>Strong partnerships with leading IT companies for placements</p>
+                </div>
+
+                <div class="achievement-card">
+                    <div class="achievement-icon">
+                        <span class="material-icons">hub</span>
+                    </div>
+                    <h4>Innovation Hub</h4>
+                    <p>Student-led projects and startups incubated within the department</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="section cta-section">
+        <div class="container">
+            <div class="cta-content">
+                <h2 class="cta-title">Want to Be Part of Our Story?</h2>
+                <p class="cta-subtitle">
+                    Join our department and become part of a community that's shaping the future of technology.
+                </p>
+                <div class="cta-actions">
+                    <a href="{{ url_for('admissions') }}" class="btn btn-white btn-lg">
+                        <span class="material-icons">school</span>
+                        Apply Now
+                    </a>
+                    <a href="{{ url_for('public_home') }}" class="btn btn-glass btn-lg">
+                        <span class="material-icons">home</span>
+                        Back to Home
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="public-footer">
+        <div class="footer-grid">
+            <div class="footer-brand">
+                <h3>🎓 BCA BUB</h3>
+                <p>Bachelor of Computer Applications<br>Bangalore University<br>Excellence in Education Since 2024</p>
+            </div>
+
+            <div class="footer-links">
+                <h4>Quick Links</h4>
+                <ul>
+                    <li><a href="{{ url_for('public_home') }}">Home</a></li>
+                    <li><a href="{{ url_for('admissions') }}">Admissions</a></li>
+                    <li><a href="{{ url_for('about') }}">About Us</a></li>
+                    <li><a href="{{ url_for('login') }}">Login</a></li>
+                </ul>
+            </div>
+
+            <div class="footer-links">
+                <h4>Programs</h4>
+                <ul>
+                    <li><a href="#">BCA (3 Years)</a></li>
+                    <li><a href="#">Certificate Courses</a></li>
+                    <li><a href="#">Workshops</a></li>
+                </ul>
+            </div>
+
+            <div class="footer-links">
+                <h4>Contact</h4>
+                <ul>
+                    <li>📍 Bangalore University</li>
+                    <li>📧 bca@bub.edu.in</li>
+                    <li>📞 +91 80 XXXX XXXX</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="footer-bottom">
+            <p>&copy; 2024 BCA Department, Bangalore University. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <!-- External JavaScript -->
+    <script src="{{ url_for('static', filename='js/public.js') }}"></script>
+</body>
+
+</html>

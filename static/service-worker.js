@@ -3,18 +3,25 @@
  * Handles caching and offline functionality
  */
 
-const CACHE_NAME = 'bca-bub-pwa-v2';
+const CACHE_NAME = 'bca-bub-pwa-v4';
 const urlsToCache = [
   '/',
+  '/welcome',
+  '/admissions',
+  '/about',
   '/login',
   '/static/css/style.css',
+  '/static/css/public.css',
   '/static/js/app.js',
+  '/static/js/public.js',
   '/static/manifest.json',
   '/static/icons/icon-192x192.png',
   '/static/icons/icon-512x512.png',
   'https://fonts.googleapis.com/icon?family=Material+Icons',
-  'https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap'
+  'https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap',
+  'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap'
 ];
+
 
 /**
  * Install Event
@@ -22,7 +29,7 @@ const urlsToCache = [
  */
 self.addEventListener('install', event => {
   console.log('Service Worker: Installing...');
-  
+
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
@@ -39,7 +46,7 @@ self.addEventListener('install', event => {
  */
 self.addEventListener('activate', event => {
   console.log('Service Worker: Activating...');
-  
+
   event.waitUntil(
     caches.keys().then(cacheNames => {
       return Promise.all(
@@ -52,7 +59,7 @@ self.addEventListener('activate', event => {
       );
     })
   );
-  
+
   return self.clients.claim();
 });
 
@@ -63,8 +70,8 @@ self.addEventListener('activate', event => {
  */
 self.addEventListener('fetch', event => {
   // Handle Google Fonts and Material Icons
-  if (event.request.url.includes('fonts.googleapis.com') || 
-      event.request.url.includes('fonts.gstatic.com')) {
+  if (event.request.url.includes('fonts.googleapis.com') ||
+    event.request.url.includes('fonts.gstatic.com')) {
     event.respondWith(
       caches.match(event.request).then(response => {
         return response || fetch(event.request).then(fetchResponse => {
@@ -77,23 +84,23 @@ self.addEventListener('fetch', event => {
     );
     return;
   }
-  
+
   // Skip other cross-origin requests
   if (!event.request.url.startsWith(self.location.origin)) {
     return;
   }
-  
+
   event.respondWith(
     fetch(event.request)
       .then(response => {
         // Clone the response
         const responseClone = response.clone();
-        
+
         // Cache the fetched response
         caches.open(CACHE_NAME).then(cache => {
           cache.put(event.request, responseClone);
         });
-        
+
         return response;
       })
       .catch(() => {
@@ -102,7 +109,7 @@ self.addEventListener('fetch', event => {
           if (cachedResponse) {
             return cachedResponse;
           }
-          
+
           // If no cache available, return a custom offline page (optional)
           // You can create an offline.html page for this
           return caches.match('/');
@@ -143,7 +150,7 @@ self.addEventListener('push', event => {
     badge: '/static/icons/icon-72x72.png',
     vibrate: [200, 100, 200]
   };
-  
+
   event.waitUntil(
     self.registration.showNotification(title, options)
   );
@@ -155,7 +162,7 @@ self.addEventListener('push', event => {
  */
 self.addEventListener('notificationclick', event => {
   event.notification.close();
-  
+
   event.waitUntil(
     clients.openWindow('/')
   );

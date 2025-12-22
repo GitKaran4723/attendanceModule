@@ -69,8 +69,12 @@ def login():
     """
     User login page and handler
     """
-    # If already logged in, redirect to dashboard
-    if get_current_user():
+    # If already logged in, redirect to appropriate dashboard
+    current_user = get_current_user()
+    if current_user:
+        # Check if user is admin
+        if current_user.role and current_user.role.role_name.lower() == 'admin':
+            return redirect(url_for('admin_dashboard'))
         return redirect(url_for('index'))
     
     if request.method == 'POST':
@@ -82,16 +86,30 @@ def login():
         if user and verify_password(user.password_hash, password):
             login_user(user)
             
-            # Redirect to next page or dashboard
+            # Redirect to next page or appropriate dashboard based on role
             next_page = request.args.get('next')
             # Validate next_page to prevent open redirect
             if next_page and next_page.startswith('/'):
                 return redirect(next_page)
+            
+            # Admin users go to admin dashboard
+            if user.role and user.role.role_name.lower() == 'admin':
+                return redirect(url_for('admin_dashboard'))
+            
+            # Student users go to student dashboard
+            if user.role and user.role.role_name.lower() == 'student':
+                return redirect(url_for('student_dashboard'))
+            
+            # Parent users also go to student dashboard (to view their child's data)
+            if user.role and user.role.role_name.lower() == 'parent':
+                return redirect(url_for('student_dashboard'))
+            
             return redirect(url_for('index'))
         else:
             return render_template('login.html', error='Invalid username or password')
     
     return render_template('login.html')
+
 
 
 @app.route('/logout')
@@ -101,6 +119,62 @@ def logout():
     """
     logout_user()
     return redirect(url_for('login'))
+
+
+@app.route('/student/dashboard')
+@login_required
+def student_dashboard():
+    """
+    Student Dashboard - Shows student's subjects and attendance
+    Also used for parent view
+    """
+    current_user = get_current_user()
+    
+    if not current_user:
+        return redirect(url_for('login'))
+    
+    # Get the student record for this user
+    student = None
+    subjects = []
+    attendance_percentage = 0
+    
+    if current_user.role.role_name.lower() == 'student':
+        student = Student.query.filter_by(user_id=current_user.user_id, is_deleted=False).first()
+    elif current_user.role.role_name.lower() == 'parent':
+        # For parent, find the linked student (username is roll_number_parent)
+        roll_number = current_user.username.replace('_parent', '')
+        student = Student.query.filter_by(roll_number=roll_number, is_deleted=False).first()
+    
+    if student:
+        # Get subjects for this student's section
+        if student.section_id:
+            # Get subjects allocated to the student's section
+            allocations = SubjectAllocation.query.filter_by(
+                section_id=student.section_id, 
+                is_deleted=False
+            ).all()
+            subjects = [alloc.subject for alloc in allocations if alloc.subject and not alloc.subject.is_deleted]
+        elif student.program_id:
+            # Fallback: Get subjects for the student's program
+            subjects = Subject.query.filter_by(
+                program_id=student.program_id, 
+                is_deleted=False
+            ).all()
+        
+        # Calculate overall attendance (placeholder - can be enhanced)
+        total_sessions = AttendanceSession.query.count()
+        if total_sessions > 0:
+            present_count = AttendanceRecord.query.filter_by(
+                student_id=student.student_id,
+                status='present'
+            ).count()
+            attendance_percentage = round((present_count / total_sessions) * 100) if total_sessions else 0
+    
+    return render_template('student_dashboard.html',
+                         current_user=current_user,
+                         student=student,
+                         subjects=subjects,
+                         attendance_percentage=attendance_percentage)
 
 
 @app.route('/')
@@ -157,6 +231,42 @@ def service_worker():
     Serve service worker JavaScript file for PWA functionality
     """
     return app.send_static_file('service-worker.js')
+
+
+# ============================================
+# Public Pages (No Authentication Required)
+# ============================================
+
+@app.route('/welcome')
+def public_home():
+    """
+    Public landing page showcasing the department
+    Accessible without login
+    """
+    faculty_count = Faculty.query.filter_by(is_deleted=False).count()
+    student_count = Student.query.filter_by(is_deleted=False).count()
+    
+    return render_template('public_home.html',
+                         faculty_count=faculty_count,
+                         student_count=student_count)
+
+
+@app.route('/admissions')
+def admissions():
+    """
+    Admission process page
+    Shows eligibility, steps, dates, and contact info
+    """
+    return render_template('admissions.html')
+
+
+@app.route('/about')
+def about():
+    """
+    About us page
+    Shows department info, team members, and history
+    """
+    return render_template('about.html')
 
 
 @app.route('/faculty')
@@ -1201,8 +1311,50 @@ def admin_import():
     """
     Display bulk import interface for admin
     """
-    recent_imports = ImportLog.query.order_by(ImportLog.created_at.desc()).limit(10).all()
+    try:
+        recent_imports = ImportLog.query.order_by(ImportLog.created_at.desc()).limit(10).all()
+    except Exception:
+        # Handle case where old enum values exist in database
+        recent_imports = []
     return render_template('admin_import.html', imports=recent_imports)
+
+
+@app.route('/api/admin/import/template/<import_type>')
+@admin_required
+def download_import_template(import_type):
+    """
+    Download sample Excel template for import
+    """
+    import os
+    from flask import send_file
+    
+    template_files = {
+        'student': 'students_template.xlsx',
+        'faculty': 'faculty_template.csv',
+        'subject': 'subjects_template.csv',
+        'schedule': 'schedules_template.csv'
+    }
+    
+    if import_type not in template_files:
+        return jsonify({'success': False, 'error': 'Invalid import type'}), 400
+    
+    template_path = os.path.join(app.root_path, 'sample_imports', template_files[import_type])
+    
+    if not os.path.exists(template_path):
+        return jsonify({'success': False, 'error': 'Template not found'}), 404
+    
+    # Determine mimetype based on file extension
+    if template_files[import_type].endswith('.xlsx'):
+        mimetype = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    else:
+        mimetype = 'text/csv'
+    
+    return send_file(
+        template_path,
+        as_attachment=True,
+        download_name=template_files[import_type],
+        mimetype=mimetype
+    )
 
 
 @app.route('/api/admin/import', methods=['POST'])
@@ -1506,13 +1658,13 @@ def process_bulk_import(df, import_type, current_user, filename):
     errors = []
     
     try:
-        if import_type == 'students':
+        if import_type == 'student':
             success_count, error_count, errors = import_students(df)
         elif import_type == 'faculty':
             success_count, error_count, errors = import_faculty(df)
-        elif import_type == 'subjects':
+        elif import_type == 'subject':
             success_count, error_count, errors = import_subjects(df)
-        elif import_type == 'schedules':
+        elif import_type == 'schedule':
             success_count, error_count, errors = import_schedules(df)
         else:
             raise ValueError(f'Unknown import type: {import_type}')
@@ -1543,41 +1695,163 @@ def process_bulk_import(df, import_type, current_user, filename):
 
 
 def import_students(df):
-    """Import students from DataFrame"""
+    """
+    Import students from DataFrame
+    Creates User account for each student:
+    - Username = roll_number (USN)
+    - Password = date_of_birth (DDMMYYYY format)
+    """
+    import pandas as pd
+    from auth import hash_password
+    
     success_count = 0
     error_count = 0
     errors = []
     
-    required_columns = ['enrollment_no', 'first_name', 'last_name', 'email']
+    # Required columns (minimum)
+    required_columns = ['roll_number', 'first_name', 'last_name', 'email', 'date_of_birth']
     
     # Validate columns
     missing_cols = set(required_columns) - set(df.columns)
     if missing_cols:
         raise ValueError(f'Missing required columns: {", ".join(missing_cols)}')
     
+    # Get student role
+    student_role = Role.query.filter_by(role_name='student').first()
+    if not student_role:
+        raise ValueError('Student role not found in database')
+    
     for idx, row in df.iterrows():
         try:
+            roll_number = str(row['roll_number']).strip()
+            
             # Check if student already exists
-            existing = Student.query.filter_by(enrollment_no=row['enrollment_no']).first()
+            existing = Student.query.filter_by(roll_number=roll_number).first()
             if existing:
-                errors.append(f"Row {idx+2}: Student {row['enrollment_no']} already exists")
+                errors.append(f"Row {idx+2}: Student {roll_number} already exists")
                 error_count += 1
                 continue
             
+            # Check if username already exists
+            existing_user = User.query.filter_by(username=roll_number).first()
+            if existing_user:
+                errors.append(f"Row {idx+2}: Username {roll_number} already exists")
+                error_count += 1
+                continue
+            
+            # Parse date of birth for password
+            dob = row['date_of_birth']
+            if pd.isna(dob):
+                errors.append(f"Row {idx+2}: Date of birth is required for password generation")
+                error_count += 1
+                continue
+            
+            # Convert to date if string
+            if isinstance(dob, str):
+                try:
+                    dob = pd.to_datetime(dob).date()
+                except:
+                    errors.append(f"Row {idx+2}: Invalid date format for date_of_birth")
+                    error_count += 1
+                    continue
+            elif hasattr(dob, 'date'):
+                dob = dob.date()
+            
+            # Password = DDMMYYYY format
+            password = dob.strftime('%d%m%Y')
+            
+            # Create User account
+            user = User(
+                username=roll_number,
+                password_hash=hash_password(password),
+                email=str(row['email']).strip(),
+                role_id=student_role.role_id,
+                is_active=True
+            )
+            db.session.add(user)
+            db.session.flush()  # Get user_id
+            
+            # Parse optional fields
+            phone = row.get('phone', '')
+            if pd.isna(phone):
+                phone = None
+            else:
+                phone = str(phone).strip() if phone else None
+            
+            admission_year = row.get('admission_year')
+            if pd.isna(admission_year) if hasattr(pd, 'isna') else admission_year is None:
+                admission_year = None
+            else:
+                admission_year = int(admission_year)
+            
+            guardian_name = row.get('guardian_name', '')
+            if pd.isna(guardian_name):
+                guardian_name = None
+            
+            guardian_phone = row.get('guardian_phone', '')
+            if pd.isna(guardian_phone):
+                guardian_phone = None
+            
+            address = row.get('address', '')
+            if pd.isna(address):
+                address = None
+            
+            # Get program_id if provided
+            program_id = None
+            if 'program_code' in row and not pd.isna(row.get('program_code')):
+                program = Program.query.filter_by(program_code=str(row['program_code']).strip()).first()
+                if program:
+                    program_id = program.program_id
+            
+            # Create Student record
             student = Student(
-                enrollment_no=row['enrollment_no'],
-                first_name=row['first_name'],
-                last_name=row['last_name'],
-                email=row['email'],
-                phone=row.get('phone'),
-                date_of_birth=row.get('date_of_birth')
+                user_id=user.user_id,
+                roll_number=roll_number,
+                first_name=str(row['first_name']).strip(),
+                last_name=str(row['last_name']).strip(),
+                email=str(row['email']).strip(),
+                phone=phone,
+                date_of_birth=dob,
+                guardian_name=guardian_name,
+                guardian_phone=str(guardian_phone).strip() if guardian_phone else None,
+                address=address,
+                admission_year=admission_year,
+                program_id=program_id,
+                status='active'
             )
             db.session.add(student)
+            
+            # Create Parent account with same credentials but parent role
+            # Username: roll_number_parent (e.g., BCA2024001_parent)
+            # Password: same as student (DOB in DDMMYYYY format)
+            parent_role = Role.query.filter_by(role_name='parent').first()
+            if parent_role:
+                parent_username = f"{roll_number}_parent"
+                existing_parent = User.query.filter_by(username=parent_username).first()
+                if not existing_parent:
+                    parent_email = f"parent_{row['email']}" if '@' in str(row['email']) else f"{roll_number}_parent@bcabub.edu"
+                    parent_user = User(
+                        username=parent_username,
+                        password_hash=hash_password(password),  # Same password as student
+                        email=parent_email,
+                        role_id=parent_role.role_id,
+                        is_active=True
+                    )
+                    db.session.add(parent_user)
+            
             success_count += 1
             
         except Exception as e:
+            print(f"[IMPORT ERROR] Row {idx+2}: {str(e)}")  # Debug logging
+            import traceback
+            traceback.print_exc()  # Print full stack trace
             errors.append(f"Row {idx+2}: {str(e)}")
             error_count += 1
+    
+    # Log summary
+    print(f"[IMPORT COMPLETE] Success: {success_count}, Failed: {error_count}")
+    if errors:
+        print(f"[IMPORT ERRORS] {errors}")
     
     db.session.commit()
     return success_count, error_count, errors
@@ -1625,6 +1899,8 @@ def import_faculty(df):
 
 def import_subjects(df):
     """Import subjects from DataFrame"""
+    import pandas as pd
+    
     success_count = 0
     error_count = 0
     errors = []
@@ -1637,25 +1913,36 @@ def import_subjects(df):
     
     for idx, row in df.iterrows():
         try:
-            existing = Subject.query.filter_by(subject_code=row['subject_code']).first()
+            existing = Subject.query.filter_by(subject_code=str(row['subject_code']).strip()).first()
             if existing:
                 errors.append(f"Row {idx+2}: Subject {row['subject_code']} already exists")
                 error_count += 1
                 continue
             
+            # Get credits, handle NaN
+            credits_val = row.get('credits', 4) if not pd.isna(row.get('credits', 4)) else 4
+            subject_type_val = row.get('subject_type', 'theory') if not pd.isna(row.get('subject_type', 'theory')) else 'theory'
+            
             subject = Subject(
-                subject_code=row['subject_code'],
-                subject_name=row['subject_name'],
-                semester=int(row['semester']),
-                credits=int(row.get('credits', 4)),
-                subject_type=row.get('subject_type', 'theory')
+                subject_code=str(row['subject_code']).strip(),
+                subject_name=str(row['subject_name']).strip(),
+                semester_id=int(row['semester']),  # Use semester_id field
+                credits=float(credits_val),
+                subject_type=str(subject_type_val).strip()
             )
             db.session.add(subject)
             success_count += 1
             
         except Exception as e:
+            print(f"[IMPORT ERROR] Row {idx+2}: {str(e)}")
+            import traceback
+            traceback.print_exc()
             errors.append(f"Row {idx+2}: {str(e)}")
             error_count += 1
+    
+    print(f"[IMPORT COMPLETE] Subjects - Success: {success_count}, Failed: {error_count}")
+    if errors:
+        print(f"[IMPORT ERRORS] {errors}")
     
     db.session.commit()
     return success_count, error_count, errors

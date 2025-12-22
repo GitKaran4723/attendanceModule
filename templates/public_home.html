@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#1a237e">
+    <meta name="description"
+        content="BCA Department - Bangalore University. Excellence in Computer Applications since 2024.">
+    <meta name="keywords"
+        content="BCA, Bachelor of Computer Applications, Bangalore University, Computer Science, Programming">
+
+    <!-- PWA Meta Tags -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="BCA BUB">
+
+    <title>BCA Department - Bangalore University</title>
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='icons/icon-192x192.png') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-192x192.png') }}">
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/public.css') }}">
+</head>
+
+<body class="public-page">
+    <!-- Navigation -->
+    <nav class="public-nav" id="navbar">
+        <div class="nav-container">
+            <a href="{{ url_for('public_home') }}" class="nav-logo">
+                <div class="logo-icon">🎓</div>
+                <span>BCA BUB</span>
+            </a>
+
+            <ul class="nav-links">
+                <li><a href="{{ url_for('public_home') }}" class="active">Home</a></li>
+                <li><a href="{{ url_for('admissions') }}">Admissions</a></li>
+                <li><a href="{{ url_for('about') }}">About Us</a></li>
+            </ul>
+
+            <div class="nav-actions">
+                <a href="{{ url_for('login') }}" class="btn btn-glass">
+                    <span class="material-icons">login</span>
+                    Login
+                </a>
+            </div>
+
+            <button class="mobile-menu-toggle" id="mobileMenuToggle">
+                <span class="material-icons">menu</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Mobile Menu -->
+    <div class="mobile-menu" id="mobileMenu">
+        <button class="mobile-menu-close" id="mobileMenuClose">
+            <span class="material-icons">close</span>
+        </button>
+        <ul class="mobile-menu-links">
+            <li><a href="{{ url_for('public_home') }}">Home</a></li>
+            <li><a href="{{ url_for('admissions') }}">Admissions</a></li>
+            <li><a href="{{ url_for('about') }}">About Us</a></li>
+            <li><a href="{{ url_for('login') }}">Login</a></li>
+        </ul>
+    </div>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-shapes">
+            <div class="shape"></div>
+            <div class="shape"></div>
+            <div class="shape"></div>
+        </div>
+
+        <div class="hero-content">
+            <div class="hero-badge">
+                <span class="material-icons">verified</span>
+                <span>Established 2024</span>
+            </div>
+
+            <h1 class="hero-title">
+                <span>BCA Department</span><br>
+                Bangalore University
+            </h1>
+
+            <p class="hero-subtitle">
+                Empowering the next generation of tech leaders with cutting-edge education in Computer Applications,
+                innovative thinking, and industry-ready skills.
+            </p>
+
+            <div class="hero-actions">
+                <a href="{{ url_for('admissions') }}" class="btn btn-primary btn-lg">
+                    <span class="material-icons">school</span>
+                    Apply Now
+                </a>
+                <a href="{{ url_for('about') }}" class="btn btn-glass btn-lg">
+                    <span class="material-icons">info</span>
+                    Learn More
+                </a>
+            </div>
+
+            <div class="hero-stats">
+                <div class="stat-item">
+                    <span class="stat-number">{{ faculty_count or '15' }}+</span>
+                    <span class="stat-label">Expert Faculty</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">{{ student_count or '200' }}+</span>
+                    <span class="stat-label">Students</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">3</span>
+                    <span class="stat-label">Year Program</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">100%</span>
+                    <span class="stat-label">Placement Support</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="section section-alt">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-badge">Why Choose Us</span>
+                <h2 class="section-title">World-Class Education, Future-Ready Skills</h2>
+                <p class="section-subtitle">
+                    Our BCA program combines theoretical knowledge with hands-on experience to prepare you for the
+                    digital future.
+                </p>
+            </div>
+
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <span class="material-icons">code</span>
+                    </div>
+                    <h3 class="feature-title">Modern Curriculum</h3>
+                    <p class="feature-desc">Industry-aligned syllabus covering Python, Java, Web Development, Cloud
+                        Computing, AI/ML, and more.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <span class="material-icons">groups</span>
+                    </div>
+                    <h3 class="feature-title">Expert Faculty</h3>
+                    <p class="feature-desc">Learn from experienced professors and industry professionals with years of
+                        real-world experience.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <span class="material-icons">computer</span>
+                    </div>
+                    <h3 class="feature-title">State-of-the-Art Labs</h3>
+                    <p class="feature-desc">Modern computer labs equipped with latest hardware and software for hands-on
+                        learning.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <span class="material-icons">work</span>
+                    </div>
+                    <h3 class="feature-title">Placement Support</h3>
+                    <p class="feature-desc">Dedicated placement cell with tie-ups with leading IT companies for
+                        internships and jobs.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <span class="material-icons">emoji_events</span>
+                    </div>
+                    <h3 class="feature-title">Extra-Curricular</h3>
+                    <p class="feature-desc">Hackathons, coding competitions, tech fests, and workshops to enhance your
+                        skills.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <span class="material-icons">public</span>
+                    </div>
+                    <h3 class="feature-title">Industry Connect</h3>
+                    <p class="feature-desc">Regular guest lectures, industry visits, and networking opportunities with
+                        tech leaders.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Stats Section -->
+    <section class="section stats-section">
+        <div class="container">
+            <div class="stats-grid">
+                <div class="stats-item">
+                    <span class="stats-number" data-count="{{ faculty_count or 15 }}">{{ faculty_count or '15'
+                        }}+</span>
+                    <span class="stats-label">Faculty Members</span>
+                </div>
+                <div class="stats-item">
+                    <span class="stats-number" data-count="{{ student_count or 200 }}">{{ student_count or '200'
+                        }}+</span>
+                    <span class="stats-label">Students Enrolled</span>
+                </div>
+                <div class="stats-item">
+                    <span class="stats-number">50+</span>
+                    <span class="stats-label">Industry Partners</span>
+                </div>
+                <div class="stats-item">
+                    <span class="stats-number">95%</span>
+                    <span class="stats-label">Success Rate</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="section cta-section">
+        <div class="container">
+            <div class="cta-content">
+                <h2 class="cta-title">Ready to Start Your Journey?</h2>
+                <p class="cta-subtitle">
+                    Join our BCA program and become part of a community dedicated to excellence in technology education.
+                </p>
+                <div class="cta-actions">
+                    <a href="{{ url_for('admissions') }}" class="btn btn-white btn-lg">
+                        <span class="material-icons">school</span>
+                        Apply for Admission
+                    </a>
+                    <a href="{{ url_for('about') }}" class="btn btn-glass btn-lg">
+                        <span class="material-icons">contact_mail</span>
+                        Contact Us
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="public-footer">
+        <div class="footer-grid">
+            <div class="footer-brand">
+                <h3>🎓 BCA BUB</h3>
+                <p>Bachelor of Computer Applications<br>Bangalore University<br>Excellence in Education Since 2024</p>
+            </div>
+
+            <div class="footer-links">
+                <h4>Quick Links</h4>
+                <ul>
+                    <li><a href="{{ url_for('public_home') }}">Home</a></li>
+                    <li><a href="{{ url_for('admissions') }}">Admissions</a></li>
+                    <li><a href="{{ url_for('about') }}">About Us</a></li>
+                    <li><a href="{{ url_for('login') }}">Login</a></li>
+                </ul>
+            </div>
+
+            <div class="footer-links">
+                <h4>Programs</h4>
+                <ul>
+                    <li><a href="#">BCA (3 Years)</a></li>
+                    <li><a href="#">Certificate Courses</a></li>
+                    <li><a href="#">Workshops</a></li>
+                </ul>
+            </div>
+
+            <div class="footer-links">
+                <h4>Contact</h4>
+                <ul>
+                    <li>📍 Bangalore University</li>
+                    <li>📧 bca@bub.edu.in</li>
+                    <li>📞 +91 80 XXXX XXXX</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="footer-bottom">
+            <p>&copy; 2024 BCA Department, Bangalore University. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <!-- Install Prompt (PWA) -->
+    <div class="install-prompt" id="installPrompt" style="display: none;">
+        <span class="material-icons" style="font-size: 2rem; color: var(--primary-color);">install_mobile</span>
+        <p>Install BCA BUB App for a better experience!</p>
+        <button class="btn btn-primary" id="installBtn">Install</button>
+        <button class="install-close" id="installClose">
+            <span class="material-icons">close</span>
+        </button>
+    </div>
+
+    <!-- External JavaScript -->
+    <script src="{{ url_for('static', filename='js/public.js') }}"></script>
+</body>
+
+</html>

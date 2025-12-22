@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#1a237e">
+    <meta name="description"
+        content="Admissions - BCA Department, Bangalore University. Learn about eligibility, fees, and how to apply.">
+
+    <!-- PWA Meta Tags -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="BCA BUB">
+
+    <title>Admissions - BCA Department | Bangalore University</title>
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='icons/icon-192x192.png') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-192x192.png') }}">
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/public.css') }}">
+
+    <style>
+        /* Additional styles for admission page */
+        .eligibility-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        .eligibility-card {
+            background: var(--bg-primary);
+            border-radius: var(--radius-xl);
+            padding: 2rem;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            border-left: 4px solid var(--primary-color);
+        }
+
+        .eligibility-card h4 {
+            font-size: 1.1rem;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .eligibility-card p {
+            color: var(--text-secondary);
+        }
+
+        .dates-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 2rem;
+            background: var(--bg-primary);
+            border-radius: var(--radius-xl);
+            overflow: hidden;
+            box-shadow: var(--shadow-md);
+        }
+
+        .dates-table th,
+        .dates-table td {
+            padding: 1.25rem 1.5rem;
+            text-align: left;
+            border-bottom: 1px solid var(--bg-tertiary);
+        }
+
+        .dates-table th {
+            background: var(--primary-gradient);
+            color: var(--text-white);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-size: 0.85rem;
+        }
+
+        .dates-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .dates-table tr:hover {
+            background: var(--bg-secondary);
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.35rem 0.75rem;
+            border-radius: var(--radius-full);
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .status-open {
+            background: rgba(34, 197, 94, 0.1);
+            color: #22c55e;
+        }
+
+        .status-upcoming {
+            background: rgba(234, 179, 8, 0.1);
+            color: #eab308;
+        }
+
+        .status-closed {
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+        }
+
+        .contact-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        .contact-card {
+            background: var(--bg-primary);
+            border-radius: var(--radius-xl);
+            padding: 2rem;
+            text-align: center;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            transition: var(--transition-normal);
+        }
+
+        .contact-card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-xl);
+        }
+
+        .contact-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, rgba(26, 35, 126, 0.1) 0%, rgba(255, 111, 0, 0.1) 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1rem;
+            font-size: 1.75rem;
+            color: var(--primary-color);
+        }
+
+        .contact-card h4 {
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .contact-card p {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        .contact-card a {
+            color: var(--primary-color);
+            font-weight: 500;
+        }
+
+        .fee-structure {
+            background: var(--bg-primary);
+            border-radius: var(--radius-xl);
+            padding: 2.5rem;
+            margin-top: 2rem;
+            box-shadow: var(--shadow-md);
+        }
+
+        .fee-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 0;
+            border-bottom: 1px solid var(--bg-tertiary);
+        }
+
+        .fee-item:last-child {
+            border-bottom: none;
+            padding-top: 1.5rem;
+            margin-top: 0.5rem;
+            border-top: 2px solid var(--primary-color);
+        }
+
+        .fee-item span:first-child {
+            color: var(--text-secondary);
+        }
+
+        .fee-item span:last-child {
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .fee-item:last-child span:last-child {
+            color: var(--primary-color);
+            font-size: 1.25rem;
+        }
+
+        @media (max-width: 768px) {
+            .dates-table {
+                display: block;
+                overflow-x: auto;
+            }
+        }
+    </style>
+</head>
+
+<body class="public-page">
+    <!-- Navigation -->
+    <nav class="public-nav" id="navbar">
+        <div class="nav-container">
+            <a href="{{ url_for('public_home') }}" class="nav-logo">
+                <div class="logo-icon">🎓</div>
+                <span>BCA BUB</span>
+            </a>
+
+            <ul class="nav-links">
+                <li><a href="{{ url_for('public_home') }}">Home</a></li>
+                <li><a href="{{ url_for('admissions') }}" class="active">Admissions</a></li>
+                <li><a href="{{ url_for('about') }}">About Us</a></li>
+            </ul>
+
+            <div class="nav-actions">
+                <a href="{{ url_for('login') }}" class="btn btn-glass">
+                    <span class="material-icons">login</span>
+                    Login
+                </a>
+            </div>
+
+            <button class="mobile-menu-toggle" id="mobileMenuToggle">
+                <span class="material-icons">menu</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Mobile Menu -->
+    <div class="mobile-menu" id="mobileMenu">
+        <button class="mobile-menu-close" id="mobileMenuClose">
+            <span class="material-icons">close</span>
+        </button>
+        <ul class="mobile-menu-links">
+            <li><a href="{{ url_for('public_home') }}">Home</a></li>
+            <li><a href="{{ url_for('admissions') }}">Admissions</a></li>
+            <li><a href="{{ url_for('about') }}">About Us</a></li>
+            <li><a href="{{ url_for('login') }}">Login</a></li>
+        </ul>
+    </div>
+
+    <!-- Hero Section -->
+    <section class="hero" style="min-height: 60vh;">
+        <div class="hero-shapes">
+            <div class="shape"></div>
+            <div class="shape"></div>
+            <div class="shape"></div>
+        </div>
+
+        <div class="hero-content">
+            <div class="hero-badge">
+                <span class="material-icons">school</span>
+                <span>Admissions 2025-26</span>
+            </div>
+
+            <h1 class="hero-title">
+                <span>Join Our BCA Program</span>
+            </h1>
+
+            <p class="hero-subtitle">
+                Take the first step towards a successful career in technology. Our admission process is designed to be
+                simple, transparent, and student-friendly.
+            </p>
+
+            <div class="hero-actions">
+                <a href="#apply" class="btn btn-primary btn-lg">
+                    <span class="material-icons">edit</span>
+                    Start Application
+                </a>
+                <a href="#eligibility" class="btn btn-glass btn-lg">
+                    <span class="material-icons">checklist</span>
+                    Check Eligibility
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Admission Steps -->
+    <section class="section section-alt" id="apply">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-badge">How to Apply</span>
+                <h2 class="section-title">Simple 4-Step Admission Process</h2>
+                <p class="section-subtitle">
+                    Follow these easy steps to secure your seat in our BCA program.
+                </p>
+            </div>
+
+            <div class="steps-container">
+                <div class="step-card">
+                    <div class="step-number"></div>
+                    <h3 class="step-title">Online Application</h3>
+                    <p class="step-desc">Fill out the online application form with your personal and academic details.
+                        Upload required documents.</p>
+                </div>
+
+                <div class="step-card">
+                    <div class="step-number"></div>
+                    <h3 class="step-title">Document Verification</h3>
+                    <p class="step-desc">Submit your original documents for verification. Our team will review and
+                        validate your application.</p>
+                </div>
+
+                <div class="step-card">
+                    <div class="step-number"></div>
+                    <h3 class="step-title">Merit List & Selection</h3>
+                    <p class="step-desc">Selection is based on 12th grade marks. Merit list will be published on the
+                        official website.</p>
+                </div>
+
+                <div class="step-card">
+                    <div class="step-number"></div>
+                    <h3 class="step-title">Fee Payment & Enrollment</h3>
+                    <p class="step-desc">Pay the admission fee online or at the college. Collect your ID card and start
+                        your journey!</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Eligibility Section -->
+    <section class="section" id="eligibility">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-badge">Requirements</span>
+                <h2 class="section-title">Eligibility Criteria</h2>
+                <p class="section-subtitle">
+                    Make sure you meet the following requirements before applying.
+                </p>
+            </div>
+
+            <div class="eligibility-grid">
+                <div class="eligibility-card">
+                    <h4>
+                        <span class="material-icons" style="color: var(--primary-color);">school</span>
+                        Educational Qualification
+                    </h4>
+                    <p>Must have passed 10+2 or equivalent examination from a recognized board with minimum 45% marks
+                        (40% for reserved categories).</p>
+                </div>
+
+                <div class="eligibility-card">
+                    <h4>
+                        <span class="material-icons" style="color: var(--primary-color);">menu_book</span>
+                        Subjects Required
+                    </h4>
+                    <p>Mathematics/Business Mathematics/Statistics as one of the subjects in 10+2. Computer Science as a
+                        subject is an advantage.</p>
+                </div>
+
+                <div class="eligibility-card">
+                    <h4>
+                        <span class="material-icons" style="color: var(--primary-color);">calendar_today</span>
+                        Age Limit
+                    </h4>
+                    <p>No specific age limit. However, candidates should have completed their 10+2 in the current or
+                        previous academic year.</p>
+                </div>
+
+                <div class="eligibility-card">
+                    <h4>
+                        <span class="material-icons" style="color: var(--primary-color);">public</span>
+                        Nationality
+                    </h4>
+                    <p>Indian nationals and NRI candidates are eligible. Foreign nationals may apply under the NRI quota
+                        with valid documents.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Important Dates -->
+    <section class="section section-alt">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-badge">Timeline</span>
+                <h2 class="section-title">Important Dates</h2>
+                <p class="section-subtitle">
+                    Mark your calendar with these key admission dates.
+                </p>
+            </div>
+
+            <table class="dates-table">
+                <thead>
+                    <tr>
+                        <th>Event</th>
+                        <th>Date</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Application Form Available</td>
+                        <td>January 15, 2025</td>
+                        <td><span class="status-badge status-open"><span class="material-icons"
+                                    style="font-size: 0.9rem;">check_circle</span> Open</span></td>
+                    </tr>
+                    <tr>
+                        <td>Last Date for Application</td>
+                        <td>May 31, 2025</td>
+                        <td><span class="status-badge status-open"><span class="material-icons"
+                                    style="font-size: 0.9rem;">check_circle</span> Open</span></td>
+                    </tr>
+                    <tr>
+                        <td>Merit List Publication</td>
+                        <td>June 15, 2025</td>
+                        <td><span class="status-badge status-upcoming"><span class="material-icons"
+                                    style="font-size: 0.9rem;">schedule</span> Upcoming</span></td>
+                    </tr>
+                    <tr>
+                        <td>Document Verification</td>
+                        <td>June 20 - 30, 2025</td>
+                        <td><span class="status-badge status-upcoming"><span class="material-icons"
+                                    style="font-size: 0.9rem;">schedule</span> Upcoming</span></td>
+                    </tr>
+                    <tr>
+                        <td>Classes Begin</td>
+                        <td>August 1, 2025</td>
+                        <td><span class="status-badge status-upcoming"><span class="material-icons"
+                                    style="font-size: 0.9rem;">schedule</span> Upcoming</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- Fee Structure -->
+    <section class="section">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-badge">Investment</span>
+                <h2 class="section-title">Fee Structure</h2>
+                <p class="section-subtitle">
+                    Affordable education with flexible payment options.
+                </p>
+            </div>
+
+            <div class="fee-structure" style="max-width: 600px; margin: 2rem auto 0;">
+                <div class="fee-item">
+                    <span>Tuition Fee (per year)</span>
+                    <span>₹35,000</span>
+                </div>
+                <div class="fee-item">
+                    <span>Lab & Computer Fee</span>
+                    <span>₹5,000</span>
+                </div>
+                <div class="fee-item">
+                    <span>Library Fee</span>
+                    <span>₹2,000</span>
+                </div>
+                <div class="fee-item">
+                    <span>Examination Fee</span>
+                    <span>₹3,000</span>
+                </div>
+                <div class="fee-item">
+                    <span>Development Fee</span>
+                    <span>₹5,000</span>
+                </div>
+                <div class="fee-item">
+                    <span><strong>Total (per year)</strong></span>
+                    <span>₹50,000</span>
+                </div>
+            </div>
+
+            <p style="text-align: center; margin-top: 1.5rem; color: var(--text-secondary);">
+                * Scholarships available for meritorious and economically weaker students
+            </p>
+        </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section class="section section-alt">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-badge">Get in Touch</span>
+                <h2 class="section-title">Have Questions?</h2>
+                <p class="section-subtitle">
+                    Our admission team is here to help you with any queries.
+                </p>
+            </div>
+
+            <div class="contact-grid">
+                <div class="contact-card">
+                    <div class="contact-icon">
+                        <span class="material-icons">email</span>
+                    </div>
+                    <h4>Email Us</h4>
+                    <p><a href="mailto:admissions@bub.edu.in">admissions@bub.edu.in</a></p>
+                </div>
+
+                <div class="contact-card">
+                    <div class="contact-icon">
+                        <span class="material-icons">phone</span>
+                    </div>
+                    <h4>Call Us</h4>
+                    <p><a href="tel:+918012345678">+91 80 1234 5678</a></p>
+                </div>
+
+                <div class="contact-card">
+                    <div class="contact-icon">
+                        <span class="material-icons">location_on</span>
+                    </div>
+                    <h4>Visit Us</h4>
+                    <p>BCA Department, Bangalore University<br>Jnana Bharathi Campus, Bangalore</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="section cta-section">
+        <div class="container">
+            <div class="cta-content">
+                <h2 class="cta-title">Ready to Apply?</h2>
+                <p class="cta-subtitle">
+                    Don't miss the opportunity to join one of the best BCA programs in Karnataka.
+                </p>
+                <div class="cta-actions">
+                    <a href="#" class="btn btn-white btn-lg">
+                        <span class="material-icons">edit</span>
+                        Apply Now
+                    </a>
+                    <a href="{{ url_for('public_home') }}" class="btn btn-glass btn-lg">
+                        <span class="material-icons">home</span>
+                        Back to Home
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="public-footer">
+        <div class="footer-grid">
+            <div class="footer-brand">
+                <h3>🎓 BCA BUB</h3>
+                <p>Bachelor of Computer Applications<br>Bangalore University<br>Excellence in Education Since 2024</p>
+            </div>
+
+            <div class="footer-links">
+                <h4>Quick Links</h4>
+                <ul>
+                    <li><a href="{{ url_for('public_home') }}">Home</a></li>
+                    <li><a href="{{ url_for('admissions') }}">Admissions</a></li>
+                    <li><a href="{{ url_for('about') }}">About Us</a></li>
+                    <li><a href="{{ url_for('login') }}">Login</a></li>
+                </ul>
+            </div>
+
+            <div class="footer-links">
+                <h4>Programs</h4>
+                <ul>
+                    <li><a href="#">BCA (3 Years)</a></li>
+                    <li><a href="#">Certificate Courses</a></li>
+                    <li><a href="#">Workshops</a></li>
+                </ul>
+            </div>
+
+            <div class="footer-links">
+                <h4>Contact</h4>
+                <ul>
+                    <li>📍 Bangalore University</li>
+                    <li>📧 bca@bub.edu.in</li>
+                    <li>📞 +91 80 XXXX XXXX</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="footer-bottom">
+            <p>&copy; 2024 BCA Department, Bangalore University. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <!-- External JavaScript -->
+    <script src="{{ url_for('static', filename='js/public.js') }}"></script>
+</body>
+
+</html>

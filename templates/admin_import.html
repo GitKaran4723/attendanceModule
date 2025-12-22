@@ -1,421 +1,574 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bulk Import - BCA BUB Admin</title>
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
-    <meta name="theme-color" content="#2196F3">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <meta name="theme-color" content="#1a237e">
     <style>
+        /* Import Page Specific Styles */
+        .page-header {
+            background: var(--admin-gradient);
+            padding: 24px;
+            margin: -24px -24px 24px -24px;
+            border-radius: 0 0 var(--admin-radius-xl) var(--admin-radius-xl);
+            color: white;
+            text-align: center;
+        }
+
+        .page-header h2 {
+            margin: 0 0 8px 0;
+            font-size: 28px;
+            font-weight: 700;
+        }
+
+        .page-header p {
+            margin: 0;
+            opacity: 0.9;
+        }
+
         .import-container {
             max-width: 800px;
             margin: 0 auto;
-            padding: 20px;
+            padding-bottom: 100px;
         }
-        
+
         .import-card {
-            background: white;
-            border-radius: 12px;
-            padding: 24px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            background: var(--admin-card-bg);
+            border-radius: var(--admin-radius-lg);
+            padding: 28px;
+            margin-bottom: 24px;
+            box-shadow: var(--admin-shadow-md);
+            border: 1px solid rgba(26, 35, 126, 0.05);
         }
-        
+
         .card-title {
-            font-size: 20px;
-            font-weight: 500;
-            margin-bottom: 16px;
-            color: #333;
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: var(--admin-primary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding-bottom: 12px;
+            border-bottom: 3px solid var(--admin-accent);
         }
-        
+
+        .card-title i {
+            color: var(--admin-accent);
+        }
+
         .upload-area {
-            border: 2px dashed #ccc;
-            border-radius: 8px;
-            padding: 32px;
+            border: 3px dashed #d0d0d0;
+            border-radius: var(--admin-radius-lg);
+            padding: 48px 32px;
             text-align: center;
             cursor: pointer;
             transition: all 0.3s;
-            background: #fafafa;
+            background: linear-gradient(135deg, rgba(26, 35, 126, 0.02) 0%, rgba(255, 111, 0, 0.02) 100%);
         }
-        
+
         .upload-area:hover {
-            border-color: #667eea;
-            background: #f0f4ff;
+            border-color: var(--admin-primary);
+            background: linear-gradient(135deg, rgba(26, 35, 126, 0.05) 0%, rgba(255, 111, 0, 0.05) 100%);
         }
-        
+
         .upload-area.dragover {
-            border-color: #667eea;
-            background: #e8f0ff;
+            border-color: var(--admin-accent);
+            background: linear-gradient(135deg, rgba(26, 35, 126, 0.08) 0%, rgba(255, 111, 0, 0.08) 100%);
         }
-        
+
         .upload-icon {
-            font-size: 64px;
-            color: #999;
+            font-size: 72px;
+            background: var(--admin-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
             margin-bottom: 16px;
         }
-        
+
+        .upload-area h3 {
+            color: var(--admin-text-primary);
+            margin: 0 0 8px 0;
+        }
+
+        .upload-area p {
+            color: var(--admin-text-muted);
+            margin: 0;
+        }
+
         .file-input {
             display: none;
         }
-        
+
         .import-type-selector {
-            margin: 20px 0;
+            margin: 24px 0;
         }
-        
+
         .type-option {
-            display: block;
-            padding: 16px;
-            margin: 8px 0;
+            display: flex;
+            align-items: center;
+            padding: 16px 20px;
+            margin: 10px 0;
             border: 2px solid #e0e0e0;
-            border-radius: 8px;
+            border-radius: var(--admin-radius-md);
             cursor: pointer;
             transition: all 0.3s;
             background: white;
         }
-        
+
         .type-option:hover {
-            border-color: #667eea;
-            background: #f5f7ff;
+            border-color: var(--admin-primary);
+            background: linear-gradient(135deg, rgba(26, 35, 126, 0.03) 0%, rgba(255, 111, 0, 0.03) 100%);
         }
-        
+
         .type-option input[type="radio"] {
-            margin-right: 12px;
+            margin-right: 14px;
+            width: 20px;
+            height: 20px;
+            accent-color: var(--admin-primary);
         }
-        
+
         .type-option.selected {
-            border-color: #667eea;
-            background: #e8f0ff;
+            border-color: var(--admin-primary);
+            background: linear-gradient(135deg, rgba(26, 35, 126, 0.08) 0%, rgba(255, 111, 0, 0.05) 100%);
+            box-shadow: 0 2px 8px rgba(26, 35, 126, 0.15);
         }
-        
+
+        .type-option strong {
+            color: var(--admin-primary);
+        }
+
         .import-info {
-            background: #e3f2fd;
-            padding: 16px;
-            border-radius: 8px;
-            margin: 16px 0;
-            font-size: 14px;
+            background: linear-gradient(135deg, rgba(26, 35, 126, 0.06) 0%, rgba(255, 111, 0, 0.03) 100%);
+            padding: 20px;
+            border-radius: var(--admin-radius-md);
+            margin: 20px 0;
+            border: 1px solid rgba(26, 35, 126, 0.1);
         }
-        
-        .import-log {
-            margin-top: 24px;
+
+        .import-info strong {
+            color: var(--admin-primary);
         }
-        
-        .log-item {
-            padding: 12px;
-            background: white;
-            border-left: 4px solid #ccc;
-            margin-bottom: 8px;
-            border-radius: 4px;
+
+        .import-info ul {
+            margin: 12px 0 0 20px;
+            padding: 0;
+            color: var(--admin-text-secondary);
         }
-        
-        .log-item.success {
-            border-left-color: #4caf50;
+
+        .import-info li {
+            margin: 6px 0;
         }
-        
-        .log-item.error {
-            border-left-color: #f44336;
+
+        .template-download {
+            text-align: center;
+            margin: 20px 0;
         }
-        
-        .log-item.warning {
-            border-left-color: #ff9800;
+
+        .template-link {
+            color: var(--admin-accent);
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: 600;
+            padding: 10px 20px;
+            border: 2px solid var(--admin-accent);
+            border-radius: var(--admin-radius-md);
+            transition: all 0.3s;
         }
-        
+
+        .template-link:hover {
+            background: var(--admin-accent);
+            color: white;
+        }
+
         .btn-upload {
             width: 100%;
-            padding: 14px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 16px;
+            background: var(--admin-accent-gradient);
             color: white;
             border: none;
-            border-radius: 8px;
+            border-radius: var(--admin-radius-md);
             font-size: 16px;
-            font-weight: 500;
+            font-weight: 600;
             cursor: pointer;
-            transition: transform 0.2s;
-            margin-top: 16px;
+            transition: all 0.3s;
+            margin-top: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 4px 12px rgba(255, 111, 0, 0.3);
         }
-        
-        .btn-upload:hover {
+
+        .btn-upload:hover:not(:disabled) {
             transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 111, 0, 0.4);
         }
-        
+
         .btn-upload:disabled {
             opacity: 0.5;
             cursor: not-allowed;
             transform: none;
         }
-        
+
         .progress-bar {
-            height: 4px;
+            height: 6px;
             background: #e0e0e0;
-            border-radius: 2px;
-            margin: 16px 0;
+            border-radius: 3px;
+            margin: 20px 0;
             overflow: hidden;
             display: none;
         }
-        
+
         .progress-fill {
             height: 100%;
-            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            background: var(--admin-accent-gradient);
             width: 0%;
             transition: width 0.3s;
+            border-radius: 3px;
         }
-        
-        .template-download {
-            text-align: center;
-            margin: 20px 0;
-        }
-        
-        .template-link {
-            color: #667eea;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-        }
-        
+
         .history-table {
             width: 100%;
             border-collapse: collapse;
         }
-        
+
         .history-table th {
-            background: #f5f5f5;
-            padding: 12px;
+            background: linear-gradient(135deg, rgba(26, 35, 126, 0.08) 0%, rgba(255, 111, 0, 0.05) 100%);
+            padding: 14px 16px;
             text-align: left;
-            font-weight: 500;
+            font-weight: 600;
+            color: var(--admin-primary);
+            border-bottom: 2px solid var(--admin-accent);
         }
-        
+
         .history-table td {
-            padding: 12px;
-            border-bottom: 1px solid #eee;
+            padding: 14px 16px;
+            border-bottom: 1px solid #f0f0f0;
+            color: var(--admin-text-secondary);
         }
-        
+
+        .history-table tr:hover td {
+            background: rgba(26, 35, 126, 0.02);
+        }
+
         .status-badge {
-            padding: 4px 8px;
-            border-radius: 4px;
+            padding: 6px 12px;
+            border-radius: 20px;
             font-size: 12px;
-            font-weight: 500;
+            font-weight: 600;
         }
-        
-        .badge-success { background: #e8f5e9; color: #388e3c; }
-        .badge-error { background: #ffebee; color: #d32f2f; }
-        .badge-warning { background: #fff3e0; color: #f57c00; }
+
+        .badge-success {
+            background: linear-gradient(135deg, rgba(34, 197, 94, 0.15) 0%, rgba(34, 197, 94, 0.05) 100%);
+            color: #16a34a;
+        }
+
+        .badge-error {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(239, 68, 68, 0.05) 100%);
+            color: #dc2626;
+        }
+
+        .badge-warning {
+            background: linear-gradient(135deg, rgba(255, 111, 0, 0.15) 0%, rgba(255, 111, 0, 0.05) 100%);
+            color: #ea580c;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--admin-text-muted);
+        }
+
+        .empty-state i {
+            font-size: 48px;
+            opacity: 0.3;
+        }
+
+        #selectedFile {
+            color: var(--admin-accent);
+            font-weight: 600;
+            margin-top: 12px;
+        }
     </style>
 </head>
-<body>
+
+<body class="admin-page">
     <!-- App Bar -->
-    <header class="app-bar">
-        <button class="menu-btn" onclick="window.history.back()">
+    <header class="admin-app-bar">
+        <button class="menu-btn" onclick="location.href='{{ url_for('admin_dashboard') }}'">
             <i class="material-icons">arrow_back</i>
         </button>
-        <h1 class="app-title">Bulk Import Data</h1>
+        <h1 class="app-title">Bulk Import</h1>
         <button class="icon-btn" onclick="location.href='{{ url_for('logout') }}'">
             <i class="material-icons">logout</i>
         </button>
     </header>
 
     <!-- Main Content -->
-    <main class="main-content">
-        <div class="import-container">
-            <!-- Upload Section -->
-            <div class="import-card">
-                <h2 class="card-title">Import Data from File</h2>
-                
-                <div class="import-type-selector">
-                    <label class="type-option" onclick="selectType(this, 'students')">
-                        <input type="radio" name="import_type" value="students">
-                        <strong>Students</strong> - Import student records (enrollment_no, first_name, last_name, email)
-                    </label>
-                    
-                    <label class="type-option" onclick="selectType(this, 'faculty')">
-                        <input type="radio" name="import_type" value="faculty">
-                        <strong>Faculty</strong> - Import faculty members (employee_id, first_name, last_name, email)
-                    </label>
-                    
-                    <label class="type-option" onclick="selectType(this, 'subjects')">
-                        <input type="radio" name="import_type" value="subjects">
-                        <strong>Subjects</strong> - Import subject records (subject_code, subject_name, semester, credits)
-                    </label>
-                    
-                    <label class="type-option" onclick="selectType(this, 'schedules')">
-                        <input type="radio" name="import_type" value="schedules">
-                        <strong>Schedules</strong> - Import class schedules (subject_code, faculty_employee_id, day_of_week, start_time, end_time, room_number)
-                    </label>
-                </div>
-                
-                <div class="template-download">
-                    <a href="#" class="template-link" id="downloadTemplate" style="display: none;">
-                        <i class="material-icons">download</i>
-                        Download Sample Template
-                    </a>
-                </div>
-                
-                <form id="uploadForm" enctype="multipart/form-data">
-                    <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
-                        <i class="material-icons upload-icon">cloud_upload</i>
-                        <h3>Drop file here or click to browse</h3>
-                        <p>Supported formats: CSV, Excel (.xlsx, .xls)</p>
-                        <p id="selectedFile" style="color: #667eea; margin-top: 8px;"></p>
-                    </div>
-                    
-                    <input type="file" id="fileInput" class="file-input" accept=".csv,.xlsx,.xls" onchange="handleFileSelect(event)">
-                    
-                    <div class="progress-bar" id="progressBar">
-                        <div class="progress-fill" id="progressFill"></div>
-                    </div>
-                    
-                    <button type="submit" class="btn-upload" id="uploadBtn" disabled>
-                        <i class="material-icons" style="vertical-align: middle;">upload</i>
-                        Start Import
-                    </button>
-                </form>
-                
-                <div class="import-info">
-                    <strong>📝 Important Notes:</strong>
-                    <ul style="margin: 8px 0 0 20px; padding: 0;">
-                        <li>First row must contain column headers</li>
-                        <li>Required fields must not be empty</li>
-                        <li>Duplicate records will be skipped</li>
-                        <li>Maximum 1000 rows per import</li>
-                    </ul>
-                </div>
+    <main class="admin-main">
+        <div class="admin-container">
+            <!-- Page Header -->
+            <div class="page-header">
+                <h2>📥 Bulk Import Data</h2>
+                <p>Import students, faculty, subjects, or schedules from Excel/CSV files</p>
             </div>
-            
-            <!-- Recent Imports -->
-            <div class="import-card">
-                <h2 class="card-title">Recent Imports</h2>
-                
-                {% if imports %}
-                <table class="history-table">
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Type</th>
-                            <th>File</th>
-                            <th>Status</th>
-                            <th>Records</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for imp in imports %}
-                        <tr>
-                            <td>{{ imp.created_at.strftime('%d %b %Y %H:%M') }}</td>
-                            <td>{{ imp.import_type.title() }}</td>
-                            <td>{{ imp.file_name }}</td>
-                            <td>
-                                <span class="status-badge 
-                                    {% if imp.status == 'completed' %}badge-success
-                                    {% elif imp.status == 'failed' %}badge-error
-                                    {% else %}badge-warning{% endif %}">
-                                    {{ imp.status.replace('_', ' ').title() }}
-                                </span>
-                            </td>
-                            <td>{{ imp.successful_rows }}/{{ imp.total_rows }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-                {% else %}
-                <p style="text-align: center; color: #999; padding: 20px;">No imports yet</p>
-                {% endif %}
+
+            <div class="import-container">
+                <!-- Upload Section -->
+                <div class="import-card">
+                    <h2 class="card-title">
+                        <i class="material-icons">cloud_upload</i>
+                        Import Data from File
+                    </h2>
+
+                    <div class="import-type-selector">
+                        <label class="type-option" onclick="selectType(this, 'student')">
+                            <input type="radio" name="import_type" value="student">
+                            <div>
+                                <strong>👩‍🎓 Students</strong><br>
+                                <small>Required: roll_number, first_name, last_name, email, date_of_birth</small><br>
+                                <small style="color: var(--admin-accent);">🔑 Auto-login: Username = Roll No, Password =
+                                    DOB (DDMMYYYY)</small>
+                            </div>
+                        </label>
+
+                        <label class="type-option" onclick="selectType(this, 'faculty')">
+                            <input type="radio" name="import_type" value="faculty">
+                            <div>
+                                <strong>Faculty</strong> - Import faculty members (employee_id, first_name, last_name,
+                                email)
+                            </div>
+                        </label>
+
+                        <label class="type-option" onclick="selectType(this, 'subject')">
+                            <input type="radio" name="import_type" value="subject">
+                            <div>
+                                <strong>Subjects</strong> - Import subject records (subject_code, subject_name,
+                                semester, credits)
+                            </div>
+                        </label>
+
+                        <label class="type-option" onclick="selectType(this, 'schedule')">
+                            <input type="radio" name="import_type" value="schedule">
+                            <div>
+                                <strong>Schedules</strong> - Import class schedules (subject_code, faculty_id, day,
+                                time, room)
+                            </div>
+                        </label>
+                    </div>
+
+                    <div class="template-download">
+                        <a href="#" class="template-link" id="downloadTemplate" style="display: none;">
+                            <i class="material-icons">download</i>
+                            Download Sample Template
+                        </a>
+                    </div>
+
+                    <form id="uploadForm" enctype="multipart/form-data">
+                        <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
+                            <i class="material-icons upload-icon">cloud_upload</i>
+                            <h3>Drop file here or click to browse</h3>
+                            <p>Supported formats: CSV, Excel (.xlsx, .xls)</p>
+                            <p id="selectedFile"></p>
+                        </div>
+
+                        <input type="file" id="fileInput" class="file-input" accept=".csv,.xlsx,.xls"
+                            onchange="handleFileSelect(event)">
+
+                        <div class="progress-bar" id="progressBar">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+
+                        <button type="submit" class="btn-upload" id="uploadBtn" disabled>
+                            <i class="material-icons">upload</i>
+                            Start Import
+                        </button>
+                    </form>
+
+                    <div class="import-info">
+                        <strong>📝 Important Notes:</strong>
+                        <ul>
+                            <li>First row must contain column headers</li>
+                            <li>Required fields must not be empty</li>
+                            <li>Duplicate records will be skipped</li>
+                            <li>Maximum 1000 rows per import</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Recent Imports -->
+                <div class="import-card">
+                    <h2 class="card-title">
+                        <i class="material-icons">history</i>
+                        Recent Imports
+                    </h2>
+
+                    {% if imports %}
+                    <table class="history-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Type</th>
+                                <th>File</th>
+                                <th>Status</th>
+                                <th>Records</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for imp in imports %}
+                            <tr>
+                                <td>{{ imp.created_at.strftime('%d %b %Y %H:%M') }}</td>
+                                <td><strong>{{ imp.import_type.title() }}</strong></td>
+                                <td>{{ imp.file_name }}</td>
+                                <td>
+                                    <span class="status-badge 
+                                        {% if imp.status == 'completed' %}badge-success
+                                        {% elif imp.status == 'failed' %}badge-error
+                                        {% else %}badge-warning{% endif %}">
+                                        {{ imp.status.replace('_', ' ').title() }}
+                                    </span>
+                                </td>
+                                <td>{{ imp.successful_rows }}/{{ imp.total_rows }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <div class="empty-state">
+                        <i class="material-icons">inbox</i>
+                        <p>No imports yet. Upload a file above to get started.</p>
+                    </div>
+                    {% endif %}
+                </div>
             </div>
         </div>
     </main>
 
+    <!-- Bottom Navigation -->
+    <nav class="admin-bottom-nav">
+        <a href="{{ url_for('admin_dashboard') }}">
+            <i class="material-icons">dashboard</i>
+            <span>Dashboard</span>
+        </a>
+        <a href="{{ url_for('admin_faculty') }}">
+            <i class="material-icons">school</i>
+            <span>Faculty</span>
+        </a>
+        <a href="{{ url_for('admin_students') }}">
+            <i class="material-icons">people</i>
+            <span>Students</span>
+        </a>
+        <a href="{{ url_for('admin_subjects') }}">
+            <i class="material-icons">book</i>
+            <span>Subjects</span>
+        </a>
+    </nav>
+
     <script>
         let selectedType = null;
         let selectedFile = null;
-        
+
         function selectType(element, type) {
             // Remove previous selection
             document.querySelectorAll('.type-option').forEach(el => el.classList.remove('selected'));
-            
+
             // Add selection
             element.classList.add('selected');
             element.querySelector('input').checked = true;
             selectedType = type;
-            
+
             // Enable upload button if file is selected
             updateUploadButton();
-            
-            // Show template download link
-            document.getElementById('downloadTemplate').style.display = 'inline-flex';
+
+            // Show template download link and set href
+            const downloadLink = document.getElementById('downloadTemplate');
+            downloadLink.style.display = 'inline-flex';
+            downloadLink.href = `/api/admin/import/template/${type}`;
         }
-        
+
         function handleFileSelect(event) {
             selectedFile = event.target.files[0];
             if (selectedFile) {
-                document.getElementById('selectedFile').textContent = `Selected: ${selectedFile.name}`;
+                document.getElementById('selectedFile').textContent = `✓ Selected: ${selectedFile.name}`;
                 updateUploadButton();
             }
         }
-        
+
         function updateUploadButton() {
             const btn = document.getElementById('uploadBtn');
             btn.disabled = !(selectedType && selectedFile);
         }
-        
+
         // Drag and drop
         const uploadArea = document.getElementById('uploadArea');
-        
+
         uploadArea.addEventListener('dragover', (e) => {
             e.preventDefault();
             uploadArea.classList.add('dragover');
         });
-        
+
         uploadArea.addEventListener('dragleave', () => {
             uploadArea.classList.remove('dragover');
         });
-        
+
         uploadArea.addEventListener('drop', (e) => {
             e.preventDefault();
             uploadArea.classList.remove('dragover');
-            
+
             const files = e.dataTransfer.files;
             if (files.length > 0) {
                 document.getElementById('fileInput').files = files;
-                handleFileSelect({target: {files: files}});
+                handleFileSelect({ target: { files: files } });
             }
         });
-        
+
         // Form submission
         document.getElementById('uploadForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            
+
             if (!selectedType || !selectedFile) return;
-            
+
             const formData = new FormData();
             formData.append('file', selectedFile);
             formData.append('import_type', selectedType);
-            
+
             // Show progress bar
             const progressBar = document.getElementById('progressBar');
             const progressFill = document.getElementById('progressFill');
             const uploadBtn = document.getElementById('uploadBtn');
-            
+
             progressBar.style.display = 'block';
             progressFill.style.width = '30%';
             uploadBtn.disabled = true;
-            uploadBtn.textContent = 'Importing...';
-            
+            uploadBtn.innerHTML = '<i class="material-icons">hourglass_empty</i> Importing...';
+
             try {
                 const response = await fetch('/api/admin/import', {
                     method: 'POST',
                     body: formData
                 });
-                
+
                 progressFill.style.width = '100%';
                 const result = await response.json();
-                
+
                 if (result.success) {
                     alert(`✅ Import completed!\n\nSuccessful: ${result.successful}\nFailed: ${result.failed}`);
-                    
+
                     if (result.errors && result.errors.length > 0) {
                         console.log('Import errors:', result.errors);
                     }
-                    
+
                     // Reload page to show updated history
                     setTimeout(() => location.reload(), 1500);
                 } else {
@@ -428,9 +581,10 @@
                 progressBar.style.display = 'none';
                 progressFill.style.width = '0%';
                 uploadBtn.disabled = false;
-                uploadBtn.innerHTML = '<i class="material-icons" style="vertical-align: middle;">upload</i> Start Import';
+                uploadBtn.innerHTML = '<i class="material-icons">upload</i> Start Import';
             }
         });
     </script>
 </body>
+
 </html>

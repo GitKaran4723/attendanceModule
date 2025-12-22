@@ -1,168 +1,335 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Manage Students - BCA BUB Admin</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <meta name="theme-color" content="#1a237e">
     <style>
-        .filter-bar {
-            background: white;
-            padding: 16px;
-            border-radius: 8px;
-            margin-bottom: 16px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            display: grid;
-            gap: 12px;
+        /* Students Page Specific Styles */
+        .page-header {
+            background: var(--admin-gradient);
+            padding: 24px;
+            margin: -24px -24px 24px -24px;
+            border-radius: 0 0 var(--admin-radius-xl) var(--admin-radius-xl);
+            color: white;
         }
-        
-        .filter-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
+
+        .page-header h2 {
+            margin: 0 0 8px 0;
+            font-size: 28px;
+            font-weight: 700;
         }
-        
-        .filter-select {
-            padding: 10px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
+
+        .page-header p {
+            margin: 0;
+            opacity: 0.9;
+        }
+
+        .stats-row {
+            display: flex;
+            gap: 16px;
+            margin-top: 16px;
+            flex-wrap: wrap;
+        }
+
+        .stat-pill {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 8px 16px;
+            border-radius: 20px;
             font-size: 14px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
-        
-        .search-input {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            font-size: 16px;
-            box-sizing: border-box;
-        }
-        
-        .student-grid {
-            display: grid;
-            gap: 12px;
-        }
-        
-        .student-card {
-            background: white;
-            border-radius: 8px;
-            padding: 16px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            display: grid;
-            grid-template-columns: auto 1fr auto;
-            gap: 12px;
+
+        .filter-bar {
+            background: var(--admin-card-bg);
+            padding: 20px;
+            border-radius: var(--admin-radius-lg);
+            margin-bottom: 24px;
+            box-shadow: var(--admin-shadow-sm);
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
             align-items: center;
         }
-        
+
+        .search-wrapper {
+            flex: 1;
+            min-width: 250px;
+            position: relative;
+        }
+
+        .search-wrapper i {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--admin-text-muted);
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 14px 16px 14px 48px;
+            border: 2px solid #e0e0e0;
+            border-radius: var(--admin-radius-md);
+            font-size: 16px;
+            box-sizing: border-box;
+            transition: all 0.3s;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--admin-primary);
+            box-shadow: 0 0 0 3px rgba(26, 35, 126, 0.1);
+        }
+
+        .filter-select {
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: var(--admin-radius-md);
+            font-size: 14px;
+            min-width: 150px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .filter-select:focus {
+            outline: none;
+            border-color: var(--admin-primary);
+        }
+
+        .student-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 16px;
+            padding-bottom: 100px;
+        }
+
+        .student-card {
+            background: var(--admin-card-bg);
+            border-radius: var(--admin-radius-lg);
+            overflow: hidden;
+            box-shadow: var(--admin-shadow-sm);
+            transition: all 0.3s;
+            border: 1px solid rgba(26, 35, 126, 0.05);
+        }
+
+        .student-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--admin-shadow-lg);
+        }
+
+        .card-content {
+            padding: 20px;
+            display: flex;
+            gap: 16px;
+            align-items: flex-start;
+        }
+
         .student-avatar {
-            width: 48px;
-            height: 48px;
+            width: 56px;
+            height: 56px;
             border-radius: 50%;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--admin-gradient);
             color: white;
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 20px;
-            font-weight: 500;
+            font-weight: 700;
+            flex-shrink: 0;
         }
-        
+
         .student-info {
             flex: 1;
+            min-width: 0;
         }
-        
+
         .student-name {
-            font-size: 16px;
-            font-weight: 500;
-            color: #333;
-            margin-bottom: 2px;
+            font-size: 17px;
+            font-weight: 700;
+            color: var(--admin-text-primary);
+            margin: 0 0 4px 0;
         }
-        
+
         .student-roll {
             font-size: 13px;
-            color: #667eea;
-            font-weight: 500;
-            margin-bottom: 4px;
+            color: var(--admin-accent);
+            font-weight: 600;
+            margin-bottom: 8px;
         }
-        
-        .student-details {
-            font-size: 12px;
-            color: #666;
-        }
-        
-        .student-actions {
+
+        .student-meta {
             display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            font-size: 13px;
+            color: var(--admin-text-secondary);
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: center;
             gap: 4px;
         }
-        
-        .btn-icon {
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
+
+        .meta-item i {
+            font-size: 16px;
+            color: var(--admin-primary);
+        }
+
+        .section-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, rgba(26, 35, 126, 0.08) 0%, rgba(255, 111, 0, 0.08) 100%);
+            color: var(--admin-primary);
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            border: 1px solid rgba(26, 35, 126, 0.1);
+        }
+
+        .card-actions {
+            padding: 12px 20px;
+            background: #fafafa;
+            display: flex;
+            gap: 8px;
+            border-top: 1px solid #f0f0f0;
+        }
+
+        .btn-action {
+            flex: 1;
+            padding: 10px 12px;
             border: none;
+            border-radius: var(--admin-radius-sm);
+            font-size: 13px;
+            font-weight: 600;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
+            gap: 6px;
+            transition: all 0.2s;
         }
-        
+
         .btn-edit {
-            background: #e3f2fd;
-            color: #1976d2;
+            background: rgba(26, 35, 126, 0.08);
+            color: var(--admin-primary);
         }
-        
+
+        .btn-edit:hover {
+            background: var(--admin-primary);
+            color: white;
+        }
+
         .btn-delete {
-            background: #ffebee;
-            color: #d32f2f;
+            background: rgba(239, 68, 68, 0.08);
+            color: #ef4444;
         }
-        
+
+        .btn-delete:hover {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn-section {
+            background: rgba(255, 111, 0, 0.08);
+            color: var(--admin-accent);
+        }
+
+        .btn-section:hover {
+            background: var(--admin-accent);
+            color: white;
+        }
+
         .fab {
             position: fixed;
-            bottom: 80px;
-            right: 20px;
-            width: 56px;
-            height: 56px;
+            bottom: 84px;
+            right: 24px;
+            width: 64px;
+            height: 64px;
             border-radius: 50%;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--admin-accent-gradient);
             color: white;
             border: none;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            box-shadow: 0 6px 20px rgba(255, 111, 0, 0.4);
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
+            transition: all 0.3s;
+            z-index: 100;
         }
-        
-        .stats-bar {
-            background: white;
-            padding: 12px;
-            border-radius: 8px;
-            margin-bottom: 16px;
-            display: flex;
-            justify-content: space-around;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+
+        .fab:hover {
+            transform: scale(1.1);
+            box-shadow: 0 8px 28px rgba(255, 111, 0, 0.5);
         }
-        
-        .stat-item {
+
+        .fab i {
+            font-size: 28px;
+        }
+
+        .empty-state {
             text-align: center;
+            padding: 60px 24px;
+            background: var(--admin-card-bg);
+            border-radius: var(--admin-radius-xl);
+            box-shadow: var(--admin-shadow-sm);
+            grid-column: 1 / -1;
         }
-        
-        .stat-value {
-            font-size: 24px;
-            font-weight: 600;
-            color: #667eea;
+
+        .empty-state i {
+            font-size: 80px;
+            color: var(--admin-primary);
+            opacity: 0.3;
         }
-        
-        .stat-label {
-            font-size: 12px;
-            color: #666;
+
+        .empty-state h3 {
+            color: var(--admin-text-primary);
+            margin: 16px 0 8px;
+        }
+
+        .empty-state p {
+            color: var(--admin-text-muted);
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        @media (max-width: 768px) {
+            .student-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .filter-bar {
+                flex-direction: column;
+            }
+
+            .search-wrapper,
+            .filter-select {
+                width: 100%;
+            }
         }
     </style>
 </head>
-<body>
-    <header class="app-bar">
-        <button class="menu-btn" onclick="window.history.back()">
+
+<body class="admin-page">
+    <!-- App Bar -->
+    <header class="admin-app-bar">
+        <button class="menu-btn" onclick="location.href='{{ url_for('admin_dashboard') }}'">
             <i class="material-icons">arrow_back</i>
         </button>
         <h1 class="app-title">Student Management</h1>
@@ -171,106 +338,148 @@
         </button>
     </header>
 
-    <main class="main-content">
-        <div class="container">
-            <div class="stats-bar">
-                <div class="stat-item">
-                    <div class="stat-value">{{ total_students }}</div>
-                    <div class="stat-label">Total</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value">{{ sections_count }}</div>
-                    <div class="stat-label">Sections</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value">{{ programs_count }}</div>
-                    <div class="stat-label">Programs</div>
-                </div>
-            </div>
-            
-            <div class="filter-bar">
-                <input type="text" class="search-input" id="searchInput" 
-                       placeholder="Search by name or roll number..." onkeyup="filterStudents()">
-                
-                <div class="filter-row">
-                    <select class="filter-select" id="programFilter" onchange="filterStudents()">
-                        <option value="">All Programs</option>
-                        {% for program in programs %}
-                        <option value="{{ program.program_id }}">{{ program.program_name }}</option>
-                        {% endfor %}
-                    </select>
-                    
-                    <select class="filter-select" id="sectionFilter" onchange="filterStudents()">
-                        <option value="">All Sections</option>
-                        {% for section in sections %}
-                        <option value="{{ section.section_id }}">{{ section.section_name }}</option>
-                        {% endfor %}
-                    </select>
+    <!-- Main Content -->
+    <main class="admin-main">
+        <div class="admin-container">
+            <!-- Page Header -->
+            <div class="page-header">
+                <h2>👩‍🎓 Students</h2>
+                <p>Manage student records, assign to sections, and track enrollment</p>
+                <div class="stats-row">
+                    <div class="stat-pill">
+                        <i class="material-icons" style="font-size: 16px;">people</i>
+                        {{ total_students }} Total Students
+                    </div>
+                    <div class="stat-pill">
+                        <i class="material-icons" style="font-size: 16px;">groups</i>
+                        {{ sections_count }} Sections
+                    </div>
+                    <div class="stat-pill">
+                        <i class="material-icons" style="font-size: 16px;">school</i>
+                        {{ programs_count }} Programs
+                    </div>
                 </div>
             </div>
 
+            <!-- Filter Bar -->
+            <div class="filter-bar">
+                <div class="search-wrapper">
+                    <i class="material-icons">search</i>
+                    <input type="text" class="search-input" id="searchInput"
+                        placeholder="Search by name or roll number..." onkeyup="filterStudents()">
+                </div>
+
+                <select class="filter-select" id="programFilter" onchange="filterStudents()">
+                    <option value="">All Programs</option>
+                    {% for program in programs %}
+                    <option value="{{ program.program_id }}">{{ program.program_name }}</option>
+                    {% endfor %}
+                </select>
+
+                <select class="filter-select" id="sectionFilter" onchange="filterStudents()">
+                    <option value="">All Sections</option>
+                    {% for section in sections %}
+                    <option value="{{ section.section_id }}">{{ section.section_name }}</option>
+                    {% endfor %}
+                </select>
+
+                <div class="action-buttons">
+                    <button class="admin-btn admin-btn-primary"
+                        onclick="location.href='{{ url_for('admin_student_add') }}'">
+                        <i class="material-icons">add</i>
+                        Add Student
+                    </button>
+                    <button class="admin-btn admin-btn-secondary"
+                        onclick="location.href='{{ url_for('admin_import') }}'">
+                        <i class="material-icons">upload_file</i>
+                        Bulk Import
+                    </button>
+                </div>
+            </div>
+
+            <!-- Student Grid -->
             <div class="student-grid" id="studentGrid">
                 {% if students %}
-                    {% for student in students %}
-                    <div class="student-card" 
-                         data-name="{{ student.first_name }} {{ student.last_name }}" 
-                         data-roll="{{ student.roll_number }}"
-                         data-program="{{ student.program_id }}"
-                         data-section="{{ student.section_id or '' }}">
+                {% for student in students %}
+                <div class="student-card" data-name="{{ student.first_name }} {{ student.last_name }}"
+                    data-roll="{{ student.roll_number }}" data-program="{{ student.program_id }}"
+                    data-section="{{ student.section_id or '' }}">
+
+                    <div class="card-content">
                         <div class="student-avatar">
-                            {{ student.first_name[0] }}{{ student.last_name[0] }}
+                            {{ student.first_name[0] }}{{ student.last_name[0] if student.last_name else '' }}
                         </div>
                         <div class="student-info">
-                            <div class="student-name">{{ student.first_name }} {{ student.last_name }}</div>
+                            <h3 class="student-name">{{ student.first_name }} {{ student.last_name }}</h3>
                             <div class="student-roll">{{ student.roll_number }}</div>
-                            <div class="student-details">
-                                {{ student.program.program_name if student.program else 'No Program' }}
-                                {% if student.section %} | {{ student.section.section_name }}{% endif %}
+                            <div class="student-meta">
+                                <span class="meta-item">
+                                    <i class="material-icons">school</i>
+                                    {{ student.program.program_name if student.program else 'No Program' }}
+                                </span>
+                                {% if student.section %}
+                                <span class="section-badge">{{ student.section.section_name }}</span>
+                                {% endif %}
                             </div>
-                            <div class="student-details">
-                                <i class="material-icons" style="font-size: 12px; vertical-align: middle;">email</i>
-                                {{ student.email }}
+                            <div class="student-meta" style="margin-top: 8px;">
+                                <span class="meta-item">
+                                    <i class="material-icons">email</i>
+                                    {{ student.email }}
+                                </span>
                             </div>
-                        </div>
-                        <div class="student-actions">
-                            <button class="btn-icon btn-edit" onclick="editStudent('{{ student.student_id }}')" title="Edit">
-                                <i class="material-icons" style="font-size: 20px;">edit</i>
-                            </button>
-                            <button class="btn-icon btn-delete" onclick="deleteStudent('{{ student.student_id }}', '{{ student.first_name }} {{ student.last_name }}')" title="Delete">
-                                <i class="material-icons" style="font-size: 20px;">delete</i>
-                            </button>
                         </div>
                     </div>
-                    {% endfor %}
+
+                    <div class="card-actions">
+                        <button class="btn-action btn-edit" onclick="editStudent('{{ student.student_id }}')">
+                            <i class="material-icons" style="font-size: 18px;">edit</i>
+                            Edit
+                        </button>
+                        {% if not student.section %}
+                        <button class="btn-action btn-section" onclick="assignSection('{{ student.student_id }}')">
+                            <i class="material-icons" style="font-size: 18px;">group_add</i>
+                            Assign
+                        </button>
+                        {% endif %}
+                        <button class="btn-action btn-delete"
+                            onclick="deleteStudent('{{ student.student_id }}', '{{ student.first_name }} {{ student.last_name }}')">
+                            <i class="material-icons" style="font-size: 18px;">delete</i>
+                            Delete
+                        </button>
+                    </div>
+                </div>
+                {% endfor %}
                 {% else %}
-                    <div style="text-align: center; padding: 48px 20px; color: #999;">
-                        <i class="material-icons" style="font-size: 64px; opacity: 0.3;">people</i>
-                        <h3>No Students</h3>
-                        <p>Click the + button to add students</p>
-                    </div>
+                <div class="empty-state">
+                    <i class="material-icons">people</i>
+                    <h3>No Students Yet</h3>
+                    <p>Click "Add Student" or use "Bulk Import" to add students</p>
+                </div>
                 {% endif %}
             </div>
         </div>
     </main>
 
-    <button class="fab" onclick="location.href='{{ url_for('admin_student_add') }}'">
+    <!-- Floating Action Button -->
+    <button class="fab" onclick="location.href='{{ url_for('admin_student_add') }}'" title="Add Student">
         <i class="material-icons">add</i>
     </button>
 
-    <nav class="bottom-nav">
-        <a href="{{ url_for('admin_dashboard') }}" class="nav-item">
+    <!-- Bottom Navigation -->
+    <nav class="admin-bottom-nav">
+        <a href="{{ url_for('admin_dashboard') }}">
             <i class="material-icons">dashboard</i>
             <span>Dashboard</span>
         </a>
-        <a href="{{ url_for('admin_faculty') }}" class="nav-item">
+        <a href="{{ url_for('admin_faculty') }}">
             <i class="material-icons">school</i>
             <span>Faculty</span>
         </a>
-        <a href="{{ url_for('admin_students') }}" class="nav-item active">
+        <a href="{{ url_for('admin_students') }}" class="active">
             <i class="material-icons">people</i>
             <span>Students</span>
         </a>
-        <a href="{{ url_for('admin_subjects') }}" class="nav-item">
+        <a href="{{ url_for('admin_subjects') }}">
             <i class="material-icons">book</i>
             <span>Subjects</span>
         </a>
@@ -282,19 +491,19 @@
             const programFilter = document.getElementById('programFilter').value;
             const sectionFilter = document.getElementById('sectionFilter').value;
             const cards = document.querySelectorAll('.student-card');
-            
+
             cards.forEach(card => {
                 const name = card.getAttribute('data-name').toLowerCase();
                 const roll = card.getAttribute('data-roll').toLowerCase();
                 const program = card.getAttribute('data-program');
                 const section = card.getAttribute('data-section');
-                
+
                 const matchSearch = name.includes(searchTerm) || roll.includes(searchTerm);
                 const matchProgram = !programFilter || program === programFilter;
                 const matchSection = !sectionFilter || section === sectionFilter;
-                
+
                 if (matchSearch && matchProgram && matchSection) {
-                    card.style.display = 'grid';
+                    card.style.display = 'block';
                 } else {
                     card.style.display = 'none';
                 }
@@ -305,19 +514,24 @@
             window.location.href = `/admin/students/${studentId}/edit`;
         }
 
+        function assignSection(studentId) {
+            // TODO: Open section assignment modal
+            alert('Section assignment feature coming soon!');
+        }
+
         async function deleteStudent(studentId, studentName) {
             if (!confirm(`Are you sure you want to delete ${studentName}? This will also delete their attendance records and test results.`)) {
                 return;
             }
-            
+
             try {
                 const response = await fetch(`/api/admin/students/${studentId}`, {
                     method: 'DELETE',
-                    headers: {'Content-Type': 'application/json'}
+                    headers: { 'Content-Type': 'application/json' }
                 });
-                
+
                 const result = await response.json();
-                
+
                 if (result.success) {
                     alert('Student deleted successfully');
                     location.reload();
@@ -331,4 +545,5 @@
         }
     </script>
 </body>
+
 </html>

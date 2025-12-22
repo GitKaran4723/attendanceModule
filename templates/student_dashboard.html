@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#1a237e">
+    <meta name="description" content="Student Dashboard - BCA BUB">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>My Dashboard - BCA BUB</title>
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+
+    <!-- Material Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #1a237e 0%, #283593 50%, #3949ab 100%);
+            min-height: 100vh;
+        }
+
+        .student-header {
+            background: linear-gradient(135deg, #1a237e, #ff6f00);
+            padding: 25px 20px;
+            color: white;
+            text-align: center;
+        }
+
+        .student-header h1 {
+            margin: 0;
+            font-size: 1.5rem;
+        }
+
+        .student-header p {
+            margin: 5px 0 0;
+            opacity: 0.9;
+        }
+
+        .student-profile {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 12px;
+            margin: 20px;
+            backdrop-filter: blur(10px);
+        }
+
+        .profile-avatar {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #ff6f00, #ff8f00);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: white;
+            text-transform: uppercase;
+        }
+
+        .profile-info h2 {
+            margin: 0;
+            color: white;
+            font-size: 1.2rem;
+        }
+
+        .profile-info p {
+            margin: 5px 0 0;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 0.9rem;
+        }
+
+        .main-container {
+            padding: 0 15px 100px;
+        }
+
+        .section-title {
+            color: white;
+            font-size: 1.1rem;
+            margin: 25px 0 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .subject-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 15px;
+        }
+
+        .subject-card {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            transition: transform 0.3s;
+        }
+
+        .subject-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .subject-icon {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #1a237e, #3949ab);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 15px;
+        }
+
+        .subject-icon i {
+            color: white;
+            font-size: 1.5rem;
+        }
+
+        .subject-name {
+            font-weight: 600;
+            color: #1a237e;
+            margin: 0 0 5px;
+            font-size: 0.95rem;
+        }
+
+        .subject-code {
+            color: #666;
+            font-size: 0.8rem;
+        }
+
+        .attendance-bar {
+            margin-top: 10px;
+            background: #e0e0e0;
+            border-radius: 10px;
+            height: 6px;
+            overflow: hidden;
+        }
+
+        .attendance-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff6f00, #ff8f00);
+            border-radius: 10px;
+        }
+
+        .attendance-text {
+            font-size: 0.75rem;
+            color: #888;
+            margin-top: 5px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 50px 20px;
+            color: white;
+        }
+
+        .empty-state i {
+            font-size: 4rem;
+            opacity: 0.5;
+            margin-bottom: 20px;
+        }
+
+        .empty-state h3 {
+            margin: 0 0 10px;
+        }
+
+        .empty-state p {
+            opacity: 0.8;
+        }
+
+        .quick-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #ff6f00;
+        }
+
+        .stat-label {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 0.85rem;
+            margin-top: 5px;
+        }
+
+        /* Bottom Navigation */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            display: flex;
+            justify-content: space-around;
+            padding: 10px 0;
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
+            z-index: 100;
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-decoration: none;
+            color: #666;
+            font-size: 0.75rem;
+            padding: 5px 15px;
+            transition: all 0.3s;
+        }
+
+        .nav-item.active {
+            color: #1a237e;
+        }
+
+        .nav-item i {
+            font-size: 1.5rem;
+            margin-bottom: 3px;
+        }
+
+        .logout-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            padding: 10px;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Header -->
+    <header class="student-header">
+        <button class="logout-btn" onclick="location.href='{{ url_for('logout') }}'">
+            <i class="material-icons">logout</i>
+        </button>
+        <h1>🎓 My Dashboard</h1>
+        <p>Welcome back, {{ student.first_name }}!</p>
+    </header>
+
+    <!-- Profile Card -->
+    <div class="student-profile">
+        <div class="profile-avatar">
+            {{ student.first_name[0] }}{{ student.last_name[0] }}
+        </div>
+        <div class="profile-info">
+            <h2>{{ student.first_name }} {{ student.last_name }}</h2>
+            <p>📋 {{ student.roll_number }} • {{ student.program.program_name if student.program else 'No Program' }}
+            </p>
+            {% if student.section %}
+            <p>🏫 Section: {{ student.section.section_name }}</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="main-container">
+        <!-- Quick Stats -->
+        <div class="quick-stats">
+            <div class="stat-card">
+                <div class="stat-value">{{ subjects|length }}</div>
+                <div class="stat-label">Subjects</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ attendance_percentage|default('--') }}%</div>
+                <div class="stat-label">Attendance</div>
+            </div>
+        </div>
+
+        <!-- My Subjects -->
+        <h3 class="section-title">
+            <i class="material-icons">menu_book</i>
+            My Subjects
+        </h3>
+
+        {% if subjects %}
+        <div class="subject-grid">
+            {% for subject in subjects %}
+            <div class="subject-card">
+                <div class="subject-icon">
+                    <i class="material-icons">book</i>
+                </div>
+                <p class="subject-name">{{ subject.subject_name }}</p>
+                <p class="subject-code">{{ subject.subject_code }}</p>
+                <div class="attendance-bar">
+                    <div class="attendance-fill" style="width: {{ subject.attendance_pct|default(75) }}%;"></div>
+                </div>
+                <p class="attendance-text">{{ subject.attendance_pct|default('--') }}% Attendance</p>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <i class="material-icons">school</i>
+            <h3>No Subjects Yet</h3>
+            <p>Your subjects will appear here once you're assigned to a section.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav">
+        <a href="{{ url_for('student_dashboard') }}" class="nav-item active">
+            <i class="material-icons">home</i>
+            <span>Home</span>
+        </a>
+        <a href="#" class="nav-item" onclick="alert('Coming soon!')">
+            <i class="material-icons">event</i>
+            <span>Timetable</span>
+        </a>
+        <a href="#" class="nav-item" onclick="alert('Coming soon!')">
+            <i class="material-icons">check_circle</i>
+            <span>Attendance</span>
+        </a>
+        <a href="{{ url_for('logout') }}" class="nav-item">
+            <i class="material-icons">logout</i>
+            <span>Logout</span>
+        </a>
+    </nav>
+</body>
+
+</html>

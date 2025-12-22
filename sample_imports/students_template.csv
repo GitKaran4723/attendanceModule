@@ -1,6 +1,6 @@
-enrollment_no,first_name,last_name,email,phone,date_of_birth
-2021001,Raj,Kumar,raj.kumar@bcabub.edu,9876543210,2003-05-15
-2021002,Priya,Sharma,priya.sharma@bcabub.edu,9876543211,2003-08-22
-2021003,Amit,Singh,amit.singh@bcabub.edu,9876543212,2003-06-10
-2021004,Neha,Verma,neha.verma@bcabub.edu,9876543213,2003-07-18
-2021005,Rohit,Gupta,rohit.gupta@bcabub.edu,9876543214,2003-04-25
+roll_number,first_name,last_name,email,date_of_birth,phone,guardian_name,guardian_phone,admission_year,program_code
+BCA2024001,Raj,Kumar,raj.kumar@bcabub.edu,2004-05-15,9876543210,Mr. Kumar,9876543220,2024,BCA
+BCA2024002,Priya,Sharma,priya.sharma@bcabub.edu,2004-08-22,9876543211,Mr. Sharma,9876543221,2024,BCA
+BCA2024003,Amit,Singh,amit.singh@bcabub.edu,2004-06-10,9876543212,Mr. Singh,9876543222,2024,BCA
+BCA2024004,Neha,Verma,neha.verma@bcabub.edu,2004-07-18,9876543213,Mr. Verma,9876543223,2024,BCA
+BCA2024005,Rohit,Gupta,rohit.gupta@bcabub.edu,2004-04-25,9876543214,Mr. Gupta,9876543224,2024,BCA
