@@ -69,6 +69,16 @@ self.addEventListener('activate', event => {
  * Strategy: Network First, falling back to Cache
  */
 self.addEventListener('fetch', event => {
+  // Skip POST requests - they should go directly to server
+  if (event.request.method !== 'GET') {
+    return;
+  }
+
+  // Skip API requests - they should always be fresh
+  if (event.request.url.includes('/api/')) {
+    return;
+  }
+
   // Handle Google Fonts and Material Icons
   if (event.request.url.includes('fonts.googleapis.com') ||
     event.request.url.includes('fonts.gstatic.com')) {

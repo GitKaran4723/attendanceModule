@@ -1,354 +1,378 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Work Diary - BCA BUB</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Work Diary - Faculty</title>
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <meta name="theme-color" content="#6200ea">
+
+    <!-- Google Fonts & Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
-    <meta name="theme-color" content="#2196F3">
+
     <style>
-        .status-badge {
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: 500;
-            display: inline-block;
+        :root {
+            --primary-color: #6200ea;
+            --primary-light: #b388ff;
+            --secondary-color: #00bfa5;
+            --bg-color: #f5f5f7;
+            --surface-color: #ffffff;
+            --text-primary: #1d1d1f;
+            --text-secondary: #86868b;
+            --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            --border-radius: 16px;
         }
-        .status-draft { background: #e3f2fd; color: #1976d2; }
-        .status-submitted { background: #fff3e0; color: #f57c00; }
-        .status-approved { background: #e8f5e9; color: #388e3c; }
-        .status-rejected { background: #ffebee; color: #d32f2f; }
-        
-        .diary-card {
-            background: white;
-            border-radius: 8px;
-            padding: 16px;
-            margin-bottom: 12px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding-bottom: 80px;
+            color: var(--text-primary);
+            -webkit-tap-highlight-color: transparent;
         }
-        
-        .diary-header {
+
+        /* App Bar */
+        .app-bar {
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
+            padding: 16px 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 12px;
-        }
-        
-        .diary-number {
-            font-weight: 600;
-            color: #1976d2;
-            font-size: 14px;
-        }
-        
-        .diary-info {
-            font-size: 14px;
-            color: #666;
-            margin: 4px 0;
-        }
-        
-        .diary-actions {
-            margin-top: 12px;
-            display: flex;
-            gap: 8px;
-        }
-        
-        .btn-small {
-            padding: 6px 12px;
-            font-size: 13px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-        }
-        
-        .btn-edit { background: #e3f2fd; color: #1976d2; }
-        .btn-submit { background: #fff3e0; color: #f57c00; }
-        .btn-approve { background: #e8f5e9; color: #388e3c; }
-        .btn-reject { background: #ffebee; color: #d32f2f; }
-        
-        .fab {
-            position: fixed;
-            bottom: 80px;
-            right: 20px;
-            width: 56px;
-            height: 56px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 10px rgba(98, 0, 234, 0.2);
             color: white;
+        }
+
+        .app-bar-title {
+            font-size: 20px;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .icon-btn {
+            background: rgba(255, 255, 255, 0.2);
             border: none;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            cursor: pointer;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: transform 0.2s;
+            color: white;
+            cursor: pointer;
+            transition: background 0.2s;
         }
-        
-        .fab:hover {
-            transform: scale(1.1);
+
+        .icon-btn:active {
+            background: rgba(255, 255, 255, 0.3);
         }
-        
-        .empty-state {
-            text-align: center;
-            padding: 48px 20px;
-            color: #999;
+
+        /* Search Bar */
+        .search-container {
+            padding: 20px;
+            background: var(--surface-color);
+            margin: -10px 0 20px 0;
+            border-radius: 0 0 var(--border-radius) var(--border-radius);
+            box-shadow: var(--card-shadow);
         }
-        
-        .empty-state i {
-            font-size: 64px;
-            opacity: 0.3;
+
+        .search-wrapper {
+            position: relative;
+        }
+
+        .search-wrapper i {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-secondary);
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 14px 16px 14px 48px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            font-size: 16px;
+            box-sizing: border-box;
+            transition: all 0.3s;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+
+        /* Table Container */
+        .diary-table-container {
+            background: var(--surface-color);
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            box-shadow: var(--card-shadow);
+            margin: 0 20px 20px 20px;
+        }
+
+        .diary-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        .diary-table th {
+            background: linear-gradient(135deg, rgba(98, 0, 234, 0.05), rgba(179, 136, 255, 0.05));
+            color: var(--primary-color);
+            font-weight: 700;
+            padding: 16px 12px;
+            border-bottom: 2px solid rgba(98, 0, 234, 0.1);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-size: 11px;
+            text-align: left;
+        }
+
+        .diary-table td {
+            padding: 16px 12px;
+            border-bottom: 1px solid #f0f0f0;
+            color: var(--text-secondary);
+            vertical-align: middle;
+        }
+
+        .diary-table tr:hover {
+            background: rgba(98, 0, 234, 0.02);
+        }
+
+        .diary-no {
+            font-family: 'Courier New', monospace;
+            font-weight: 600;
+            color: var(--primary-color);
+            background: rgba(98, 0, 234, 0.08);
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 12px;
+        }
+
+        .subject-code-badge {
+            font-weight: 700;
+            color: var(--secondary-color);
+        }
+
+        .hours-badge {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .lab-reduction {
+            color: #d32f2f;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        @media (max-width: 992px) {
+            .diary-table-container {
+                overflow-x: auto;
+                margin: 0 10px 20px 10px;
+            }
+
+            .diary-table {
+                min-width: 1000px;
+                /* Increased min-width for extra column */
+            }
+        }
+
+        /* Print Styles */
+        @media print {
+
+            .bottom-nav,
+            .search-container,
+            .icon-btn,
+            .student-count-col {
+                display: none !important;
+            }
+
+            .diary-table-container {
+                box-shadow: none;
+                margin: 0;
+            }
+
+            .diary-table th,
+            .diary-table td {
+                border: 1px solid #ddd;
+            }
+        }
+
+        /* Bottom Nav - Glassy Style */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            display: flex;
+            justify-content: space-around;
+            padding: 12px 0 24px 0;
+            /* Extra padding for iOS home indicator */
+            box-shadow: 0 -2px 20px rgba(0, 0, 0, 0.05);
+            z-index: 1000;
+            border-top: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 11px;
+            font-weight: 500;
+            gap: 4px;
+            transition: all 0.3s ease;
+            width: 25%;
+        }
+
+        .nav-item.active {
+            color: var(--primary-color);
+            transform: translateY(-2px);
+        }
+
+        .nav-item i {
+            font-size: 24px;
+            transition: all 0.3s ease;
+        }
+
+        .nav-item.active i {
+            font-variation-settings: 'FILL' 1;
         }
     </style>
 </head>
+
 <body>
     <!-- App Bar -->
     <header class="app-bar">
-        <button class="menu-btn" onclick="toggleMenu()">
-            <i class="material-icons">menu</i>
+        <button class="icon-btn" onclick="location.href='{{ url_for('faculty_dashboard_view') }}'">
+            <i class="material-icons-round">arrow_back</i>
         </button>
-        <h1 class="app-title">Work Diary</h1>
-        <button class="icon-btn" onclick="location.href='{{ url_for('logout') }}'">
-            <i class="material-icons">logout</i>
+        <h1 class="app-bar-title">Work Diary</h1>
+        <button class="icon-btn" onclick="window.print()">
+            <i class="material-icons-round">print</i>
         </button>
     </header>
 
-    <!-- Navigation Drawer -->
-    <nav class="drawer" id="drawer">
-        <div class="drawer-header">
-            <h2>BCA BUB</h2>
-            <p>Attendance System</p>
+    <!-- Search Bar -->
+    <div class="search-container">
+        <div class="search-wrapper">
+            <i class="material-icons-round">search</i>
+            <input type="text" id="searchInput" class="search-input"
+                placeholder="Search by diary no, subject, or topic..." onkeyup="filterDiary()">
         </div>
-        <ul class="nav-list">
-            <li class="nav-item">
-                <a href="{{ url_for('index') }}">
-                    <i class="material-icons">dashboard</i>
-                    <span>Dashboard</span>
-                </a>
-            </li>
-            <li class="nav-item active">
-                <a href="{{ url_for('work_diary_list') }}">
-                    <i class="material-icons">book</i>
-                    <span>Work Diary</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="{{ url_for('faculty') }}">
-                    <i class="material-icons">people</i>
-                    <span>Faculty</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="{{ url_for('students') }}">
-                    <i class="material-icons">school</i>
-                    <span>Students</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="{{ url_for('attendance') }}">
-                    <i class="material-icons">assignment_turned_in</i>
-                    <span>Attendance</span>
-                </a>
-            </li>
-        </ul>
-    </nav>
+    </div>
 
-    <!-- Main Content -->
-    <main class="main-content">
-        <div class="container">
-            {% if diaries %}
+    <!-- Table -->
+    <div class="diary-table-container">
+        <table class="diary-table" id="diaryTable">
+            <thead>
+                <tr>
+                    <th style="width: 50px;">Sl. No</th>
+                    <th style="width: 140px;">Diary No.</th>
+                    <th style="width: 110px;">Date</th>
+                    <th>Particulars / Topic / Semester</th>
+                    <th style="width: 100px;">Actual Hours</th>
+                    <th style="width: 120px;">Claiming Hours</th>
+                    <th style="width: 110px;">Subject Code</th>
+                    <th style="width: 110px;" class="student-count-col">Attended</th>
+                </tr>
+            </thead>
+            <tbody id="diaryBody">
+                {% if diaries %}
                 {% for diary in diaries %}
-                <div class="diary-card">
-                    <div class="diary-header">
-                        <span class="diary-number">{{ diary.diary_number }}</span>
-                        <span class="status-badge status-{{ diary.status }}">
-                            {{ diary.status.replace('_', ' ').title() }}
+                <tr class="diary-row">
+                    <td style="text-align: center; font-weight: 600;">{{ diary.sl_no }}</td>
+                    <td><a href="{{ url_for('faculty_attendance_session_detail', session_id=diary.session_id) }}"
+                            class="diary-no" style="text-decoration: none;">{{ diary.diary_no }}</a></td>
+                    <td>{{ diary.date.strftime('%d-%m-%Y') }}</td>
+                    <td>
+                        <div style="font-weight: 600; color: var(--text-primary);">{{ diary.subject_name }}</div>
+                        <div style="font-size: 13px; margin-top: 2px;">{{ diary.particulars }}</div>
+                    </td>
+                    <td class="hours-badge">{{ diary.actual_hours }}h</td>
+                    <td>
+                        <div class="{{ 'lab-reduction' if diary.is_lab else 'hours-badge' }}">
+                            {{ diary.claiming_hours }}h
+                            {% if diary.is_lab %}
+                            <i class="material-icons-round" style="font-size: 14px;"
+                                title="Lab reduction applied (3/4)">info</i>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td><span class="subject-code-badge">{{ diary.subject_code }}</span></td>
+                    <td class="student-count-col" style="text-align: center;">
+                        <span class="status-badge"
+                            style="background: rgba(98, 0, 234, 0.05); color: var(--primary-color); font-weight: 700; border: 1px solid rgba(98, 0, 234, 0.1);">
+                            {{ diary.present_count }}/{{ diary.total_count }}
                         </span>
-                    </div>
-                    
-                    <div class="diary-info">
-                        <i class="material-icons" style="font-size: 16px; vertical-align: middle;">event</i>
-                        {{ diary.date.strftime('%d %b %Y') }} | 
-                        {{ diary.start_time.strftime('%H:%M') }} - {{ diary.end_time.strftime('%H:%M') }}
-                        ({{ diary.duration_hours }}h)
-                    </div>
-                    
-                    <div class="diary-info">
-                        <i class="material-icons" style="font-size: 16px; vertical-align: middle;">class</i>
-                        {{ diary.activity_type.replace('_', ' ').title() }}
-                        {% if diary.subject %}
-                        - {{ diary.subject.subject_name }}
-                        {% endif %}
-                    </div>
-                    
-                    {% if diary.students_present is not none %}
-                    <div class="diary-info">
-                        <i class="material-icons" style="font-size: 16px; vertical-align: middle;">group</i>
-                        Students: {{ diary.students_present }}/{{ diary.students_total }}
-                    </div>
-                    {% endif %}
-                    
-                    {% if diary.activity_title %}
-                    <div class="diary-info">
-                        <strong>{{ diary.activity_title }}</strong>
-                    </div>
-                    {% endif %}
-                    
-                    <div class="diary-actions">
-                        {% if diary.status == 'draft' or diary.status == 'rejected' %}
-                        <button class="btn-small btn-edit" onclick="editDiary('{{ diary.diary_id }}')">
-                            <i class="material-icons" style="font-size: 16px;">edit</i>
-                            Edit
-                        </button>
-                        <button class="btn-small btn-submit" onclick="submitDiary('{{ diary.diary_id }}')">
-                            <i class="material-icons" style="font-size: 16px;">send</i>
-                            Submit
-                        </button>
-                        {% endif %}
-                        
-                        {% if diary.status == 'submitted' and (session.role == 'admin' or session.role == 'hod') %}
-                        <button class="btn-small btn-approve" onclick="approveDiary('{{ diary.diary_id }}')">
-                            <i class="material-icons" style="font-size: 16px;">check_circle</i>
-                            Approve
-                        </button>
-                        <button class="btn-small btn-reject" onclick="rejectDiary('{{ diary.diary_id }}')">
-                            <i class="material-icons" style="font-size: 16px;">cancel</i>
-                            Reject
-                        </button>
-                        {% endif %}
-                    </div>
-                    
-                    {% if diary.approval_remarks %}
-                    <div class="diary-info" style="margin-top: 8px; padding: 8px; background: #f5f5f5; border-radius: 4px;">
-                        <strong>Remarks:</strong> {{ diary.approval_remarks }}
-                    </div>
-                    {% endif %}
-                </div>
+                    </td>
+                </tr>
                 {% endfor %}
-            {% else %}
-                <div class="empty-state">
-                    <i class="material-icons">book</i>
-                    <h3>No Work Diary Entries</h3>
-                    <p>Click the + button to create your first entry</p>
-                </div>
-            {% endif %}
-        </div>
-    </main>
-
-    <!-- Floating Action Button -->
-    <button class="fab" onclick="location.href='{{ url_for('create_work_diary') }}'">
-        <i class="material-icons">add</i>
-    </button>
+                {% else %}
+                <tr>
+                    <td colspan="7">
+                        <div class="empty-state">
+                            <i class="material-icons-round">event_busy</i>
+                            <p>No entries in your work diary yet.</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
 
     <!-- Bottom Navigation -->
     <nav class="bottom-nav">
-        <a href="{{ url_for('index') }}" class="nav-item">
-            <i class="material-icons">home</i>
+        <a href="{{ url_for('faculty_dashboard_view') }}" class="nav-item">
+            <i class="material-icons-round">dashboard</i>
             <span>Home</span>
         </a>
-        <a href="{{ url_for('faculty') }}" class="nav-item">
-            <i class="material-icons">people</i>
-            <span>Faculty</span>
+        {% if is_class_teacher %}
+        <a href="{{ url_for('faculty_my_class_view') }}" class="nav-item">
+            <i class="material-icons-round">school</i>
+            <span>My Class</span>
         </a>
-        <a href="{{ url_for('work_diary_list') }}" class="nav-item active">
-            <i class="material-icons">book</i>
+        {% endif %}
+        <a href="{{ url_for('faculty_work_diary') }}" class="nav-item active">
+            <i class="material-icons-round">book</i>
             <span>Diary</span>
         </a>
-        <a href="{{ url_for('attendance') }}" class="nav-item">
-            <i class="material-icons">assignment</i>
-            <span>Attendance</span>
+        <a href="{{ url_for('faculty_profile') }}" class="nav-item">
+            <i class="material-icons-round">person</i>
+            <span>Profile</span>
         </a>
     </nav>
 
     <script>
-        function toggleMenu() {
-            document.getElementById('drawer').classList.toggle('open');
-        }
+        function filterDiary() {
+            const input = document.getElementById('searchInput');
+            const filter = input.value.toLowerCase();
+            const rows = document.querySelectorAll('.diary-row');
 
-        function editDiary(diaryId) {
-            window.location.href = `/work-diary/${diaryId}/edit`;
-        }
-
-        async function submitDiary(diaryId) {
-            if (!confirm('Submit this diary entry for approval?')) return;
-            
-            try {
-                const response = await fetch(`/api/work-diary/${diaryId}/submit`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'}
-                });
-                const data = await response.json();
-                
-                if (data.success) {
-                    alert(data.message);
-                    location.reload();
+            rows.forEach(row => {
+                const text = row.innerText.toLowerCase();
+                if (text.includes(filter)) {
+                    row.style.display = '';
                 } else {
-                    alert('Error: ' + data.error);
+                    row.style.display = 'none';
                 }
-            } catch (error) {
-                alert('Failed to submit diary');
-            }
+            });
         }
-
-        async function approveDiary(diaryId) {
-            const remarks = prompt('Enter approval remarks (optional):');
-            if (remarks === null) return;
-            
-            try {
-                const response = await fetch(`/api/work-diary/${diaryId}/approve`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({remarks})
-                });
-                const data = await response.json();
-                
-                if (data.success) {
-                    alert(data.message);
-                    location.reload();
-                } else {
-                    alert('Error: ' + data.error);
-                }
-            } catch (error) {
-                alert('Failed to approve diary');
-            }
-        }
-
-        async function rejectDiary(diaryId) {
-            const remarks = prompt('Enter rejection reason:');
-            if (!remarks) return;
-            
-            try {
-                const response = await fetch(`/api/work-diary/${diaryId}/reject`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({remarks})
-                });
-                const data = await response.json();
-                
-                if (data.success) {
-                    alert(data.message);
-                    location.reload();
-                } else {
-                    alert('Error: ' + data.error);
-                }
-            } catch (error) {
-                alert('Failed to reject diary');
-            }
-        }
-
-        // Close drawer when clicking outside
-        document.addEventListener('click', function(event) {
-            const drawer = document.getElementById('drawer');
-            const menuBtn = document.querySelector('.menu-btn');
-            
-            if (!drawer.contains(event.target) && !menuBtn.contains(event.target)) {
-                drawer.classList.remove('open');
-            }
-        });
     </script>
 </body>
+
 </html>

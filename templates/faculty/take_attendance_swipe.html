@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Take Attendance</title>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #6366f1;
+            --primary-gradient: linear-gradient(135deg, #6366f1, #a855f7);
+            --success-color: #22c55e;
+            --danger-color: #ef4444;
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            overflow: hidden;
+            height: 100vh;
+            height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            touch-action: none;
+            /* Crucial for custom swipe gestures */
+        }
+
+        /* View Containers */
+        .view-container {
+            display: none;
+            flex: 1;
+            min-height: 0;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .view-container.active {
+            display: flex;
+        }
+
+        /* Branding Area */
+        .brand-header {
+            padding: 20px 20px 10px;
+            text-align: center;
+            background: white;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .college-icon-box {
+            width: 44px;
+            height: 44px;
+            background: var(--primary-gradient);
+            border-radius: 12px;
+            margin: 0 auto 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+        }
+
+        .college-name {
+            font-size: 16px;
+            font-weight: 700;
+            color: #1e293b;
+            margin: 0;
+        }
+
+        .dept-title {
+            font-size: 11px;
+            color: #64748b;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* iOS-Style Extruded Animation */
+        /* REFINED: Uses --start-x/y/rot to prevent snapping back */
+        @keyframes extrudeToPoint {
+            0% {
+                transform: scale(1) translate(var(--start-x, 0px), var(--start-y, 0px)) rotate(var(--start-rot, 0deg));
+                opacity: 1;
+                filter: blur(0px);
+            }
+
+            100% {
+                transform: scale(0.1) translate(var(--target-x), var(--target-y)) rotate(var(--start-rot, 0deg));
+                opacity: 0;
+                filter: blur(2px);
+            }
+        }
+
+        .anim-extrude {
+            animation: extrudeToPoint 0.5s cubic-bezier(0.19, 1, 0.22, 1) forwards !important;
+            pointer-events: none !important;
+        }
+
+        /* Brighter Color Coding for States */
+        .state-present {
+            box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.6) !important;
+            border-color: #00e676 !important;
+            background: #f0fdf4 !important;
+        }
+
+        .state-absent {
+            box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.6) !important;
+            border-color: #ff1744 !important;
+            background: #fef2f2 !important;
+        }
+
+        /* Horizontal Slide Animations */
+        @keyframes slideOutLeft {
+            to {
+                transform: translate(-150%, 0) rotate(-20deg);
+                opacity: 0;
+            }
+        }
+
+        @keyframes slideOutRight {
+            to {
+                transform: translate(150%, 0) rotate(20deg);
+                opacity: 0;
+            }
+        }
+
+        .slide-out-left {
+            animation: slideOutLeft 0.3s ease-out forwards;
+        }
+
+        .slide-out-right {
+            animation: slideOutRight 0.3s ease-out forwards;
+        }
+
+        .view-content {
+            flex: 1;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .view-content::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* Form Layout */
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #555;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 12px;
+            font-size: 16px;
+            font-family: inherit;
+            box-sizing: border-box;
+            background: white;
+        }
+
+        .btn-primary {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 16px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            width: 100%;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(98, 0, 234, 0.3);
+        }
+
+        /* Swipe View */
+        .header {
+            padding: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: white;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            z-index: 10;
+        }
+
+        .class-badge {
+            background: #ede7f6;
+            color: var(--primary-color);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .card-container {
+            flex: 1;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        .student-card {
+            position: absolute;
+            width: 85%;
+            height: 60%;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 20px;
+            transition: transform 0.3s ease;
+            cursor: grab;
+        }
+
+        .student-card.dragging {
+            transition: none;
+            cursor: grabbing;
+        }
+
+        .student-initial {
+            width: 100px;
+            height: 100px;
+            background: var(--primary-color);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+            font-weight: 700;
+            margin-bottom: 24px;
+        }
+
+        .student-name {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: #333;
+        }
+
+        .student-usn {
+            font-size: 16px;
+            color: #777;
+            background: #f5f5f5;
+            padding: 4px 12px;
+            border-radius: 12px;
+        }
+
+        .action-footer {
+            padding: 20px;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            background: white;
+            border-top: 1px solid rgba(0, 0, 0, 0.05);
+            padding-bottom: 30px;
+            /* Safe area for mobile */
+        }
+
+        .action-btn {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: transform 0.2s, background 0.2s;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .action-btn:active {
+            transform: scale(0.9);
+        }
+
+        .action-btn.absent {
+            background: #fee2e2;
+            color: #ef4444;
+        }
+
+        .action-btn.present {
+            background: #dcfce7;
+            color: #22c55e;
+        }
+
+        .action-btn.home-nav {
+            background: #f1f5f9;
+            color: #64748b;
+            width: 50px;
+            height: 50px;
+        }
+
+        .action-btn .material-icons-round {
+            font-size: 32px;
+        }
+
+        .action-btn.home-nav .material-icons-round {
+            font-size: 24px;
+        }
+
+        /* Review View */
+        .review-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+
+        .review-item {
+            background: white;
+            margin-bottom: 12px;
+            padding: 16px;
+            border-radius: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 4px solid #ddd;
+        }
+
+        .review-item.status-present {
+            border-left-color: var(--success-color);
+            background: linear-gradient(to right, rgba(0, 200, 83, 0.05), white);
+        }
+
+        .review-item.status-absent {
+            border-left-color: var(--danger-color);
+            background: linear-gradient(to right, rgba(213, 0, 0, 0.05), white);
+        }
+
+        .footer-action {
+            padding: 16px;
+            background: white;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .verify-check {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+            font-size: 14px;
+            color: #555;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Branding Header -->
+    <div class="brand-header" style="padding-bottom: 0;">
+        <div class="dept-title" style="font-size: 13px; font-weight: 700; color: #1e293b;">BCA DEPARTMENT</div>
+    </div>
+
+    <!-- 1. Setup View -->
+    <div id="setupView" class="view-container setup-view active">
+        <div class="view-content" style="flex: 1; overflow-y: auto; padding: 24px;">
+            <!-- Added Icon Here for Consistency in Setup -->
+            <div class="college-icon-box" style="margin: 0 auto 16px;">
+                <span class="material-icons-round">school</span>
+            </div>
+            <h2 style="text-align: center; margin-bottom: 24px; font-weight: 600; font-size: 20px;">Session Setup</h2>
+            <div class="form-group">
+                <label class="form-label">Subject *</label>
+                <select id="subjectSelect" class="form-control" onchange="handleSubjectChange()">
+                    <option value="">Select Subject</option>
+                    {% for alloc in allocations %}
+                    <option value="{{ alloc.subject_id }}" data-subject-type="{{ alloc.subject_type }}"
+                        data-subject-name="{{ alloc.subject_name }}" data-semester-id="{{ alloc.semester_id }}">
+                        {{ alloc.subject_name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group" id="sectionGroup">
+                <label class="form-label">Section *</label>
+                <select id="sectionSelect" class="form-control">
+                    <option value="">Select Section</option>
+                    {% for section in sections %}
+                    <option value="{{ section.section_id }}" data-semester="{{ section.current_semester }}">
+                        {{ section.section_name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Topic Taught</label>
+                <input type="text" id="topicInput" class="form-control" placeholder="e.g. Introduction to Trees">
+            </div>
+
+            <div class="form-group" style="display: flex; gap: 12px;">
+                <div style="flex: 1;">
+                    <label class="form-label">Class Start Time *</label>
+                    <input type="time" id="classStartTime" class="form-control" required>
+                </div>
+                <div style="flex: 1;">
+                    <label class="form-label">Class End Time *</label>
+                    <input type="time" id="classEndTime" class="form-control" required>
+                </div>
+            </div>
+
+            <div
+                style="background: #e8f5e9; padding: 12px; border-radius: 8px; font-size: 13px; color: #2e7d32; margin-bottom: 16px;">
+                <strong>📝 Note:</strong> Attendance entry time will be recorded automatically as <strong
+                    id="currentTimestamp"></strong>
+            </div>
+
+            <div style="display: flex; gap: 12px; margin-top: 24px; align-items: center;">
+                <a href="{{ url_for('faculty_dashboard_view') }}"
+                    style="flex: 1; text-align: center; padding: 15px; border-radius: 12px; border: 1.5px solid #e2e8f0; color: #64748b; text-decoration: none; font-weight: 600; font-size: 15px; background: #fff;">
+                    Cancel
+                </a>
+                <button class="btn-primary" onclick="startAttendance()" style="flex: 2; margin: 0; width: auto;">
+                    Start Session
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Swipe View -->
+    <div id="swipeView" class="view-container">
+        <!-- Modified Header: Row Layout [Subject] [Icon] [Count] -->
+        <div class="header"
+            style="display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; gap: 12px; height: 70px;">
+            <!-- Subject Info (Left) -->
+            <div class="class-badge"
+                style="flex: 1; margin: 0; font-size: 14px; padding: 8px 12px; justify-content: flex-start; text-align: left; background: #eef2ff; color: #4f46e5; height: 48px; box-sizing: border-box; display: flex; align-items: center;">
+                <span id="headerSubject" style="line-height: 1.2; width: 100%;">Subject</span>
+            </div>
+
+            <!-- Target for Vanishing Point (Center) -->
+            <div class="college-icon-box"
+                style="margin: 0; width: 48px; height: 48px; min-width: 48px; font-size: 24px; box-shadow: 0 4px 15px rgba(99, 102, 241, 0.25);">
+                <span class="material-icons-round" style="font-size: 28px;">school</span>
+            </div>
+
+            <!-- Progress Count (Right) -->
+            <div id="progressText"
+                style="text-align: right; font-size: 15px; font-weight: 700; color: #64748b; white-space: nowrap;">0/0
+            </div>
+        </div>
+
+        <div class="card-container" id="cardContainer">
+            <!-- Cards will be injected here JS -->
+        </div>
+
+        <div class="action-footer">
+            <button class="action-btn home-nav" onclick="markAbsent()" id="homeBtn"
+                style="color: #ef4444; background: #fee2e2;">
+                <span class="material-icons-round">home</span>
+            </button>
+            <div style="flex: 1;"></div> <!-- Spacer -->
+            <button class="action-btn present" onclick="markPresent()" id="presentBtn">
+                <span class="material-icons-round">done</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- 3. Review View -->
+    <div id="reviewView" class="view-container">
+        <div class="header" style="padding: 24px 20px 10px;">
+            <h2 style="margin:0; font-size: 20px; font-weight: 700;">Review Attendance</h2>
+            <div class="class-badge" style="margin-top: 8px;">
+                <span id="reviewCount">0/0 Present</span>
+            </div>
+        </div>
+
+        <div class="review-list" id="reviewList" style="flex: 1; overflow-y: auto; padding: 0 20px;">
+            <!-- List items injected via JS -->
+        </div>
+
+        <div class="footer-action">
+            <label class="verify-check">
+                <input type="checkbox" id="verifyCheckbox">
+                Verified by subject teacher
+            </label>
+            <button class="btn-primary" onclick="submitAttendance()" id="submitBtn" disabled>
+                Submit Final Attendance
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Data Store
+        let students = []; // {id, name, usn}
+        let attendance = {}; // {studentId: true/false}
+        let currentIndex = 0;
+        let allocationsData = {{ allocations_json | safe }};
+
+        // Update timestamp display every second
+        function updateTimestamp() {
+            const now = new Date();
+            const formatted = now.toLocaleString('en-IN', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            document.getElementById('currentTimestamp').textContent = formatted;
+        }
+        updateTimestamp();
+        setInterval(updateTimestamp, 1000);
+
+        let currentSubjectType = null;
+        let currentSectionId = null;
+
+        function handleSubjectChange() {
+            const subjectSelect = document.getElementById('subjectSelect');
+            const sectionSelect = document.getElementById('sectionSelect');
+            const sectionGroup = document.getElementById('sectionGroup');
+            const selectedOption = subjectSelect.options[subjectSelect.selectedIndex];
+
+            if (!selectedOption || !selectedOption.value) {
+                currentSubjectType = null;
+                return;
+            }
+
+            currentSubjectType = selectedOption.getAttribute('data-subject-type');
+            const semesterId = selectedOption.getAttribute('data-semester-id');
+
+            // Hide section group for electives
+            if (currentSubjectType === 'elective') {
+                sectionGroup.style.display = 'none';
+            } else {
+                sectionGroup.style.display = 'block';
+
+                // Filter sections by semester
+                const options = sectionSelect.querySelectorAll('option');
+                let matches = 0;
+                options.forEach(opt => {
+                    if (!opt.value) return; // Skip "Select Section"
+                    const sectionSem = opt.getAttribute('data-semester');
+                    if (semesterId && sectionSem === semesterId) {
+                        opt.style.display = 'block';
+                        matches++;
+                    } else {
+                        opt.style.display = 'none';
+                    }
+                });
+
+                // Reset selection if current selection is hidden
+                sectionSelect.value = "";
+
+                if (matches === 0) {
+                    console.warn('No sections found for semester:', semesterId);
+                }
+            }
+        }
+
+        async function startAttendance() {
+            const subjectSelect = document.getElementById('subjectSelect');
+            const sectionSelect = document.getElementById('sectionSelect');
+            const topicInput = document.getElementById('topicInput');
+            const startTime = document.getElementById('classStartTime');
+            const endTime = document.getElementById('classEndTime');
+
+            if (!subjectSelect.value || !startTime.value || !endTime.value) {
+                alert('Please fill all required fields');
+                return;
+            }
+
+            if (currentSubjectType !== 'elective' && !sectionSelect.value) {
+                alert('Please select a section');
+                return;
+            }
+
+            // fetch params
+            const subjectId = subjectSelect.value;
+            const sectionId = sectionSelect.value;
+            const topic = topicInput.value;
+
+            // Update Header Stats (Initial)
+            updateHeaderStats(0);
+
+            // API URL
+            let studentsUrl;
+            if (currentSubjectType === 'elective') {
+                studentsUrl = `/api/subject/${subjectId}/students`;
+            } else {
+                studentsUrl = `/api/section/${sectionId}/students`;
+            }
+
+            try {
+                const resp = await fetch(studentsUrl);
+                const data = await resp.json();
+
+                if (data.error) {
+                    alert(data.error);
+                } else {
+                    students = data;
+                    attendance = {};
+                    currentIndex = 0;
+                    if (students.length === 0) {
+                        alert('No students found for this selection.');
+                    } else {
+                        switchView('swipeView');
+                        loadCard(0);
+                    }
+                }
+            } catch (e) {
+                alert('Error fetching students');
+            }
+        }
+
+        function updateHeaderStats(presentCount) {
+            const subjectSelect = document.getElementById('subjectSelect');
+            const sectionSelect = document.getElementById('sectionSelect');
+            const subjName = subjectSelect.options[subjectSelect.selectedIndex].getAttribute('data-subject-name');
+            const secName = currentSubjectType === 'elective' ? 'Elective' : sectionSelect.options[sectionSelect.selectedIndex].text;
+            document.getElementById('headerSubject').innerHTML = `
+                <div style="font-size:14px; line-height:1.4;">
+                    ${subjName} | ${secName}<br>
+                    <span style="color: #22c55e; font-weight: 700;">${presentCount} Present</span>
+                </div>
+             `;
+        }
+
+        function switchView(viewId) {
+            document.querySelectorAll('.view-container').forEach(el => el.classList.remove('active'));
+            document.getElementById(viewId).classList.add('active');
+        }
+
+        function createCard(student) {
+            const card = document.createElement('div');
+            card.className = 'student-card';
+            card.innerHTML = `
+                <div class="student-initial">${student.first_name[0]}</div>
+                <div class="student-name">${student.first_name} ${student.last_name}</div>
+                <div class="student-usn">${student.usn || student.roll_number || 'No USN'}</div>
+            `;
+            return card;
+        }
+
+        function loadCard(index) {
+            if (index < 0 || index >= students.length) return;
+
+            currentIndex = index;
+            const container = document.getElementById('cardContainer');
+            container.innerHTML = '';
+
+            const student = students[currentIndex];
+            const card = createCard(student);
+            container.appendChild(card);
+
+            updateProgress();
+            initSwipe(card);
+        }
+
+        function updateProgress() {
+            document.getElementById('progressText').textContent = `${currentIndex + 1}/${students.length}`;
+        }
+
+        function initSwipe(card) {
+            let startX = 0, startY = 0;
+            let currX = 0, currY = 0;
+            let isDragging = false;
+            const threshold = 100;
+
+            card.addEventListener('touchstart', e => {
+                startX = e.touches[0].clientX;
+                startY = e.touches[0].clientY;
+                isDragging = true;
+                card.classList.add('dragging');
+            });
+
+            card.addEventListener('touchmove', e => {
+                if (!isDragging) return;
+                currX = e.touches[0].clientX - startX;
+                currY = e.touches[0].clientY - startY;
+
+                // Visual feedback: Rotate and move
+                const rot = currX * 0.05 + currY * 0.02;
+                card.style.transform = `translate(${currX}px, ${currY}px) rotate(${rot}deg)`;
+            });
+
+            card.addEventListener('touchend', e => {
+                if (!isDragging) return;
+                isDragging = false;
+                card.classList.remove('dragging');
+
+                // User Request: Disable "wipe to miss" (Navigation). 
+                // Only Present/Absent allowed via Horizontal Swipe.
+                // Right -> Present
+                // Left -> Absent
+
+                if (currX > threshold) {
+                    // Swipe Right -> Present
+                    markWithEffect(true, currX, currY, currX * 0.05 + currY * 0.02);
+                } else if (currX < -threshold) {
+                    // Swipe Left -> Absent
+                    markWithEffect(false, currX, currY, currX * 0.05 + currY * 0.02);
+                } else {
+                    // Reset if threshold not met (or vertical swipe which is now disabled)
+                    card.style.transform = '';
+                }
+            });
+        }
+
+        function navigateStudent(dir) {
+            const card = document.querySelector('.student-card');
+            if (card) {
+                // Animate current card out
+                if (dir === -1) card.classList.add('slide-out-right'); // Prev goes right (visual flow)
+                else card.classList.add('slide-out-left'); // Next goes left
+
+                setTimeout(() => {
+                    const nextIdx = currentIndex + dir;
+                    if (nextIdx >= 0 && nextIdx < students.length) {
+                        loadCard(nextIdx);
+                    } else {
+                        // Reset if boundary
+                        card.style.transform = '';
+                        card.classList.remove('slide-out-left', 'slide-out-right');
+                    }
+                }, 250);
+            }
+        }
+
+        function markWithEffect(isPresent, startX = 0, startY = 0, startRot = 0) {
+            const card = document.querySelector('.student-card');
+            if (!card) return;
+
+            // Remove drag transform purely to calculate Original-to-Target vector correctly.
+            // We immediately re-apply visual continuity via the animation keyframes.
+            // CRITICAL: Disable transition to prevent "snap-back" fighting with animation
+            card.style.transition = 'none';
+            card.style.transform = '';
+
+            // 1. Determine Target (College Icon for Present, Home Btn for Absent)
+            let targetEl;
+            if (isPresent) {
+                // Target the specific college icon in the active swipe header
+                targetEl = document.querySelector('#swipeView .header .college-icon-box');
+            } else {
+                // Target the home button in the footer
+                targetEl = document.getElementById('homeBtn');
+            }
+
+            // Fallback to center if elements missing
+            if (!targetEl) targetEl = document.body;
+
+            // 2. Add Feedback Class (Green/Red)
+            card.classList.add(isPresent ? 'state-present' : 'state-absent');
+
+            // 3. Calculate Extrusion Coordinates
+            // Rect after stripping transform is the "Layout Position"
+            const rect = card.getBoundingClientRect();
+            const targetRect = targetEl.getBoundingClientRect();
+
+            console.log(rect);
+            console.log(targetRect);
+
+            const targetX = targetRect.left + targetRect.width / 2 - (rect.left + rect.width / 2);
+            const targetY = targetRect.top + targetRect.height / 2 - (rect.top + rect.height / 2);
+
+            // Set variables for animation
+            // --start-x/y allows animation to begin from where the finger left off!
+            card.style.setProperty('--start-x', `${startX}px`);
+            card.style.setProperty('--start-y', `${startY}px`);
+            card.style.setProperty('--start-rot', `${startRot}deg`);
+            card.style.setProperty('--target-x', `${targetX}px`);
+            card.style.setProperty('--target-y', `${targetY}px`);
+
+            card.classList.add('anim-extrude');
+
+            // 3. Mark data
+            attendance[students[currentIndex].student_id] = isPresent;
+
+            // Update Header Count
+            const currentPresent = Object.values(attendance).filter(v => v).length;
+            updateHeaderStats(currentPresent);
+
+            // 4. Clean up and load next
+            setTimeout(() => {
+                if (currentIndex + 1 < students.length) {
+                    loadCard(currentIndex + 1);
+                } else {
+                    showReview();
+                }
+            }, 500);
+        }
+
+        function markPresent() { markWithEffect(true); }
+        function markAbsent() { markWithEffect(false); }
+
+        function homeWithEffect() {
+            // Deprecated name, but keeping for button compatibility if needed, though buttons call markPresent/Absent directly now.
+            markAbsent();
+        }
+
+        // Keyboard Support
+        document.addEventListener('keydown', (e) => {
+            if (document.getElementById('swipeView').classList.contains('active')) {
+                if (e.key === 'ArrowUp') markWithEffect(true);
+                if (e.key === 'ArrowDown') markWithEffect(false);
+                if (e.key === 'ArrowLeft') navigateStudent(-1);
+                if (e.key === 'ArrowRight') navigateStudent(1);
+            }
+        });
+
+        function showReview() {
+            switchView('reviewView');
+            const list = document.getElementById('reviewList');
+            list.innerHTML = '';
+
+            let presentCount = 0;
+            students.forEach(s => {
+                const isPresent = attendance[s.student_id];
+                if (isPresent) presentCount++;
+
+                const item = document.createElement('div');
+                item.className = 'review-item';
+                item.style = 'background: white; padding: 16px; border-radius: 16px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.05); cursor: pointer;';
+                item.onclick = () => toggleReviewStatus(s.student_id);
+                item.innerHTML = `
+                    <div>
+                        <div style="font-weight: 600; font-size: 15px;">${s.first_name} ${s.last_name}</div>
+                        <div style="font-size: 12px; color: #64748b;">${s.usn || s.roll_number}</div>
+                    </div>
+                <div style="font-weight: 700; font-size: 12px; padding: 6px 12px; border-radius: 20px; ${isPresent ? 'background:#dcfce7; color:#22c55e;' : 'background:#fee2e2; color:#ef4444;'}">
+                    ${isPresent ? 'PRESENT' : 'ABSENT'}
+                </div>
+                `;
+                list.appendChild(item);
+            });
+
+            document.getElementById('reviewCount').textContent = `${presentCount}/${students.length} Present`;
+            document.getElementById('submitBtn').disabled = !document.getElementById('verifyCheckbox').checked;
+        }
+
+        function toggleReviewStatus(sid) {
+            attendance[sid] = !attendance[sid];
+            showReview();
+        }
+
+        // Checkbox Logic
+        document.getElementById('verifyCheckbox').addEventListener('change', (e) => {
+            document.getElementById('submitBtn').disabled = !e.target.checked;
+        });
+
+        async function submitAttendance() {
+            if (!document.getElementById('verifyCheckbox').checked) {
+                alert('Please verify the attendance first');
+                return;
+            }
+
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = true;
+            btn.textContent = 'Submitting...';
+
+            const payload = {
+                subject_id: document.getElementById('subjectSelect').value,
+                section_id: document.getElementById('sectionSelect').value || null,
+                topic: document.getElementById('topicInput').value,
+                class_start_time: document.getElementById('classStartTime').value,
+                class_end_time: document.getElementById('classEndTime').value,
+                records: Object.keys(attendance).map(id => ({
+                    student_id: id,
+                    status: attendance[id] ? 'present' : 'absent'
+                }))
+            };
+
+            try {
+                const resp = await fetch('/api/attendance/submit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const res = await resp.json();
+
+                if (res.success) {
+                    alert('Attendance submitted successfully!');
+
+                    // Generate and Download PDF
+                    await generateAndDownloadPDF(payload);
+
+                    // Redirect to dashboard (Simulate button click or similar)
+                    window.location.href = "{{ url_for('faculty_dashboard_view') }}";
+                } else {
+                    alert('Error: ' + res.error);
+                    btn.disabled = false;
+                    btn.textContent = 'Submit Final Attendance';
+                }
+            } catch (e) {
+                alert('Failed to submit attendance');
+                btn.disabled = false;
+                btn.textContent = 'Submit Final Attendance';
+            }
+        }
+
+        // Checkbox Logic
+        document.getElementById('verifyCheckbox').addEventListener('change', function () {
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = !this.checked;
+        });
+
+        // PDF Generation
+        async function generateAndDownloadPDF(data) {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+
+            // Header
+            doc.setFontSize(18);
+            doc.text("Attendance Report", 14, 22);
+            doc.setFontSize(11);
+            doc.setTextColor(100);
+
+            // Class Details
+            const subjectSelect = document.getElementById('subjectSelect');
+            const sectionSelect = document.getElementById('sectionSelect');
+            const subjectName = subjectSelect.options[subjectSelect.selectedIndex].getAttribute('data-subject-name');
+            const sectionName = currentSubjectType === 'elective' ? 'Elective' : sectionSelect.options[sectionSelect.selectedIndex].text;
+
+            doc.text(`Subject: ${subjectName}`, 14, 32);
+            doc.text(`Section: ${sectionName}`, 14, 38);
+            doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 44);
+            doc.text(`Time: ${data.class_start_time} - ${data.class_end_time}`, 14, 50);
+            doc.text(`Topic: ${data.topic || 'N/A'}`, 14, 56);
+
+            // Table
+            const tableData = data.records.map(rec => {
+                const s = students.find(s => s.student_id === rec.student_id);
+                return [
+                    s.roll_number || s.usn,
+                    `${s.first_name} ${s.last_name}`,
+                    rec.status.toUpperCase()
+                ];
+            });
+
+            doc.autoTable({
+                startY: 65,
+                head: [['Roll No', 'Name', 'Status']],
+                body: tableData,
+                theme: 'grid',
+                headStyles: { fillColor: [99, 102, 241] },
+                styles: { fontSize: 10 },
+                didParseCell: function (data) {
+                    if (data.section === 'body' && data.column.index === 2) {
+                        if (data.cell.raw === 'ABSENT') {
+                            data.cell.styles.textColor = [239, 68, 68];
+                        } else {
+                            data.cell.styles.textColor = [34, 197, 94];
+                        }
+                    }
+                }
+            });
+
+            // Stats
+            const presentCount = data.records.filter(r => r.status === 'present').length;
+            const totalCount = data.records.length;
+            const finalY = doc.lastAutoTable.finalY + 10;
+
+            doc.setFontSize(10);
+            doc.text(`Total Students: ${totalCount}`, 14, finalY);
+            doc.text(`Present: ${presentCount}`, 14, finalY + 6);
+            doc.text(`Absent: ${totalCount - presentCount}`, 14, finalY + 12);
+
+            // Save
+            const fileName = `Attendance_${subjectName}_${sectionName}_${new Date().toISOString().slice(0, 10)}.pdf`;
+            doc.save(fileName);
+
+            // Small delay to allow download to start
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+    </script>
+</body>
+
+</html>

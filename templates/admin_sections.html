@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Sections - BCA BUB Admin</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        .page-header {
+            background: var(--admin-gradient);
+            padding: 24px;
+            margin: -24px -24px 24px -24px;
+            border-radius: 0 0 var(--admin-radius-xl) var(--admin-radius-xl);
+            color: white;
+        }
+
+        .section-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 16px;
+            padding-bottom: 100px;
+        }
+
+        .section-card {
+            background: var(--admin-card-bg);
+            border-radius: var(--admin-radius-lg);
+            overflow: hidden;
+            box-shadow: var(--admin-shadow-sm);
+            transition: all 0.3s;
+        }
+
+        .section-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--admin-shadow-lg);
+        }
+
+        .card-content {
+            padding: 20px;
+        }
+
+        .section-name {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+
+        .section-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            font-size: 14px;
+            color: var(--admin-text-secondary);
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .meta-item i {
+            font-size: 18px;
+            color: var(--admin-primary);
+        }
+
+        .card-actions {
+            padding: 12px 20px;
+            background: #fafafa;
+            display: flex;
+            gap: 8px;
+            border-top: 1px solid #f0f0f0;
+        }
+
+        .btn-action {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: var(--admin-radius-sm);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        .btn-delete {
+            background: rgba(239, 68, 68, 0.08);
+            color: #ef4444;
+        }
+
+        .btn-edit {
+            background: rgba(26, 35, 126, 0.08);
+            color: var(--admin-primary);
+        }
+
+        .btn-edit:hover {
+            background: var(--admin-primary);
+            color: white;
+        }
+
+        .btn-delete {
+            background: rgba(239, 68, 68, 0.08);
+            color: #ef4444;
+        }
+
+        .btn-delete:hover {
+            background: #ef4444;
+            color: white;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 24px;
+            border-radius: var(--admin-radius-lg);
+            max-width: 500px;
+            width: 90%;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: var(--admin-radius-md);
+            font-size: 14px;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+    </style>
+</head>
+
+<body class="admin-page">
+    <header class="admin-app-bar">
+        <button class="menu-btn" onclick="location.href='{{ url_for('admin_dashboard') }}'">
+            <i class="material-icons">arrow_back</i>
+        </button>
+        <h1 class="app-title">Sections</h1>
+        <button class="icon-btn" onclick="location.href='{{ url_for('logout') }}'">
+            <i class="material-icons">logout</i>
+        </button>
+    </header>
+
+    <main class="admin-main">
+        <div class="admin-container">
+            <div class="page-header">
+                <h2>📋 Sections</h2>
+                <p>Manage class sections and assign students</p>
+            </div>
+
+            <div style="margin-bottom: 24px;">
+                <button class="admin-btn admin-btn-primary" onclick="openAddModal()">
+                    <i class="material-icons">add</i>
+                    Add Section
+                </button>
+            </div>
+
+            <div class="section-grid">
+                {% if sections %}
+                {% for section in sections %}
+                <div class="section-card">
+                    <div class="card-content">
+                        <h3 class="section-name">{{ section.section_name }}</h3>
+                        <div class="section-meta">
+                            <div class="meta-item">
+                                <i class="material-icons">school</i>
+                                <span>{{ section.program.name if section.program else 'No Program' }}</span>
+                            </div>
+                            <div class="meta-item">
+                                <i class="material-icons">calendar_today</i>
+                                <span>{{ section.academic_year or 'N/A' }}</span>
+                            </div>
+                            <div class="meta-item">
+                                <i class="material-icons">people</i>
+                                <span>{{ section.student_count }} Students</span>
+                            </div>
+                            <div class="meta-item">
+                                <i class="material-icons">class</i>
+                                <span>Semester {{ section.current_semester or 'N/A' }}</span>
+                            </div>
+                            <div class="meta-item">
+                                <i class="material-icons">person</i>
+                                <span>Class Teacher: {{ section.class_teacher.first_name ~ ' ' ~
+                                    section.class_teacher.last_name if section.class_teacher else 'Not Assigned'
+                                    }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-actions">
+                        <button class="btn-action btn-edit"
+                            onclick="openEditModal('{{ section.section_id }}', '{{ section.section_name }}', '{{ section.program_id }}', '{{ section.academic_year or "" }}', '{{ section.current_semester or "" }}')">
+                            <i class="material-icons">edit</i>
+                            Edit
+                        </button>
+                        <button class="btn-action btn-delete"
+                            onclick="deleteSection('{{ section.section_id }}', '{{ section.section_name }}')">
+                            <i class="material-icons">delete</i>
+                            Delete
+                        </button>
+                    </div>
+                </div>
+                {% endfor %}
+                {% else %}
+                <div style="text-align: center; padding: 60px; grid-column: 1/-1;">
+                    <i class="material-icons" style="font-size: 64px; opacity: 0.3;">class</i>
+                    <h3>No Sections Yet</h3>
+                    <p>Click "Add Section" to create your first section</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </main>
+
+    <!-- Add Section Modal -->
+    <div class="modal" id="addModal">
+        <div class="modal-content">
+            <h2>Add New Section</h2>
+            <form id="addForm" onsubmit="addSection(event)">
+                <div class="form-group">
+                    <label>Section Name *</label>
+                    <input type="text" name="section_name" required placeholder="e.g., BCA 3rd Year A">
+                </div>
+                <div class="form-group">
+                    <label>Program *</label>
+                    <select name="program_id" required>
+                        <option value="">Select Program</option>
+                        {% for program in programs %}
+                        <option value="{{ program.program_id }}">{{ program.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Academic Year</label>
+                    <input type="text" name="academic_year" placeholder="e.g., 2024-2025">
+                </div>
+                <div class="form-group">
+                    <label>Current Semester</label>
+                    <input type="number" name="current_semester" min="1" max="8" placeholder="1-8">
+                </div>
+                <div class="form-group">
+                    <label>Class Teacher</label>
+                    <select name="class_teacher_id">
+                        <option value="">No Class Teacher</option>
+                        {% for faculty in faculties %}
+                        <option value="{{ faculty.faculty_id }}">{{ faculty.first_name }} {{ faculty.last_name }} ({{
+                            faculty.employee_id }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="admin-btn admin-btn-secondary"
+                        onclick="closeAddModal()">Cancel</button>
+                    <button type="submit" class="admin-btn admin-btn-primary">Create Section</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Section Modal -->
+    <div class="modal" id="editModal">
+        <div class="modal-content">
+            <h2>Edit Section</h2>
+            <form id="editForm" onsubmit="editSection(event)">
+                <input type="hidden" id="editSectionId" name="section_id">
+                <div class="form-group">
+                    <label>Section Name *</label>
+                    <input type="text" id="editSectionName" name="section_name" required
+                        placeholder="e.g., BCA 3rd Year A">
+                </div>
+                <div class="form-group">
+                    <label>Program *</label>
+                    <select id="editProgramId" name="program_id" required>
+                        <option value="">Select Program</option>
+                        {% for program in programs %}
+                        <option value="{{ program.program_id }}">{{ program.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Academic Year</label>
+                    <input type="text" id="editAcademicYear" name="academic_year" placeholder="e.g., 2024-2025">
+                </div>
+                <div class="form-group">
+                    <label>Current Semester</label>
+                    <input type="number" id="editCurrentSemester" name="current_semester" min="1" max="8"
+                        placeholder="1-8">
+                </div>
+                <div class="form-group">
+                    <label>Class Teacher</label>
+                    <select id="editClassTeacherId" name="class_teacher_id">
+                        <option value="">No Class Teacher</option>
+                        {% for faculty in faculties %}
+                        <option value="{{ faculty.faculty_id }}">{{ faculty.first_name }} {{ faculty.last_name }} ({{
+                            faculty.employee_id }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="admin-btn admin-btn-secondary"
+                        onclick="closeEditModal()">Cancel</button>
+                    <button type="submit" class="admin-btn admin-btn-primary">Update Section</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <nav class="admin-bottom-nav">
+        <a href="{{ url_for('admin_dashboard') }}" class="nav-item">
+            <i class="material-icons">dashboard</i>
+            <span>Dashboard</span>
+        </a>
+        <a href="{{ url_for('admin_students') }}" class="nav-item">
+            <i class="material-icons">people</i>
+            <span>Students</span>
+        </a>
+        <a href="{{ url_for('admin_subjects') }}" class="nav-item">
+            <i class="material-icons">menu_book</i>
+            <span>Subjects</span>
+        </a>
+        <a href="{{ url_for('admin_sections') }}" class="nav-item active">
+            <i class="material-icons">class</i>
+            <span>Sections</span>
+        </a>
+    </nav>
+
+    <script>
+        function openAddModal() {
+            document.getElementById('addModal').style.display = 'flex';
+        }
+
+        function closeAddModal() {
+            document.getElementById('addModal').style.display = 'none';
+            document.getElementById('addForm').reset();
+        }
+
+        async function openEditModal(sectionId, sectionName, programId, academicYear, currentSemester) {
+            document.getElementById('editSectionId').value = sectionId;
+            document.getElementById('editSectionName').value = sectionName;
+            document.getElementById('editProgramId').value = programId;
+            document.getElementById('editAcademicYear').value = academicYear;
+            document.getElementById('editCurrentSemester').value = currentSemester;
+
+            // Fetch section details to get class teacher
+            try {
+                const response = await fetch(`/api/admin/sections/${sectionId}`);
+                const result = await response.json();
+                if (result.success && result.section) {
+                    document.getElementById('editClassTeacherId').value = result.section.class_teacher_id || '';
+                }
+            } catch (error) {
+                console.error('Failed to fetch section details:', error);
+            }
+
+            document.getElementById('editModal').style.display = 'flex';
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').style.display = 'none';
+        }
+
+        async function addSection(event) {
+            event.preventDefault();
+            const formData = new FormData(event.target);
+            const data = Object.fromEntries(formData);
+
+            try {
+                const response = await fetch('/api/admin/sections', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    alert('Section created successfully!');
+                    location.reload();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Failed to create section');
+                console.error(error);
+            }
+        }
+
+        async function editSection(event) {
+            event.preventDefault();
+            const sectionId = document.getElementById('editSectionId').value;
+            const formData = new FormData(event.target);
+            const data = Object.fromEntries(formData);
+
+            try {
+                const response = await fetch(`/api/admin/sections/${sectionId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    alert('Section updated successfully!');
+                    location.reload();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Failed to update section');
+                console.error(error);
+            }
+        }
+
+        async function deleteSection(sectionId, sectionName) {
+            if (!confirm(`Delete section "${sectionName}"?`)) return;
+
+            try {
+                const response = await fetch(`/api/admin/sections/${sectionId}`, {
+                    method: 'DELETE'
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    alert('Section deleted successfully');
+                    location.reload();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Failed to delete section');
+                console.error(error);
+            }
+        }
+    </script>
+</body>
+
+</html>

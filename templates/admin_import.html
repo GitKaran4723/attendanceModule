@@ -337,8 +337,8 @@
                             <input type="radio" name="import_type" value="student">
                             <div>
                                 <strong>👩‍🎓 Students</strong><br>
-                                <small>Required: roll_number, first_name, last_name, email, date_of_birth</small><br>
-                                <small style="color: var(--admin-accent);">🔑 Auto-login: Username = Roll No, Password =
+                                <small>Required: usn, name, email, date_of_birth, gender</small><br>
+                                <small style="color: var(--admin-accent);">🔑 Auto-login: Username = USN, Password =
                                     DOB (DDMMYYYY)</small>
                             </div>
                         </label>
@@ -390,6 +390,18 @@
                             <div class="progress-fill" id="progressFill"></div>
                         </div>
 
+                        <!-- Import Log Panel -->
+                        <div class="import-log-panel" id="importLogPanel" style="display: none;">
+                            <div class="log-header">
+                                <i class="material-icons">terminal</i>
+                                <span>Import Log</span>
+                                <span id="logCounter" class="log-counter">0 / 0</span>
+                            </div>
+                            <div class="log-content" id="logContent">
+                                <!-- Logs will be appended here -->
+                            </div>
+                        </div>
+
                         <button type="submit" class="btn-upload" id="uploadBtn" disabled>
                             <i class="material-icons">upload</i>
                             Start Import
@@ -405,6 +417,74 @@
                             <li>Maximum 1000 rows per import</li>
                         </ul>
                     </div>
+
+                    <style>
+                        .import-log-panel {
+                            background: #1a1a2e;
+                            border-radius: var(--admin-radius-md);
+                            margin: 20px 0;
+                            overflow: hidden;
+                            font-family: 'Consolas', 'Monaco', monospace;
+                        }
+
+                        .log-header {
+                            display: flex;
+                            align-items: center;
+                            gap: 10px;
+                            padding: 12px 16px;
+                            background: #16213e;
+                            color: #4ade80;
+                            font-weight: 600;
+                            font-size: 14px;
+                        }
+
+                        .log-header i {
+                            font-size: 18px;
+                        }
+
+                        .log-counter {
+                            margin-left: auto;
+                            color: #fbbf24;
+                        }
+
+                        .log-content {
+                            max-height: 250px;
+                            overflow-y: auto;
+                            padding: 12px 16px;
+                            font-size: 12px;
+                            line-height: 1.6;
+                        }
+
+                        .log-entry {
+                            padding: 4px 0;
+                            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+                        }
+
+                        .log-entry:last-child {
+                            border-bottom: none;
+                        }
+
+                        .log-success {
+                            color: #4ade80;
+                        }
+
+                        .log-error {
+                            color: #f87171;
+                        }
+
+                        .log-info {
+                            color: #60a5fa;
+                        }
+
+                        .log-warning {
+                            color: #fbbf24;
+                        }
+
+                        .log-time {
+                            color: #6b7280;
+                            margin-right: 8px;
+                        }
+                    </style>
                 </div>
 
                 <!-- Recent Imports -->
@@ -533,6 +613,25 @@
             }
         });
 
+        // Log helper functions
+        function addLog(message, type = 'info') {
+            const logContent = document.getElementById('logContent');
+            const time = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.innerHTML = `<span class="log-time">[${time}]</span> ${message}`;
+            logContent.appendChild(entry);
+            logContent.scrollTop = logContent.scrollHeight;
+        }
+
+        function clearLogs() {
+            document.getElementById('logContent').innerHTML = '';
+        }
+
+        function updateLogCounter(success, total) {
+            document.getElementById('logCounter').textContent = `${success} / ${total}`;
+        }
+
         // Form submission
         document.getElementById('uploadForm').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -543,39 +642,85 @@
             formData.append('file', selectedFile);
             formData.append('import_type', selectedType);
 
-            // Show progress bar
+            // Show progress bar and log panel
             const progressBar = document.getElementById('progressBar');
             const progressFill = document.getElementById('progressFill');
             const uploadBtn = document.getElementById('uploadBtn');
+            const logPanel = document.getElementById('importLogPanel');
 
             progressBar.style.display = 'block';
-            progressFill.style.width = '30%';
+            logPanel.style.display = 'block';
+            progressFill.style.width = '10%';
             uploadBtn.disabled = true;
             uploadBtn.innerHTML = '<i class="material-icons">hourglass_empty</i> Importing...';
 
+            // Clear previous logs
+            clearLogs();
+            addLog(`📁 Starting import of ${selectedFile.name}...`, 'info');
+            addLog(`📋 Import type: ${selectedType.toUpperCase()}`, 'info');
+
             try {
+                progressFill.style.width = '30%';
+                addLog('📤 Uploading file to server...', 'info');
+                addLog(`📦 File size: ${(selectedFile.size / 1024).toFixed(2)} KB`, 'info');
+
+                // Add timeout controller
+                const controller = new AbortController();
+                // Increase timeout to 5 minutes (300000ms) for large imports
+                const timeoutId = setTimeout(() => {
+                    controller.abort();
+                    addLog('⏰ Request timed out after 5 minutes', 'error');
+                }, 300000);
+
+                console.log('Sending fetch request to /api/admin/import');
                 const response = await fetch('/api/admin/import', {
                     method: 'POST',
-                    body: formData
+                    body: formData,
+                    signal: controller.signal
                 });
 
-                progressFill.style.width = '100%';
+                clearTimeout(timeoutId);
+                console.log('Response received:', response.status);
+                addLog(`📥 Response received: ${response.status}`, 'info');
+
+                progressFill.style.width = '70%';
+                addLog('⚙️ Processing data...', 'info');
+
                 const result = await response.json();
 
-                if (result.success) {
-                    alert(`✅ Import completed!\n\nSuccessful: ${result.successful}\nFailed: ${result.failed}`);
+                progressFill.style.width = '100%';
 
-                    if (result.errors && result.errors.length > 0) {
-                        console.log('Import errors:', result.errors);
+                if (result.success) {
+                    addLog(`✅ Import completed successfully!`, 'success');
+                    addLog(`📊 Total rows: ${result.successful + result.failed}`, 'info');
+                    addLog(`✓ Successful: ${result.successful}`, 'success');
+
+                    if (result.failed > 0) {
+                        addLog(`✗ Failed: ${result.failed}`, 'error');
                     }
 
+                    updateLogCounter(result.successful, result.successful + result.failed);
+
+                    // Show individual errors if any
+                    if (result.errors && result.errors.length > 0) {
+                        addLog('', 'info');
+                        addLog('⚠️ Error details:', 'warning');
+                        result.errors.forEach(err => {
+                            addLog(`   ${err}`, 'error');
+                        });
+                    }
+
+                    addLog('', 'info');
+                    addLog('🔄 Refreshing page in 3 seconds...', 'info');
+
                     // Reload page to show updated history
-                    setTimeout(() => location.reload(), 1500);
+                    setTimeout(() => location.reload(), 3000);
                 } else {
-                    alert(`❌ Import failed:\n${result.error}`);
+                    addLog(`❌ Import failed: ${result.error}`, 'error');
+                    updateLogCounter(0, 0);
                 }
             } catch (error) {
-                alert('Failed to upload file. Please try again.');
+                addLog(`❌ Network error: ${error.message}`, 'error');
                 console.error(error);
             } finally {
                 progressBar.style.display = 'none';

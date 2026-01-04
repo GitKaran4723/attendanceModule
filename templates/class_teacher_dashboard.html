@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#1565c0">
+    <meta name="description" content="Class Teacher Dashboard - BCA BUB">
+    <title>Class Teacher Dashboard - BCA BUB</title>
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+
+    <!-- Material Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #1565c0 0%, #1976d2 50%, #2196f3 100%);
+            min-height: 100vh;
+        }
+
+        .page-header {
+            background: linear-gradient(135deg, #1565c0, #0d47a1);
+            padding: 25px 20px;
+            color: white;
+            text-align: center;
+        }
+
+        .page-header h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .page-header p {
+            margin: 8px 0 0;
+            opacity: 0.9;
+            font-size: 0.95rem;
+        }
+
+        .main-container {
+            padding: 20px 15px 100px;
+        }
+
+        .section-card {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .section-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #1565c0;
+            margin: 0;
+        }
+
+        .checkin-count {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: linear-gradient(135deg, #4caf50, #2e7d32);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-weight: 600;
+        }
+
+        .checkin-count.warning {
+            background: linear-gradient(135deg, #ff9800, #f57c00);
+        }
+
+        .progress-bar {
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4caf50, #81c784);
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+
+        .student-lists {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .student-lists {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .list-section {
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .list-header {
+            padding: 12px 15px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .list-header.present {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .list-header.absent {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        .list-items {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .student-item {
+            display: flex;
+            align-items: center;
+            padding: 10px 15px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .student-item:last-child {
+            border-bottom: none;
+        }
+
+        .student-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: #1565c0;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin-right: 12px;
+        }
+
+        .student-info {
+            flex: 1;
+        }
+
+        .student-name {
+            font-weight: 500;
+            color: #333;
+        }
+
+        .student-roll {
+            font-size: 0.8rem;
+            color: #666;
+        }
+
+        .checkin-time-badge {
+            font-size: 0.75rem;
+            color: #4caf50;
+            background: #e8f5e9;
+            padding: 4px 10px;
+            border-radius: 12px;
+        }
+
+        .empty-list {
+            padding: 30px;
+            text-align: center;
+            color: #888;
+        }
+
+        .empty-list i {
+            font-size: 2.5rem;
+            opacity: 0.5;
+            margin-bottom: 10px;
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .nav-btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: background 0.2s;
+            text-decoration: none;
+        }
+
+        .nav-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .refresh-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: #1565c0;
+            color: white;
+            border: none;
+            box-shadow: 0 4px 15px rgba(21, 101, 192, 0.4);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .refresh-btn i {
+            font-size: 1.5rem;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Header -->
+    <header class="page-header">
+        <h1>
+            <i class="material-icons">groups</i>
+            Class Teacher Dashboard
+        </h1>
+        <p>{{ today.strftime('%A, %B %d, %Y') }}</p>
+    </header>
+
+    <div class="main-container">
+        <!-- Navigation -->
+        <div class="nav-buttons">
+            <a href="{{ url_for('index') }}" class="nav-btn">
+                <i class="material-icons">home</i> Home
+            </a>
+            <a href="{{ url_for('monthly_attendance_report') }}" class="nav-btn">
+                <i class="material-icons">assessment</i> Monthly Report
+            </a>
+        </div>
+
+        {% for data in section_data %}
+        <div class="section-card">
+            <div class="section-header">
+                <h2 class="section-title">
+                    {{ data.section.section_name }}
+                    {% if data.section.program %}
+                    - {{ data.section.program.program_code }}
+                    {% endif %}
+                </h2>
+                <div class="checkin-count {% if data.checked_in_count < data.total_students // 2 %}warning{% endif %}">
+                    <i class="material-icons">login</i>
+                    {{ data.checked_in_count }}/{{ data.total_students }}
+                </div>
+            </div>
+
+            <!-- Progress Bar -->
+            <div class="progress-bar">
+                <div class="progress-fill"
+                    style="width: {{ (data.checked_in_count / data.total_students * 100) if data.total_students > 0 else 0 }}%;">
+                </div>
+            </div>
+
+            <div class="student-lists">
+                <!-- Checked In Students -->
+                <div class="list-section">
+                    <div class="list-header present">
+                        <i class="material-icons">check_circle</i>
+                        Checked In ({{ data.checked_in_count }})
+                    </div>
+                    <div class="list-items">
+                        {% if data.checked_in_students %}
+                        {% for item in data.checked_in_students %}
+                        <div class="student-item">
+                            <div class="student-avatar">{{ item.student.first_name[0] }}{{ item.student.last_name[0] }}
+                            </div>
+                            <div class="student-info">
+                                <div class="student-name">{{ item.student.first_name }} {{ item.student.last_name }}
+                                </div>
+                                <div class="student-roll">{{ item.student.roll_number }}</div>
+                            </div>
+                            <span class="checkin-time-badge">{{ item.checkin_time.strftime('%I:%M %p') }}</span>
+                        </div>
+                        {% endfor %}
+                        {% else %}
+                        <div class="empty-list">
+                            <i class="material-icons">person_off</i>
+                            <p>No students checked in yet</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Not Checked In Students -->
+                <div class="list-section">
+                    <div class="list-header absent">
+                        <i class="material-icons">cancel</i>
+                        Not Checked In ({{ data.not_checked_in_students|length }})
+                    </div>
+                    <div class="list-items">
+                        {% if data.not_checked_in_students %}
+                        {% for student in data.not_checked_in_students %}
+                        <div class="student-item">
+                            <div class="student-avatar">{{ student.first_name[0] }}{{ student.last_name[0] }}</div>
+                            <div class="student-info">
+                                <div class="student-name">{{ student.first_name }} {{ student.last_name }}</div>
+                                <div class="student-roll">{{ student.roll_number }}</div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                        {% else %}
+                        <div class="empty-list">
+                            <i class="material-icons">celebration</i>
+                            <p>All students checked in!</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="section-card">
+            <div class="empty-list">
+                <i class="material-icons">warning</i>
+                <h3>No Sections Assigned</h3>
+                <p>You are not assigned as class teacher for any section. Contact admin to get assigned.</p>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Refresh Button -->
+    <button class="refresh-btn" onclick="location.reload()">
+        <i class="material-icons">refresh</i>
+    </button>
+</body>
+
+</html>

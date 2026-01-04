@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assign Sections - BCA BUB Admin</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --matrix-header-bg: #f8faff;
+            --matrix-hover-bg: #f0f7ff;
+            --matrix-border: #e0e7ff;
+            --sticky-shadow: 4px 0 12px rgba(0, 0, 0, 0.08);
+        }
+
+        body {
+            background-color: #f1f5f9;
+        }
+
+        /* Toolbar Styling */
+        .toolbar {
+            background: white;
+            padding: 20px;
+            border-radius: var(--admin-radius-lg);
+            box-shadow: var(--admin-shadow-sm);
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .search-wrapper {
+            position: relative;
+            flex: 1;
+            max-width: 400px;
+        }
+
+        .search-wrapper i {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--admin-text-secondary);
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 12px 12px 12px 42px;
+            border: 1px solid var(--matrix-border);
+            border-radius: 8px;
+            font-size: 15px;
+            transition: all 0.2s;
+            background: #fcfdff;
+        }
+
+        .search-input:focus {
+            border-color: var(--admin-primary);
+            background: white;
+            box-shadow: 0 0 0 3px rgba(26, 35, 126, 0.1);
+            outline: none;
+        }
+
+        .filter-group {
+            display: flex;
+            gap: 8px;
+            background: #f1f3f9;
+            padding: 4px;
+            border-radius: 8px;
+        }
+
+        .filter-chip {
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            color: #666;
+            transition: all 0.2s;
+            user-select: none;
+        }
+
+        .filter-chip.active {
+            background: white;
+            color: var(--admin-primary);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        /* Matrix Table Styling */
+        .matrix-container {
+            background: white;
+            border-radius: var(--admin-radius-lg);
+            box-shadow: var(--admin-shadow-md);
+            overflow: hidden;
+            /* For rounded corners */
+            border: 1px solid var(--matrix-border);
+            display: flex;
+            flex-direction: column;
+            max-height: calc(100vh - 200px);
+        }
+
+        .matrix-scroll-area {
+            overflow: auto;
+            position: relative;
+        }
+
+        .matrix-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            min-width: 1200px;
+        }
+
+        .matrix-table th,
+        .matrix-table td {
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--matrix-border);
+            text-align: left;
+            font-size: 14px;
+        }
+
+        .matrix-table th {
+            background: var(--matrix-header-bg);
+            font-weight: 600;
+            color: var(--admin-text-primary);
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            border-bottom: 2px solid var(--matrix-border);
+            text-transform: uppercase;
+            font-size: 12px;
+            letter-spacing: 0.5px;
+        }
+
+        .matrix-table td.section-cell {
+            text-align: center;
+            border-left: 1px solid #f5f7fa;
+            padding: 8px;
+        }
+
+        .matrix-table th.section-header {
+            text-align: center;
+            border-left: 1px solid var(--matrix-border);
+            min-width: 110px;
+        }
+
+        .matrix-table th.header-none {
+            background: #fff8f8;
+            color: #d32f2f;
+        }
+
+        /* Sticky Columns */
+        .col-sticky,
+        .col-sticky-2,
+        .col-sticky-3 {
+            position: sticky;
+            background: white;
+            z-index: 10;
+        }
+
+        .col-sticky {
+            left: 0;
+            width: 60px;
+            text-align: center;
+            color: #888;
+        }
+
+        .col-sticky-2 {
+            left: 60px;
+            width: 130px;
+            font-family: monospace;
+            font-size: 13px;
+        }
+
+        .col-sticky-3 {
+            left: 190px;
+            width: 220px;
+            border-right: 2px solid var(--matrix-border);
+            box-shadow: var(--sticky-shadow);
+            clip-path: inset(0 -15px 0 0);
+            /* Show shadow only on right */
+        }
+
+        .matrix-table th.col-sticky,
+        .matrix-table th.col-sticky-2,
+        .matrix-table th.col-sticky-3 {
+            background: var(--matrix-header-bg);
+            z-index: 30;
+        }
+
+        /* Row Hover & Stripes */
+        .matrix-table tbody tr:hover td {
+            background-color: var(--matrix-hover-bg);
+        }
+
+        .matrix-table tbody tr:hover .col-sticky,
+        .matrix-table tbody tr:hover .col-sticky-2,
+        .matrix-table tbody tr:hover .col-sticky-3 {
+            background-color: #fafcff;
+            /* Slightly different for sticky to maintain contrast */
+        }
+
+        /* Custom Radio Button */
+        .custom-radio-container {
+            display: inline-block;
+            position: relative;
+            cursor: pointer;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .custom-radio {
+            appearance: none;
+            width: 22px;
+            height: 22px;
+            border: 2px solid #cbd5e1;
+            border-radius: 50%;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .custom-radio:hover {
+            border-color: var(--admin-primary);
+            background-color: rgba(26, 35, 126, 0.05);
+        }
+
+        .custom-radio:checked {
+            border-color: var(--admin-primary);
+            background-color: white;
+        }
+
+        .custom-radio:checked::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(1);
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--admin-primary);
+            animation: radio-pop 0.2s ease-out;
+        }
+
+        .custom-radio-container.none-option .custom-radio:checked {
+            border-color: #d32f2f;
+        }
+
+        .custom-radio-container.none-option .custom-radio:checked::after {
+            background: #d32f2f;
+        }
+
+        @keyframes radio-pop {
+            0% {
+                transform: translate(-50%, -50%) scale(0);
+            }
+
+            80% {
+                transform: translate(-50%, -50%) scale(1.2);
+            }
+
+            100% {
+                transform: translate(-50%, -50%) scale(1);
+            }
+        }
+
+        /* Modified Row Indicator */
+        .matrix-table tr.modified td {
+            background-color: #fff8e1 !important;
+        }
+
+        .matrix-table tr.modified .col-sticky-3 {
+            border-right-color: #ffe082;
+        }
+
+        /* Bottom Action Bar */
+        .action-bar {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(0);
+            background: #1e293b;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 100px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            z-index: 1000;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .action-bar.hidden {
+            transform: translateX(-50%) translateY(150%);
+            opacity: 0;
+        }
+
+        .action-btn {
+            background: var(--admin-primary);
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 50px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.1s;
+            box-shadow: 0 4px 12px rgba(26, 35, 126, 0.4);
+        }
+
+        .action-btn:active {
+            transform: scale(0.96);
+        }
+
+        /* Modal styling */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(4px);
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: var(--admin-radius-lg);
+            padding: 32px;
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+        }
+    </style>
+</head>
+
+<body class="admin-page">
+    <div class="admin-container" style="max-width: 1600px; padding: 24px;">
+        <header style="margin-bottom: 24px; display: flex; align-items: center; gap: 16px;">
+            <button class="menu-btn" onclick="location.href='{{ url_for('admin_dashboard') }}'"
+                style="background: white; border: 1px solid #eee; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                <i class="material-icons">arrow_back</i>
+            </button>
+            <div>
+                <h1 style="font-size: 24px; margin: 0; color: #1a237e;">Assign Sections</h1>
+                <p style="margin: 4px 0 0; color: #666; font-size: 14px;">Manage student section assignments</p>
+            </div>
+            <div style="margin-left: auto;">
+                <button class="icon-btn" onclick="location.href='{{ url_for('logout') }}'">
+                    <i class="material-icons">logout</i>
+                </button>
+            </div>
+        </header>
+
+        <div class="toolbar">
+            <div class="search-wrapper">
+                <i class="material-icons">search</i>
+                <input type="text" id="searchInput" class="search-input" placeholder="Search by Student Name or USN..."
+                    onkeyup="filterTable()">
+            </div>
+
+            <div class="filter-group">
+                <input type="radio" name="viewFilter" value="all" id="radio-all" checked onchange="filterTable()"
+                    style="display:none">
+                <label for="radio-all" class="filter-chip active" id="filter-all" onclick="setActiveFilter(this)">All
+                    Students</label>
+
+                <input type="radio" name="viewFilter" value="unassigned" id="radio-unassigned" onchange="filterTable()"
+                    style="display:none">
+                <label for="radio-unassigned" class="filter-chip" id="filter-unassigned"
+                    onclick="setActiveFilter(this)">Unassigned Only</label>
+            </div>
+        </div>
+
+        <!-- Matrix Container -->
+        <div class="matrix-container">
+            <div class="matrix-scroll-area">
+                <table class="matrix-table" id="matrixTable">
+                    <thead>
+                        <tr>
+                            <th class="col-sticky">Sl</th>
+                            <th class="col-sticky-2">USN</th>
+                            <th class="col-sticky-3">Name</th>
+                            {% for section in sections %}
+                            <th class="section-header"
+                                title="{{ section.program.program_code }} - {{ section.section_name }}">
+                                <div style="font-size: 14px; margin-bottom: 2px;">{{ section.section_name }}</div>
+                                <div style="font-weight: 400; color: #666; font-size: 11px;">{{ section.current_semester
+                                    }} Sem</div>
+                            </th>
+                            {% endfor %}
+                            <th class="section-header header-none">None</th>
+                            <th class="section-header header-none"
+                                style="background: #fff5f5; color: #b91c1c; border-left: 2px solid #fee;">Left</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for student in students %}
+                        <tr class="student-row" data-student-id="{{ student.student_id }}"
+                            data-original-section="{{ 'left_college' if not student.is_active else (student.section_id or 'none') }}">
+                            <td class="col-sticky">{{ loop.index }}</td>
+                            <td class="col-sticky-2">{{ student.roll_number }}</td>
+                            <td class="col-sticky-3">
+                                <div style="font-weight: 500; color: #334155;">{{ student.first_name }} {{
+                                    student.last_name }}</div>
+                            </td>
+
+                            {% for section in sections %}
+                            <td class="section-cell">
+                                <label class="custom-radio-container">
+                                    <input type="radio" name="section_{{ student.student_id }}"
+                                        value="{{ section.section_id }}" class="custom-radio section-radio" {{ 'checked'
+                                        if student.section_id==section.section_id else '' }}
+                                        onchange="markModified(this)">
+                                </label>
+                            </td>
+                            {% endfor %}
+
+                            <!-- Unassign Option -->
+                            <td class="section-cell" style="background: rgba(255,165,0,0.05);">
+                                <label class="custom-radio-container none-option" title="Unassign (Keep Active)">
+                                    <input type="radio" name="section_{{ student.student_id }}" value="none"
+                                        class="custom-radio section-radio" {{ 'checked' if not student.section_id and
+                                        student.is_active else '' }} onchange="markModified(this)">
+                                </label>
+                            </td>
+
+                            <!-- Left College Option -->
+                            <td class="section-cell"
+                                style="background: rgba(255,0,0,0.05); border-left: 2px solid #fee;">
+                                <label class="custom-radio-container left-option" title="Left College (Inactive)">
+                                    <input type="radio" name="section_{{ student.student_id }}" value="left_college"
+                                        class="custom-radio section-radio warning-radio" {{ 'checked' if not
+                                        student.is_active else '' }} onchange="markModified(this)">
+                                </label>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div
+                style="padding: 12px 20px; background: #fafafa; border-top: 1px solid var(--matrix-border); color: #666; font-size: 13px; display: flex; justify-content: space-between;">
+                <span>Showing {{ students|length }} students</span>
+                <span>Assignments are auto-saved only when you click Update</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sticky Action Bar -->
+    <div class="action-bar hidden" id="actionBar">
+        <span id="modifiedCount" style="font-weight: 500;">0 changes</span>
+        <div style="width: 1px; height: 20px; background: rgba(255,255,255,0.2);"></div>
+        <button class="action-btn" onclick="prepareUpdate()">
+            Update Assignments
+        </button>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div class="modal" id="confirmModal">
+        <div class="modal-content">
+            <h2 style="margin: 0 0 16px; color: #1e293b;">Transfer Attendance?</h2>
+            <p style="color: #64748b; margin-bottom: 24px; line-height: 1.5;">
+                You are changing sections for some students.<br>
+                How should their past attendance be handled?
+            </p>
+
+            <div class="form-group"
+                style="text-align: left; background: #f8fafc; padding: 20px; border-radius: 12px; margin-bottom: 24px; border: 1px solid #e2e8f0;">
+                <label style="display: flex; gap: 16px; cursor: pointer; padding: 4px;">
+                    <input type="radio" name="transferOption" value="true" checked
+                        style="width: 20px; height: 20px; margin-top: 2px;">
+                    <div>
+                        <div style="font-weight: 600; color: #334155; margin-bottom: 4px;">Keep Attendance History</div>
+                        <div style="font-size: 13px; color: #64748b;">Attendance records will be preserved. Recommended
+                            for transfers.</div>
+                    </div>
+                </label>
+                <div style="height: 1px; background: #e2e8f0; margin: 16px 0;"></div>
+                <label style="display: flex; gap: 16px; cursor: pointer; padding: 4px;">
+                    <input type="radio" name="transferOption" value="false"
+                        style="width: 20px; height: 20px; margin-top: 2px;">
+                    <div>
+                        <div style="font-weight: 600; color: #ef4444; margin-bottom: 4px;">Reset Attendance</div>
+                        <div style="font-size: 13px; color: #64748b;">Deletes all attendance history for this year. Use
+                            if assignment was a mistake.</div>
+                    </div>
+                </label>
+            </div>
+
+            <div style="display: flex; gap: 12px; justify-content: center;">
+                <button onclick="closeModal()"
+                    style="padding: 10px 24px; border: 1px solid #cbd5e1; background: white; border-radius: 8px; font-weight: 600; color: #475569; cursor: pointer;">Cancel</button>
+                <button onclick="submitUpdates()"
+                    style="padding: 10px 24px; border: none; background: var(--admin-primary); border-radius: 8px; font-weight: 600; color: white; cursor: pointer; box-shadow: 0 4px 6px rgba(26, 35, 126, 0.2);">Confirm
+                    Update</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Filters UI
+        function setActiveFilter(element) {
+            document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+            element.classList.add('active');
+            // Checkbox logic handled by label 'for' attribute, but need to trigger filter
+            setTimeout(filterTable, 10);
+        }
+
+        // Filter Table Logic
+        function filterTable() {
+            const searchText = document.getElementById('searchInput').value.toLowerCase();
+            const viewFilter = document.querySelector('input[name="viewFilter"]:checked').value;
+            const rows = document.querySelectorAll('.student-row');
+
+            rows.forEach(row => {
+                const name = row.querySelector('.col-sticky-3').textContent.toLowerCase();
+                const usn = row.querySelector('.col-sticky-2').textContent.toLowerCase();
+                const isUnassigned = row.dataset.originalSection === 'none';
+
+                const matchesSearch = name.includes(searchText) || usn.includes(searchText);
+                const matchesFilter = viewFilter === 'all' || (viewFilter === 'unassigned' && isUnassigned);
+
+                if (matchesSearch && matchesFilter) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+
+        // Change Detection
+        function markModified(radio) {
+            const row = radio.closest('tr');
+            const originalSection = row.dataset.originalSection;
+            const currentSection = radio.value;
+
+            if (originalSection !== currentSection) {
+                row.classList.add('modified');
+            } else {
+                row.classList.remove('modified');
+            }
+
+            updateActionBar();
+        }
+
+        function updateActionBar() {
+            const count = document.querySelectorAll('tr.modified').length;
+            const bar = document.getElementById('actionBar');
+            const countText = document.getElementById('modifiedCount');
+
+            if (count > 0) {
+                bar.classList.remove('hidden');
+                countText.textContent = `${count} Pending Change${count !== 1 ? 's' : ''}`;
+            } else {
+                bar.classList.add('hidden');
+            }
+        }
+
+        // Update Flow
+        let pendingAssignments = [];
+
+        function prepareUpdate() {
+            const modifiedRows = document.querySelectorAll('tr.modified');
+            pendingAssignments = [];
+
+            modifiedRows.forEach(row => {
+                const studentId = row.dataset.studentId;
+                const selectedRadio = row.querySelector(`input[name="section_${studentId}"]:checked`);
+
+                // If None is selected, value is "none", which means section_id = null
+                let sectionId = selectedRadio.value;
+                if (sectionId === 'none') sectionId = null;
+
+                pendingAssignments.push({
+                    student_id: studentId,
+                    section_id: sectionId
+                });
+            });
+
+            if (pendingAssignments.length === 0) return;
+
+            // Show Confirmation Modal
+            document.getElementById('confirmModal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('confirmModal').classList.remove('active');
+        }
+
+        async function submitUpdates() {
+            const transferOption = document.querySelector('input[name="transferOption"]:checked').value === 'true';
+
+            try {
+                const response = await fetch('/api/admin/students/update-sections', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        assignments: pendingAssignments,
+                        transfer_attendance: transferOption
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Show success feedback
+                    const btn = document.querySelector('#confirmModal button:last-child');
+                    btn.textContent = 'Updated!';
+                    btn.style.background = '#4caf50';
+
+                    setTimeout(() => {
+                        location.reload();
+                    }, 500);
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Failed to update sections');
+                console.error(error);
+            }
+        }
+    </script>
+</body>
+
+</html>

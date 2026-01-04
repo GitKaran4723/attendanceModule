@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -9,21 +10,22 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>BCA BUB</title>
-    
+
     <!-- PWA Manifest -->
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
-    
+
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='icons/icon-192x192.png') }}">
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-192x192.png') }}">
-    
+
     <!-- Material Icons -->
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
-    
+
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
+
 <body>
     <!-- Top App Bar -->
     <header class="app-bar">
@@ -44,7 +46,8 @@
             <div>
                 <strong>{{ current_user.username }}</strong>
                 {% if current_user.role %}
-                <p style="font-size: 12px; opacity: 0.7; margin: 2px 0 0 0;">{{ current_user.role.role_name.title() }}</p>
+                <p style="font-size: 12px; opacity: 0.7; margin: 2px 0 0 0;">{{ current_user.role.role_name.title() }}
+                </p>
                 {% endif %}
             </div>
         </div>
@@ -75,9 +78,11 @@
             <li><a href="/" class="active"><span class="material-icons">dashboard</span> Dashboard</a></li>
             <li><a href="{{ url_for('faculty') }}"><span class="material-icons">school</span> Faculty</a></li>
             <li><a href="{{ url_for('students') }}"><span class="material-icons">people</span> Students</a></li>
-            <li><a href="{{ url_for('attendance') }}"><span class="material-icons">check_circle</span> Attendance</a></li>
+            <li><a href="{{ url_for('attendance') }}"><span class="material-icons">check_circle</span> Attendance</a>
+            </li>
             {% if current_user and current_user.role and current_user.role.role_name == 'admin' %}
-            <li><a href="{{ url_for('admin_dashboard') }}"><span class="material-icons">admin_panel_settings</span> Admin Panel</a></li>
+            <li><a href="{{ url_for('admin_dashboard') }}"><span class="material-icons">admin_panel_settings</span>
+                    Admin Panel</a></li>
             {% endif %}
             <li style="margin-top: auto; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;">
                 <a href="{{ url_for('logout') }}"><span class="material-icons">logout</span> Logout</a>
@@ -148,7 +153,7 @@
                     <span class="material-icons">chevron_right</span>
                 </div>
                 {% if session.role == 'faculty' or session.role == 'admin' or session.role == 'hod' %}
-                <div class="list-item" onclick="location.href='{{ url_for('work_diary_list') }}'">
+                <div class="list-item" onclick="location.href='{{ url_for('faculty_work_diary') }}'">
                     <span class="material-icons list-icon">book</span>
                     <div class="list-content">
                         <div class="list-title">Work Diary</div>
@@ -202,4 +207,5 @@
     <!-- JavaScript -->
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
+
 </html>

@@ -161,6 +161,26 @@ def admin_required(f):
     return decorated_function
 
 
+def student_required(f):
+    """
+    Decorator to require student role
+    Usage: @student_required
+    """
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not is_authenticated():
+            flash('Please log in to access this page.', 'warning')
+            return redirect(url_for('login', next=request.url))
+        
+        user_role = get_user_role()
+        if user_role not in ['student', 'parent']:
+            flash('Only students can access this page.', 'danger')
+            return redirect(url_for('index'))
+        
+        return f(*args, **kwargs)
+    return decorated_function
+
+
 # ============================================
 # Permission Checking
 # ============================================

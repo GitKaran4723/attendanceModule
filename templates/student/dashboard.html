@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Dashboard - BCA BUB</title>
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --glass-bg: rgba(255, 255, 255, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.5);
+            --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --danger-gradient: linear-gradient(135deg, #ff6b6b 0%, #ee5253 100%);
+            --text-primary: #2d3748;
+            --text-secondary: #718096;
+        }
+
+        body {
+            background: #f0f2f5;
+            font-family: 'Inter', sans-serif;
+
+            /* Dynamic background based on red zone */
+                {
+                % if is_red_zone %
+            }
+
+            background: linear-gradient(135deg, #fff5f5 0%, #ffe3e3 100%);
+
+                {
+                % else %
+            }
+
+            background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+
+                {
+                % endif %
+            }
+
+            min-height: 100vh;
+            margin: 0;
+            padding-bottom: 80px;
+        }
+
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            box-shadow: var(--glass-shadow);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .dashboard-header {
+            padding: 20px 20px 0;
+            margin-bottom: 20px;
+        }
+
+        .welcome-text {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 5px;
+        }
+
+        .student-name {
+            font-size: 24px;
+            font-weight: 800;
+            color: var(--text-primary);
+            margin: 0;
+        }
+
+        .student-meta {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-top: 5px;
+            display: flex;
+            gap: 10px;
+        }
+
+        /* Overall Percentage Card */
+        .overall-card {
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            color: white;
+            border: none;
+        }
+
+        .overall-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+
+                {
+                % if is_red_zone %
+            }
+
+            background: var(--danger-gradient);
+
+                {
+                % else %
+            }
+
+            background: var(--primary-gradient);
+
+                {
+                % endif %
+            }
+
+            z-index: -1;
+        }
+
+        .percentage-circle {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            margin: 0 auto 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 4px solid rgba(255, 255, 255, 0.4);
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .percentage-value {
+            font-size: 36px;
+            font-weight: 800;
+        }
+
+        .attendance-label {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+
+        .stats-row {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            padding-top: 15px;
+        }
+
+        .stat-item h4 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .stat-item span {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        /* Section Titles */
+        .section-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin: 25px 20px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* Motivational Quote */
+        .quote-card {
+            background: rgba(255, 255, 255, 0.9);
+            border-left: 4px solid #764ba2;
+            font-style: italic;
+        }
+
+        .quote-text {
+            font-size: 14px;
+            color: #4a5568;
+            line-height: 1.5;
+        }
+
+        /* Quick Actions Grid */
+        .quick-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            padding: 0 20px;
+        }
+
+        .quick-action-card {
+            background: white;
+            padding: 20px;
+            border-radius: 20px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            transition: transform 0.2s;
+            text-decoration: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .quick-action-card:active {
+            transform: scale(0.98);
+        }
+
+        .icon-box {
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 10px;
+            color: white;
+            font-size: 20px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .quick-action-card span {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        /* Analytics Table */
+        .analytics-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .analytics-table th {
+            text-align: left;
+            padding: 12px;
+            color: var(--text-secondary);
+            font-weight: 600;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .analytics-table td {
+            padding: 12px;
+            border-bottom: 1px solid #f7fafc;
+            color: var(--text-primary);
+        }
+
+        .subject-name {
+            font-weight: 600;
+        }
+
+        .badge {
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .badge-green {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .badge-orange {
+            background: #ffedd5;
+            color: #9a3412;
+        }
+
+        .badge-red {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        /* Bottom Nav */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            display: flex;
+            justify-content: space-around;
+            padding: 15px 0;
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.05);
+            z-index: 1000;
+            border-top: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .nav-item {
+            text-align: center;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 11px;
+            transition: color 0.2s;
+        }
+
+        .nav-item.active {
+            color: #764ba2;
+            font-weight: 600;
+        }
+
+        .nav-icon {
+            font-size: 20px;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        /* GPS Check-in Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 2000;
+            backdrop-filter: blur(4px);
+            justify-content: center;
+            align-items: flex-end;
+            /* Sheet style */
+        }
+
+        .modal-content {
+            background: white;
+            width: 100%;
+            border-radius: 20px 20px 0 0;
+            padding: 25px;
+            animation: slideUp 0.3s ease;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(100%);
+            }
+
+            to {
+                transform: translateY(0);
+            }
+        }
+
+        .checkin-btn {
+            background: var(--primary-gradient);
+            color: white;
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 700;
+            margin-top: 20px;
+            cursor: pointer;
+        }
+
+        .checkin-btn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+
+        /* Holidays List */
+        .holiday-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .holiday-date {
+            background: #f3e8ff;
+            color: #7e22ce;
+            padding: 8px 12px;
+            border-radius: 8px;
+            text-align: center;
+            margin-right: 15px;
+            min-width: 60px;
+        }
+
+        .holiday-day {
+            font-size: 10px;
+            text-transform: uppercase;
+            font-weight: 700;
+            display: block;
+        }
+
+        .holiday-num {
+            font-size: 16px;
+            font-weight: 700;
+            display: block;
+        }
+
+        .holiday-name {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="dashboard-header" style="display: flex; justify-content: space-between; align-items: flex-start;">
+        <div>
+            <div class="welcome-text">Welcome back,</div>
+            <h1 class="student-name">{{ student.first_name }} {{ student.last_name }}</h1>
+            <div class="student-meta">
+                <span><i class="fas fa-id-card"></i> {{ student.roll_number }}</span>
+                <span><i class="fas fa-layer-group"></i> {{ section.section_name }}</span>
+            </div>
+        </div>
+        <a href="{{ url_for('logout') }}"
+            style="background: white; padding: 10px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); color: #e53e3e; text-decoration: none; display: flex; align-items: center; justify-content: center;">
+            <i class="fas fa-sign-out-alt"></i>
+        </a>
+    </div>
+
+    <div style="padding: 0 20px;">
+        <!-- Motivational Quote -->
+        <div class="glass-card quote-card">
+            <p class="quote-text">"{{ motivational_quote }}"</p>
+        </div>
+
+        <!-- Overall Stats Card -->
+        <div class="glass-card overall-card">
+            <div class="percentage-circle">
+                <span class="percentage-value">{{ overall_percentage }}%</span>
+            </div>
+            <div class="attendance-label">Overall Attendance</div>
+
+            <div class="stats-row">
+                <div class="stat-item">
+                    <h4>{{ attended }}</h4>
+                    <span>Attended</span>
+                </div>
+                <div class="stat-item">
+                    <h4>{{ total_sessions }}</h4>
+                    <span>Total Classes</span>
+                </div>
+                <div class="stat-item">
+                    <h4>{{ total_sessions - attended }}</h4>
+                    <span>Absent</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="quick-actions">
+            <!-- Dynamic Check-In/Out Button -->
+            <a href="#" class="quick-action-card" onclick="openCheckInModal()">
+                {% if has_checked_in %}
+                {% if current_checkin and current_checkin.checkout_time %}
+                <!-- Checked Out (Done/Normal) -->
+                <div class="icon-box" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <span>Completed</span>
+                {% else %}
+                <!-- Checked In (Green) -->
+                <div class="icon-box" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+                    <i class="fas fa-user-check"></i>
+                </div>
+                <span>Checked In</span>
+                {% endif %}
+                {% else %}
+                <!-- Not Checked In (Normal) -->
+                <div class="icon-box" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                    <i class="fas fa-map-marker-alt"></i>
+                </div>
+                <span>Check In</span>
+                {% endif %}
+            </a>
+
+            <a href="{{ url_for('student_profile') }}" class="quick-action-card">
+                <div class="icon-box" style="background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);">
+                    <i class="fas fa-user-circle"></i>
+                </div>
+                <span>My Profile</span>
+            </a>
+        </div>
+
+        <!-- Analytics Section -->
+        <div class="section-title">
+            <span>Subject Wise Attendance</span>
+            <button onclick="refreshAnalytics()" style="background:none; border:none; color:#718096;"><i
+                    class="fas fa-sync-alt"></i></button>
+        </div>
+
+        <div class="glass-card" style="padding: 0; overflow: hidden;">
+            <div style="overflow-x: auto;">
+                <table class="analytics-table" id="analyticsTable">
+                    <thead>
+                        <tr>
+                            <th style="padding-left: 20px;">Subject</th>
+                            <th class="text-center">Cond.</th>
+                            <th class="text-center">Attd.</th>
+                            <th style="padding-right: 20px;">%</th>
+                        </tr>
+                    </thead>
+                    <tbody id="analyticsBody">
+                        <tr>
+                            <td colspan="4" style="text-align:center; padding: 20px;">Loading data...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Holidays Section -->
+        <div class="section-title">
+            <span>Upcoming Holidays</span>
+        </div>
+        <div class="glass-card" id="holidaysList">
+            <div style="text-align:center; padding: 10px; color: #718096;">Loading holidays...</div>
+        </div>
+
+        <!-- Recent Absences -->
+        <div class="section-title">
+            <span>Recent Absences (Last 3 Days)</span>
+        </div>
+        <div class="glass-card" id="absencesList">
+            <div style="text-align:center; padding: 10px; color: #718096;">Loading...</div>
+        </div>
+    </div>
+
+    <!-- Check-in/Out Modal -->
+    <div id="checkInModal" class="modal">
+        <div class="modal-content">
+            <h3 style="margin: 0 0 15px;">📍 Campus Attendance</h3>
+            <p style="color: #718096; margin-bottom: 20px;" id="checkinStatusText">
+                {% if has_checked_in %}
+                You are currently checked in. Leaving campus?
+                {% else %}
+                Verify your location to mark your presence at campus.
+                {% endif %}
+            </p>
+
+            <div id="checkinResult" style="display:none; padding: 10px; border-radius: 8px; margin-bottom: 15px;"></div>
+
+            {% if not has_checked_in %}
+            <button class="checkin-btn" id="btnCheckIn" onclick="performCheckIn()">
+                <i class="fas fa-fingerprint"></i> Verify & Check In
+            </button>
+            {% else %}
+            {% if current_checkin and current_checkin.checkout_time %}
+            <button class="checkin-btn" style="background: #10b981; pointer-events: none;">
+                <i class="fas fa-check-double"></i> Attendance Completed
+            </button>
+            {% else %}
+            <button class="checkin-btn" id="btnCheckOut" onclick="performCheckOut()"
+                style="background: var(--danger-gradient);">
+                <i class="fas fa-sign-out-alt"></i> Check Out Now
+            </button>
+            {% endif %}
+            {% endif %}
+
+            <button onclick="closeCheckInModal()"
+                style="width: 100%; padding: 15px; background: none; border: none; color: #718096; margin-top: 10px;">Close</button>
+        </div>
+    </div>
+
+    <!-- Bottom Nav -->
+    <div class="bottom-nav">
+        <a href="{{ url_for('student_dashboard') }}" class="nav-item active">
+            <span class="nav-icon"><i class="fas fa-home"></i></span>
+            Home
+        </a>
+        <a href="#" class="nav-item"
+            onclick="document.querySelector('.section-title').scrollIntoView({behavior: 'smooth'})">
+            <span class="nav-icon"><i class="fas fa-chart-pie"></i></span>
+            Analytics
+        </a>
+        <a href="#" class="nav-item" onclick="alert('📢 No new notices from your department.')">
+            <span class="nav-icon"><i class="fas fa-bell"></i></span>
+            Notice
+        </a>
+        <a href="{{ url_for('student_profile') }}" class="nav-item">
+            <span class="nav-icon"><i class="fas fa-user"></i></span>
+            Profile
+        </a>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            loadAnalytics();
+            loadHolidays();
+            loadAbsences();
+        });
+
+        function loadAnalytics() {
+            fetch('/api/student/analytics')
+                .then(response => response.json())
+                .then(data => {
+                    const tbody = document.getElementById('analyticsBody');
+                    tbody.innerHTML = '';
+
+                    if (data.subject_stats.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 20px;">No subjects found</td></tr>';
+                        return;
+                    }
+
+                    data.subject_stats.forEach(sub => {
+                        let badgeClass = 'badge-green';
+                        if (sub.percentage < 75) badgeClass = 'badge-red';
+                        else if (sub.percentage < 85) badgeClass = 'badge-orange';
+
+                        const row = `
+                        <tr>
+                            <td style="padding-left: 20px;">
+                                <div class="subject-name">${sub.subject_name}</div>
+                                <div style="font-size: 11px; color: #a0aec0;">${sub.subject_code}</div>
+                            </td>
+                            <td style="text-align: center;">${sub.total_classes}</td>
+                            <td style="text-align: center;">${sub.attended}</td>
+                            <td style="padding-right: 20px;">
+                                <span class="badge ${badgeClass}">${sub.percentage}%</span>
+                            </td>
+                        </tr>
+                    `;
+                        tbody.innerHTML += row;
+                    });
+                });
+        }
+
+        function loadHolidays() {
+            fetch('/api/student/holidays')
+                .then(response => response.json())
+                .then(data => {
+                    const container = document.getElementById('holidaysList');
+                    container.innerHTML = '';
+
+                    if (data.tomorrow_is_holiday) {
+                        container.innerHTML += `
+                        <div class="holiday-item" style="background: #fff5f5; border-radius: 8px; padding: 10px; margin-bottom: 10px; border: 1px solid #fed7d7;">
+                            <i class="fas fa-umbrella-beach" style="color: #e53e3e; margin: 0 15px;"></i>
+                            <div>
+                                <span style="color: #c53030; font-weight: 700; display: block;">Holiday Tomorrow!</span>
+                                <span style="font-size: 13px; color: #c53030;">${data.tomorrow_holiday_name}</span>
+                            </div>
+                        </div>
+                    `;
+                    }
+
+                    const allHolidays = [...data.upcoming, ...data.recent].slice(0, 3);
+
+                    if (allHolidays.length === 0) {
+                        container.innerHTML += '<div style="text-align: center; color: #a0aec0; padding: 10px;">No holidays nearby</div>';
+                        return;
+                    }
+
+                    allHolidays.forEach(h => {
+                        const d = new Date(h.date);
+                        const day = h.day.substring(0, 3);
+                        const dateNum = h.date.split(' ')[0];
+
+                        const html = `
+                        <div class="holiday-item">
+                            <div class="holiday-date">
+                                <span class="holiday-day">${day}</span>
+                                <span class="holiday-num">${dateNum}</span>
+                            </div>
+                            <div class="holiday-name">${h.name}</div>
+                        </div>
+                    `;
+                        container.innerHTML += html;
+                    });
+                });
+        }
+
+        function loadAbsences() {
+            fetch('/api/student/recent-absences')
+                .then(response => response.json())
+                .then(data => {
+                    const container = document.getElementById('absencesList');
+                    container.innerHTML = '';
+
+                    if (data.absences.length === 0) {
+                        container.innerHTML = '<div style="text-align: center; color: #a0aec0; padding: 15px;">✨ No recent absences! Great job.</div>';
+                        return;
+                    }
+
+                    data.absences.forEach(a => {
+                        container.innerHTML += `
+                        <div style="padding: 10px; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between;">
+                             <div>
+                                <div style="font-weight: 600; color: #2d3748;">${a.subject_name}</div>
+                                <div style="font-size: 12px; color: #e53e3e;">Marked Absent</div>
+                             </div>
+                             <div style="text-align: right;">
+                                <div style="font-size: 13px; font-weight: 600;">${a.date}</div>
+                                <div style="font-size: 11px; color: #718096;">${a.day}</div>
+                             </div>
+                        </div>
+                    `;
+                    });
+                });
+        }
+
+        function openCheckInModal() {
+            document.getElementById('checkInModal').style.display = 'flex';
+        }
+
+        function closeCheckInModal() {
+            document.getElementById('checkInModal').style.display = 'none';
+            document.getElementById('checkinResult').style.display = 'none';
+        }
+
+        function performCheckIn() {
+            const btn = document.getElementById('btnCheckIn');
+            performLocationAction('/api/student/check-in', btn, 'Checked In');
+        }
+
+        function performCheckOut() {
+            const btn = document.getElementById('btnCheckOut');
+            performLocationAction('/api/student/check-out', btn, 'Checked Out');
+        }
+
+        function performLocationAction(url, btn, successText) {
+            const result = document.getElementById('checkinResult');
+            const statusText = document.getElementById('checkinStatusText');
+            const originalText = btn.innerHTML;
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Locating...';
+
+            if (!navigator.geolocation) {
+                showActionError("Geolocation is not supported", btn, originalText);
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    console.log("User Location:", position.coords.latitude, position.coords.longitude);
+
+                    fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            latitude: position.coords.latitude,
+                            longitude: position.coords.longitude
+                        })
+                    })
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data.success) {
+                                result.style.display = 'block';
+                                result.style.background = '#d1fae5';
+                                result.style.color = '#065f46';
+                                result.innerHTML = `<strong>Success!</strong> ${data.message} at ${data.checkin_time || data.checkout_time}`;
+
+                                btn.innerHTML = `<i class="fas fa-check-circle"></i> ${successText}`;
+                                // Reload page after 2 seconds to update UI state
+                                setTimeout(() => location.reload(), 2000);
+                            } else {
+                                showActionError(data.error, btn, originalText);
+                            }
+                        })
+                        .catch(err => showActionError("Network error. Try again.", btn, originalText));
+                },
+                () => {
+                    showActionError("Unable to retrieve your location.", btn, originalText);
+                }
+            );
+        }
+
+        function showActionError(msg, btn, originalText) {
+            const result = document.getElementById('checkinResult');
+            result.style.display = 'block';
+            result.style.background = '#fee2e2';
+            result.style.color = '#991b1b';
+            result.innerHTML = `<strong>Error:</strong> ${msg}`;
+
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+
+        function refreshAnalytics() {
+            loadAnalytics();
+        }
+    </script>
+</body>
+
+</html>

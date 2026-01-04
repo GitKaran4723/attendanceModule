@@ -1,0 +1,17 @@
+
+@app.route('/faculty/session/<session_id>')
+@faculty_required
+def faculty_attendance_session_detail(session_id):
+    """
+    View details of a specific attendance session
+    """
+    session = AttendanceSession.query.filter_by(attendance_session_id=session_id).first_or_404()
+    
+    # Optional: Verify user permission (e.g., owner or admin)
+    current_user = get_current_user()
+    if session.taken_by_user_id != current_user.user_id:
+        pass # Allow for now or implement restriction
+
+    records = AttendanceRecord.query.filter_by(attendance_session_id=session.attendance_session_id).join(Student).order_by(Student.roll_number).all()
+    
+    return render_template('faculty/session_detail.html', session=session, records=records)

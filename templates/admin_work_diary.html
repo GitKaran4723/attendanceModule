@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Work Diaries - Admin</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body class="admin-page">
+    <!-- App Bar -->
+    <header class="admin-app-bar">
+        <button class="menu-btn" onclick="toggleMenu()">
+            <i class="material-icons">menu</i>
+        </button>
+        <h1 class="app-title">Work Diaries</h1>
+        <button class="icon-btn" onclick="location.href='{{ url_for('logout') }}'">
+            <i class="material-icons">logout</i>
+        </button>
+    </header>
+
+    <!-- Navigation Drawer -->
+    <nav class="admin-drawer" id="drawer">
+        <div class="admin-drawer-header">
+            <h2>🎓 BCA BUB</h2>
+            <p>Attendance & Work Diary System</p>
+            <span class="role-badge">Admin Panel</span>
+        </div>
+        <ul class="admin-nav-list">
+            <li class="admin-nav-item">
+                <a href="{{ url_for('admin_dashboard') }}">
+                    <i class="material-icons">dashboard</i>
+                    <span>Dashboard</span>
+                </a>
+            </li>
+            <li class="admin-nav-item">
+                <a href="{{ url_for('admin_faculty') }}">
+                    <i class="material-icons">school</i>
+                    <span>Faculty</span>
+                </a>
+            </li>
+            <li class="admin-nav-item">
+                <a href="{{ url_for('admin_students') }}">
+                    <i class="material-icons">people</i>
+                    <span>Students</span>
+                </a>
+            </li>
+            <li class="admin-nav-item">
+                <a href="{{ url_for('admin_subjects') }}">
+                    <i class="material-icons">book</i>
+                    <span>Subjects</span>
+                </a>
+            </li>
+            <li class="admin-nav-item">
+                <a href="{{ url_for('admin_sections') }}">
+                    <i class="material-icons">class</i>
+                    <span>Sections</span>
+                </a>
+            </li>
+            <li class="admin-nav-item active">
+                <a href="{{ url_for('admin_work_diary') }}">
+                    <i class="material-icons">assignment</i>
+                    <span>Work Diaries</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="admin-main">
+        <div class="admin-container">
+            <div class="page-header">
+                <h2>Faculty Work Diaries</h2>
+                <p>Review and monitor all faculty work diary entries</p>
+            </div>
+
+            <!-- Filter Bar -->
+            <div class="filter-bar">
+                <div class="search-box">
+                    <i class="material-icons">search</i>
+                    <input type="text" id="searchInput" placeholder="Search by topic, section...">
+                </div>
+                <select id="facultyFilter" class="filter-select">
+                    <option value="">All Faculty</option>
+                    {% for faculty in faculties %}
+                    <option value="{{ faculty.faculty_id }}">{{ faculty.first_name }} {{ faculty.last_name }}</option>
+                    {% endfor %}
+                </select>
+                <button class="btn-primary" onclick="downloadExcel()" style="margin-left: auto;">
+                    <i class="material-icons">download</i>
+                    Download Excel
+                </button>
+            </div>
+
+            <!-- Diary Table -->
+            <div class="admin-table-container">
+                <table class="admin-table sortable-table" id="diaryTable">
+                    <thead>
+                        <tr>
+                            <th onclick="sortTable(0)" style="cursor: pointer;">
+                                Diary No. <i class="material-icons sort-icon">unfold_more</i>
+                            </th>
+                            <th onclick="sortTable(1)" style="cursor: pointer;">
+                                Faculty Name <i class="material-icons sort-icon">unfold_more</i>
+                            </th>
+                            <th onclick="sortTable(2)" style="cursor: pointer;">
+                                Date <i class="material-icons sort-icon">unfold_more</i>
+                            </th>
+                            <th onclick="sortTable(3)" style="cursor: pointer;">
+                                Subject <i class="material-icons sort-icon">unfold_more</i>
+                            </th>
+                            <th onclick="sortTable(4)" style="cursor: pointer;">
+                                Section <i class="material-icons sort-icon">unfold_more</i>
+                            </th>
+                            <th>Topic</th>
+                            <th>Students</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="diaryTableBody">
+                        {% for entry in diary_entries %}
+                        <tr data-faculty-id="{{ entry.faculty_id }}">
+                            <td><strong>{{ entry.diary_number }}</strong></td>
+                            <td>
+                                <div class="faculty-info">
+                                    <strong>{{ entry.faculty_name }}</strong>
+                                </div>
+                            </td>
+                            <td>{{ entry.date.strftime('%d %b %Y') }}</td>
+                            <td>{{ entry.subject_name }}</td>
+                            <td>{{ entry.section_name }}</td>
+                            <td>{{ entry.topic }}</td>
+                            <td>
+                                <span class="badge badge-success">{{ entry.present_count }} Present</span>
+                                <span class="badge badge-danger">{{ entry.absent_count }} Absent</span>
+                            </td>
+                            <td>
+                                <button class="icon-btn" onclick="viewDetails('{{ entry.session_id }}')"
+                                    title="View Details">
+                                    <i class="material-icons">visibility</i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        function toggleMenu() {
+            document.getElementById('drawer').classList.toggle('open');
+        }
+
+        // Search functionality
+        document.getElementById('searchInput').addEventListener('input', filterTable);
+        document.getElementById('facultyFilter').addEventListener('change', filterTable);
+
+        function filterTable() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const facultyId = document.getElementById('facultyFilter').value;
+            const rows = document.querySelectorAll('#diaryTableBody tr');
+
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                const rowFacultyId = row.getAttribute('data-faculty-id');
+
+                const matchesSearch = text.includes(searchTerm);
+                const matchesFaculty = !facultyId || rowFacultyId === facultyId;
+
+                row.style.display = (matchesSearch && matchesFaculty) ? '' : 'none';
+            });
+        }
+
+        function viewDetails(sessionId) {
+            // Navigate to details page or show modal
+            window.location.href = `/admin/attendance-session/${sessionId}`;
+        }
+
+        // Table sorting
+        let sortDirection = {};
+
+        function sortTable(columnIndex) {
+            const table = document.getElementById('diaryTable');
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+
+            // Toggle sort direction
+            sortDirection[columnIndex] = !sortDirection[columnIndex];
+            const ascending = sortDirection[columnIndex];
+
+            rows.sort((a, b) => {
+                const aValue = a.cells[columnIndex].textContent.trim();
+                const bValue = b.cells[columnIndex].textContent.trim();
+
+                // Try to parse as number or date
+                const aNum = parseFloat(aValue);
+                const bNum = parseFloat(bValue);
+
+                if (!isNaN(aNum) && !isNaN(bNum)) {
+                    return ascending ? aNum - bNum : bNum - aNum;
+                }
+
+                // String comparison
+                return ascending ?
+                    aValue.localeCompare(bValue) :
+                    bValue.localeCompare(aValue);
+            });
+
+            // Re-append sorted rows
+            rows.forEach(row => tbody.appendChild(row));
+
+            // Update sort icons
+            const headers = table.querySelectorAll('th .sort-icon');
+            headers.forEach((icon, idx) => {
+                if (idx === columnIndex) {
+                    icon.textContent = ascending ? 'arrow_upward' : 'arrow_downward';
+                } else {
+                    icon.textContent = 'unfold_more';
+                }
+            });
+        }
+
+        // Excel download using SheetJS
+        function downloadExcel() {
+            const table = document.getElementById('diaryTable');
+            const rows = Array.from(table.querySelectorAll('tbody tr'));
+
+            // Filter visible rows only
+            const visibleRows = rows.filter(row => row.style.display !== 'none');
+
+            // Prepare data
+            const data = [
+                ['Diary No.', 'Faculty Name', 'Date', 'Subject', 'Section', 'Topic', 'Present', 'Absent']
+            ];
+
+            visibleRows.forEach(row => {
+                const cells = row.cells;
+                const presentMatch = cells[6].textContent.match(/(\d+) Present/);
+                const absentMatch = cells[6].textContent.match(/(\d+) Absent/);
+
+                data.push([
+                    cells[0].textContent.trim(),
+                    cells[1].textContent.trim(),
+                    cells[2].textContent.trim(),
+                    cells[3].textContent.trim(),
+                    cells[4].textContent.trim(),
+                    cells[5].textContent.trim(),
+                    presentMatch ? presentMatch[1] : '0',
+                    absentMatch ? absentMatch[1] : '0'
+                ]);
+            });
+
+            // Create CSV content
+            const csvContent = data.map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
+
+            // Download
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `Work_Diaries_${new Date().toISOString().split('T')[0]}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+</body>
+
+</html>

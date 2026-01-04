@@ -10,9 +10,12 @@ Project Structure:
 - routes/: Modular route blueprints (for students to work on)
 """
 
-from flask import Flask, render_template, request, jsonify, redirect, url_for, flash
-from datetime import datetime
+from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session
+from datetime import datetime, date, time, timedelta
 import os
+import math
+import json
+import uuid
 
 # Import configuration
 from config import Config
@@ -40,17 +43,22 @@ os.makedirs(instance_path, exist_ok=True)
 # Initialize database with app
 db.init_app(app)
 
+# Initialize Flask-Migrate
+from flask_migrate import Migrate
+migrate = Migrate(app, db)
+
 # Import models after db initialization
 from models import (
-    User, Role, Faculty, Student, Program, Section,
+    gen_uuid, User, Role, Faculty, Student, Program, Section,
     Semester, Subject, SubjectAllocation, ClassSchedule,
     AttendanceSession, AttendanceRecord, Test, TestResult,
-    WorkDiary, ImportLog, Unit, Chapter, Concept
+    WorkDiary, ImportLog, Unit, Chapter, Concept,
+    CampusCheckIn, CollegeConfig, StudentSubjectEnrollment
 )
 
 # Import authentication utilities
 from auth import (
-    login_required, admin_required, faculty_required, role_required,
+    login_required, admin_required, faculty_required, student_required, role_required,
     login_user, logout_user, get_current_user, hash_password, verify_password,
     can_edit_work_diary, can_approve_work_diary, can_view_all_diaries
 )
@@ -68,6 +76,7 @@ from auth import (
 def login():
     """
     User login page and handler
+    Supports student/parent login type selection for USN-based logins
     """
     # If already logged in, redirect to appropriate dashboard
     current_user = get_current_user()
@@ -78,13 +87,21 @@ def login():
         return redirect(url_for('index'))
     
     if request.method == 'POST':
-        username = request.form.get('username')
+        username = request.form.get('username', '').strip()
         password = request.form.get('password')
+        login_type = request.form.get('login_type', 'student')  # 'student' or 'parent'
         
         user = User.query.filter_by(username=username, is_active=True, is_deleted=False).first()
         
         if user and verify_password(user.password_hash, password):
             login_user(user)
+            
+            # Store login_type in session for parent view mode
+            # This allows same credentials to access as student or as parent
+            if login_type == 'parent' and user.role and user.role.role_name.lower() == 'student':
+                session['login_as_parent'] = True
+            else:
+                session['login_as_parent'] = False
             
             # Redirect to next page or appropriate dashboard based on role
             next_page = request.args.get('next')
@@ -96,13 +113,19 @@ def login():
             if user.role and user.role.role_name.lower() == 'admin':
                 return redirect(url_for('admin_dashboard'))
             
-            # Student users go to student dashboard
+            # Student users go to student dashboard (whether logged in as student or parent)
             if user.role and user.role.role_name.lower() == 'student':
+                if session.get('login_as_parent'):
+                    return redirect(url_for('parent_dashboard'))
                 return redirect(url_for('student_dashboard'))
             
-            # Parent users also go to student dashboard (to view their child's data)
+            # Legacy: Parent users with separate accounts also go to student dashboard
             if user.role and user.role.role_name.lower() == 'parent':
                 return redirect(url_for('student_dashboard'))
+                
+            # Faculty users go to faculty dashboard
+            if user.role and user.role.role_name.lower() == 'faculty':
+                return redirect(url_for('faculty_dashboard_view'))
             
             return redirect(url_for('index'))
         else:
@@ -121,100 +144,31 @@ def logout():
     return redirect(url_for('login'))
 
 
-@app.route('/student/dashboard')
-@login_required
-def student_dashboard():
-    """
-    Student Dashboard - Shows student's subjects and attendance
-    Also used for parent view
-    """
-    current_user = get_current_user()
-    
-    if not current_user:
-        return redirect(url_for('login'))
-    
-    # Get the student record for this user
-    student = None
-    subjects = []
-    attendance_percentage = 0
-    
-    if current_user.role.role_name.lower() == 'student':
-        student = Student.query.filter_by(user_id=current_user.user_id, is_deleted=False).first()
-    elif current_user.role.role_name.lower() == 'parent':
-        # For parent, find the linked student (username is roll_number_parent)
-        roll_number = current_user.username.replace('_parent', '')
-        student = Student.query.filter_by(roll_number=roll_number, is_deleted=False).first()
-    
-    if student:
-        # Get subjects for this student's section
-        if student.section_id:
-            # Get subjects allocated to the student's section
-            allocations = SubjectAllocation.query.filter_by(
-                section_id=student.section_id, 
-                is_deleted=False
-            ).all()
-            subjects = [alloc.subject for alloc in allocations if alloc.subject and not alloc.subject.is_deleted]
-        elif student.program_id:
-            # Fallback: Get subjects for the student's program
-            subjects = Subject.query.filter_by(
-                program_id=student.program_id, 
-                is_deleted=False
-            ).all()
-        
-        # Calculate overall attendance (placeholder - can be enhanced)
-        total_sessions = AttendanceSession.query.count()
-        if total_sessions > 0:
-            present_count = AttendanceRecord.query.filter_by(
-                student_id=student.student_id,
-                status='present'
-            ).count()
-            attendance_percentage = round((present_count / total_sessions) * 100) if total_sessions else 0
-    
-    return render_template('student_dashboard.html',
-                         current_user=current_user,
-                         student=student,
-                         subjects=subjects,
-                         attendance_percentage=attendance_percentage)
 
 
 @app.route('/')
-@login_required
 def index():
     """
-    Home page - displays main dashboard
-    Shows different data based on user role
+    Root route - redirects users based on their role
     """
     current_user = get_current_user()
     
-    # If user is not logged in properly, redirect to login
+    # If not logged in, redirect to login
     if not current_user:
-        flash('Please log in to continue.', 'warning')
         return redirect(url_for('login'))
+        
+    # Redirect based on role
+    role_name = current_user.role.role_name.lower() if current_user.role else ''
     
-    # Common stats
-    faculty_count = Faculty.query.filter_by(is_deleted=False).count()
-    student_count = Student.query.filter_by(is_deleted=False).count()
-    
-    # Role-specific data
-    if current_user.role and current_user.role.role_name == 'faculty':
-        # Get faculty's own work diaries
-        faculty_record = Faculty.query.filter_by(user_id=current_user.user_id).first()
-        if faculty_record:
-            pending_diaries = WorkDiary.query.filter_by(
-                faculty_id=faculty_record.faculty_id,
-                status='draft',
-                is_deleted=False
-            ).count()
-        else:
-            pending_diaries = 0
+    if role_name == 'admin':
+        return redirect(url_for('admin_dashboard'))
+    elif role_name == 'faculty':
+        return redirect(url_for('faculty_dashboard_view'))
+    elif role_name == 'student':
+        return redirect(url_for('student_dashboard'))
     else:
-        pending_diaries = 0
-    
-    return render_template('index.html', 
-                         faculty_count=faculty_count,
-                         student_count=student_count,
-                         pending_diaries=pending_diaries,
-                         current_user=current_user)
+        # Fallback
+        return redirect(url_for('login'))
 
 
 @app.route('/manifest.json')
@@ -269,30 +223,33 @@ def about():
     return render_template('about.html')
 
 
-@app.route('/faculty')
-def faculty():
+@app.route('/admin/faculty-list')
+@admin_required
+def admin_faculty_list():
     """
-    Display all faculty members
+    Display all faculty members (Admin View)
     TODO for students: Add pagination, search, filters
     """
     faculties = Faculty.query.filter_by(is_deleted=False).all()
     return render_template('faculty.html', faculties=faculties)
 
 
-@app.route('/students')
-def students():
+@app.route('/admin/students-list')
+@admin_required
+def admin_students_list():
     """
-    Display all students
+    Display all students (Admin View)
     TODO for students: Add pagination, search, filters by section/program
     """
     students = Student.query.filter_by(is_deleted=False).limit(50).all()
     return render_template('students.html', students=students)
 
 
-@app.route('/attendance')
-def attendance():
+@app.route('/admin/attendance-overview')
+@admin_required
+def admin_attendance_overview():
     """
-    Display attendance management page
+    Display attendance management page (Admin View)
     TODO for students: Implement full attendance taking workflow
     """
     # Get recent attendance sessions
@@ -401,32 +358,86 @@ def api_create_attendance_session():
 # Work Diary Routes
 # ============================================
 
-@app.route('/work-diary')
+@app.route('/faculty/work-diary')
 @faculty_required
-def work_diary_list():
+def faculty_work_diary():
     """
-    Display work diary entries
-    Faculty see their own, Admin/HOD see all
+    Display work diary entries based on actual attendance taken.
+    Shows classes conducted date-wise and faculty-wise.
     """
     current_user = get_current_user()
     
-    if can_view_all_diaries():
-        # Admin/HOD view all diaries
-        diaries = WorkDiary.query.filter_by(is_deleted=False).order_by(
-            WorkDiary.date.desc(), WorkDiary.start_time.desc()
-        ).limit(50).all()
-    else:
-        # Faculty view only their own
-        faculty_record = Faculty.query.filter_by(user_id=current_user.user_id).first()
-        if faculty_record:
-            diaries = WorkDiary.query.filter_by(
-                faculty_id=faculty_record.faculty_id,
-                is_deleted=False
-            ).order_by(WorkDiary.date.desc(), WorkDiary.start_time.desc()).limit(50).all()
-        else:
-            diaries = []
+    # Base query for AttendanceSession
+    query = AttendanceSession.query.join(ClassSchedule).filter(
+        AttendanceSession.is_deleted == False
+    )
     
-    return render_template('work_diary.html', diaries=diaries)
+    if not can_view_all_diaries():
+        # Faculty view: only their own sessions
+        faculty_record = Faculty.query.filter_by(user_id=current_user.user_id).first()
+        if not faculty_record:
+            diaries = []
+            return render_template('work_diary.html', diaries=diaries)
+        
+        query = query.filter(AttendanceSession.taken_by_user_id == current_user.user_id)
+    
+    # Get recent sessions
+    sessions = query.order_by(AttendanceSession.taken_at.desc()).limit(100).all()
+    
+    # Process sessions into displayable diary entries
+    diaries = []
+    for idx, session in enumerate(sessions):
+        # Fetch related data
+        schedule = session.schedule
+        subject = schedule.subject
+        section = schedule.section
+        faculty = session.taken_by.faculty
+        
+        # Calculate hours
+        actual_hours = 0
+        if schedule.start_time and schedule.end_time:
+            # Simple duration calculation
+            dummy_date = date.today()
+            start_dt = datetime.combine(dummy_date, schedule.start_time)
+            end_dt = datetime.combine(dummy_date, schedule.end_time)
+            actual_hours = (end_dt - start_dt).total_seconds() / 3600
+        
+        # Logic for claiming hours: Lab period reduced by 3/4 (which means 0.75 of actual)
+        is_lab = subject.subject_type and subject.subject_type.lower() in ['lab', 'practical']
+        claiming_hours = actual_hours * 0.75 if is_lab else actual_hours
+        
+        # Particulars: Topic taught + Semester info
+        particulars = session.topic_taught or "Regular Class"
+        sem_info = f"({section.current_semester if section else '?'} Sem)"
+        
+        # Count students present
+        # Count students present
+        present_count = AttendanceRecord.query.filter_by(attendance_session_id=session.attendance_session_id, status='present').count()
+        total_count = AttendanceRecord.query.filter_by(attendance_session_id=session.attendance_session_id).count()
+
+        diaries.append({
+            'sl_no': idx + 1,
+            'session_id': session.attendance_session_id,
+            'diary_no': session.diary_number or f"DN-{session.attendance_session_id[:8].upper()}",
+            'date': session.taken_at.date(),
+            'particulars': f"{particulars} {sem_info}",
+            'actual_hours': round(actual_hours, 2),
+            'claiming_hours': round(claiming_hours, 2),
+            'subject_code': subject.subject_code if subject else 'N/A',
+            'faculty_name': f"{faculty.first_name} {faculty.last_name}" if faculty else session.taken_by.username,
+            'subject_name': subject.subject_name if subject else 'Unknown Subject',
+            'section_name': section.section_name if section else 'Unknown Section',
+            'status': session.status,
+            'is_lab': is_lab,
+            'present_count': present_count,
+            'total_count': total_count
+        })
+        
+    # Check if Class Teacher
+    managed_section = Section.query.filter_by(class_teacher_id=faculty_record.faculty_id).first() if not can_view_all_diaries() else None
+    is_class_teacher = managed_section is not None
+        
+    return render_template('work_diary.html', diaries=diaries, is_class_teacher=is_class_teacher)
 
 
 @app.route('/work-diary/create', methods=['GET', 'POST'])
@@ -605,6 +616,63 @@ def reject_work_diary(diary_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 400
+
+
+@app.route('/admin/work-diary')
+@admin_required
+def admin_work_diary():
+    """Admin view of all faculty work diaries"""
+    from models import AttendanceSession, ClassSchedule, Faculty, Subject, Section, AttendanceRecord
+    
+    # Get all faculties for filter
+    faculties = Faculty.query.order_by(Faculty.first_name).all()
+    
+    # Get all attendance sessions with details
+    sessions = db.session.query(
+        AttendanceSession,
+        ClassSchedule,
+        Subject,
+        Section,
+        Faculty
+    ).join(
+        ClassSchedule, AttendanceSession.schedule_id == ClassSchedule.schedule_id
+    ).join(
+        Subject, ClassSchedule.subject_id == Subject.subject_id
+    ).outerjoin(
+        Section, ClassSchedule.section_id == Section.section_id
+    ).join(
+        Faculty, ClassSchedule.faculty_id == Faculty.faculty_id
+    ).filter(
+        AttendanceSession.is_deleted == False
+    ).order_by(
+        AttendanceSession.taken_at.desc()
+    ).all()
+    
+    # Format diary entries
+    diary_entries = []
+    for session, schedule, subject, section, faculty in sessions:
+        # Count present/absent
+        records = AttendanceRecord.query.filter_by(attendance_session_id=session.attendance_session_id).all()
+        present_count = sum(1 for r in records if r.status == 'present')
+        absent_count = sum(1 for r in records if r.status == 'absent')
+        
+        diary_entries.append({
+            'session_id': session.attendance_session_id,
+            'diary_number': session.diary_number,
+            'faculty_id': faculty.faculty_id,
+            'faculty_name': f"{faculty.first_name} {faculty.last_name}",
+            'date': schedule.date,
+            'subject_name': subject.subject_name,
+            'section_name': section.section_name if section else 'N/A',
+            'topic': session.topic_taught or 'N/A',
+            'present_count': present_count,
+            'absent_count': absent_count
+        })
+    
+    return render_template('admin_work_diary.html', 
+                         diary_entries=diary_entries,
+                         faculties=faculties)
+
 
 
 # ============================================
@@ -853,6 +921,19 @@ def admin_student_add():
             username = request.form.get('username')
             password = request.form.get('password')
             
+            # Generate Temp USN if empty
+            if not roll_number:
+                import random
+                import string
+                # Generate unique temp ID: TMP-YYYY-XXXXX
+                year_suffix = datetime.now().year
+                rand_str = ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
+                roll_number = f"TMP-{year_suffix}-{rand_str}"
+            
+            # Auto-set username if empty
+            if not username:
+                username = roll_number
+
             # Check if roll_number or username exists
             existing_student = Student.query.filter_by(roll_number=roll_number).first()
             if existing_student:
@@ -926,6 +1007,20 @@ def admin_student_edit(student_id):
     
     if request.method == 'POST':
         try:
+            # Handle USN/Roll Number Update
+            new_roll_number = request.form.get('roll_number')
+            if new_roll_number and new_roll_number != student.roll_number:
+                # Check for duplicate
+                if Student.query.filter_by(roll_number=new_roll_number).first():
+                    raise ValueError(f"Roll Number {new_roll_number} already exists")
+                
+                # Update username if it matches the old roll number
+                if student.user.username == student.roll_number:
+                    student.user.username = new_roll_number
+                
+                student.roll_number = new_roll_number
+                student.usn = new_roll_number
+            
             student.first_name = request.form.get('first_name')
             student.last_name = request.form.get('last_name')
             student.name = f"{student.first_name} {student.last_name}"
@@ -987,6 +1082,106 @@ def api_delete_student(student_id):
         return jsonify({'success': False, 'error': str(e)}), 400
 
 
+
+
+# ---------------------------------------------
+# Section Management API Routes
+# ---------------------------------------------
+
+@app.route('/api/admin/sections', methods=['POST'])
+@admin_required
+def api_create_section():
+    """Create new section"""
+    try:
+        data = request.get_json()
+        
+        # Create section
+        new_section = Section(
+            section_name=data.get('section_name'),
+            program_id=data.get('program_id') if data.get('program_id') else None,
+            academic_year=data.get('academic_year'),
+            current_semester=int(data.get('current_semester')) if data.get('current_semester') else None,
+            class_teacher_id=data.get('class_teacher_id') if data.get('class_teacher_id') else None
+        )
+        
+        db.session.add(new_section)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'section': {
+            'section_id': new_section.section_id,
+            'section_name': new_section.section_name
+        }}), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+
+@app.route('/api/admin/sections/<section_id>', methods=['PUT'])
+@admin_required
+def api_update_section(section_id):
+    """Update existing section"""
+    try:
+        section = Section.query.get_or_404(section_id)
+        data = request.get_json()
+        
+        section.section_name = data.get('section_name', section.section_name)
+        section.program_id = data.get('program_id') if data.get('program_id') else None
+        section.academic_year = data.get('academic_year')
+        section.current_semester = int(data.get('current_semester')) if data.get('current_semester') else None
+        section.class_teacher_id = data.get('class_teacher_id') if data.get('class_teacher_id') else None
+        
+        db.session.commit()
+        
+        return jsonify({'success': True, 'section': {
+            'section_id': section.section_id,
+            'section_name': section.section_name
+        }})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+
+@app.route('/api/admin/sections/<section_id>', methods=['GET'])
+@admin_required
+def api_get_section(section_id):
+    """Get section details"""
+    try:
+        section = Section.query.get_or_404(section_id)
+        
+        return jsonify({
+            'success': True,
+            'section': {
+                'section_id': section.section_id,
+                'section_name': section.section_name,
+                'program_id': section.program_id,
+                'academic_year': section.academic_year,
+                'current_semester': section.current_semester,
+                'class_teacher_id': section.class_teacher_id
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+
+@app.route('/api/admin/sections/<section_id>', methods=['DELETE'])
+@admin_required
+def api_delete_section(section_id):
+    """Delete section (soft delete)"""
+    try:
+        section = Section.query.get_or_404(section_id)
+        section.is_deleted = True
+        db.session.commit()
+        
+        return jsonify({'success': True})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+
 # ---------------------------------------------
 # Subject Management Routes (with Units/Chapters/Concepts)
 # ---------------------------------------------
@@ -1008,6 +1203,21 @@ def admin_subjects():
                 chapter.concepts = Concept.query.filter_by(chapter_id=chapter.chapter_id, is_deleted=False).all()
     
     return render_template('admin_subjects.html', subjects=subjects)
+
+
+@app.route('/admin/sections')
+@admin_required
+def admin_sections():
+    """Manage sections"""
+    sections = Section.query.filter_by(is_deleted=False).all()
+    programs = Program.query.filter_by(is_deleted=False).all()
+    faculties = Faculty.query.filter_by(is_deleted=False).order_by(Faculty.first_name).all()
+    
+    # Calculate student counts and get class teacher info
+    for section in sections:
+        section.student_count = Student.query.filter_by(section_id=section.section_id, is_deleted=False).count()
+        
+    return render_template('admin_sections.html', sections=sections, programs=programs, faculties=faculties)
 
 
 @app.route('/admin/subjects/add', methods=['GET', 'POST'])
@@ -1041,7 +1251,8 @@ def admin_subject_add():
                 semester_id=int(semester_id) if semester_id else None,
                 credits=float(credits) if credits else 0,
                 subject_type=subject_type,
-                total_hours=int(total_hours) if total_hours else None
+                total_hours=int(total_hours) if total_hours else None,
+                is_specialization=True if request.form.get('is_specialization') == 'true' else False
             )
             db.session.add(new_subject)
             db.session.commit()
@@ -1232,16 +1443,7 @@ def api_delete_concept(concept_id):
 @admin_required
 def admin_batches():
     """Manage programs and sections"""
-    programs = Program.query.filter_by(is_deleted=False).all()
-    
-    # Get sections with student and schedule counts
-    for program in programs:
-        program.sections = Section.query.filter_by(program_id=program.program_id, is_deleted=False).all()
-        for section in program.sections:
-            section.student_count = Student.query.filter_by(section_id=section.section_id, is_deleted=False).count()
-            section.schedule_count = ClassSchedule.query.filter_by(section_id=section.section_id, is_deleted=False).count()
-    
-    return render_template('admin_batches.html', programs=programs)
+    return redirect(url_for('admin_sections'))
 
 
 @app.route('/api/admin/programs', methods=['POST'])
@@ -1266,35 +1468,166 @@ def api_create_program():
         return jsonify({'success': False, 'error': str(e)}), 400
 
 
-@app.route('/api/admin/sections', methods=['POST'])
+
+# ============================================
+# Student Assignment Routes (Admin Only)
+# ============================================
+
+@app.route('/admin/assign-students')
 @admin_required
-def api_create_section():
-    """Create a new section"""
+def admin_assign_students():
+    """Student-section assignment and specialization enrollment page"""
+    students = Student.query.filter_by(is_deleted=False).all()
+    sections = Section.query.filter_by(is_deleted=False).all()
+    subjects = Subject.query.filter_by(is_deleted=False).all()
+    return render_template('admin_assign_students.html', 
+                         students=students, 
+                         sections=sections,
+                         subjects=subjects)
+
+
+@app.route('/api/admin/students/assign-section', methods=['POST'])
+@admin_required
+def api_assign_students_to_section():
+    """Bulk assign students to a section"""
     try:
         data = request.get_json()
+        student_ids = data.get('student_ids', [])
+        section_id = data.get('section_id')
         
-        section = Section(
-            section_name=data['section_name'],
-            program_id=data['program_id'],
-            academic_year=data.get('academic_year'),
-            current_semester=int(data['current_semester']) if data.get('current_semester') else None
-        )
-        db.session.add(section)
+        if not student_ids or not section_id:
+            return jsonify({'success': False, 'error': 'Missing student_ids or section_id'}), 400
+        
+        # Update all students
+        updated_count = 0
+        for student_id in student_ids:
+            student = Student.query.get(student_id)
+            if student:
+                student.section_id = section_id
+                updated_count += 1
+        
         db.session.commit()
-        return jsonify({'success': True, 'section_id': section.section_id})
+        return jsonify({'success': True, 'updated': updated_count})
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 400
 
 
-@app.route('/api/admin/sections/<section_id>', methods=['DELETE'])
+@app.route('/api/admin/students/update-sections', methods=['POST'])
 @admin_required
-def api_delete_section(section_id):
-    """Delete section (soft delete)"""
+def api_update_student_sections():
+    """Bulk update student sections with attendance transfer logic"""
     try:
-        section = Section.query.get_or_404(section_id)
-        section.is_deleted = True
+        data = request.get_json()
+        assignments = data.get('assignments', [])
+        transfer_attendance = data.get('transfer_attendance', True)
+        
+        updated_count = 0
+        
+        for item in assignments:
+            student_id = item.get('student_id')
+            new_section_id = item.get('section_id')
+            
+            student = Student.query.get(student_id)
+            if not student:
+                continue
+
+            # Check if status or section is changing
+            current_section = student.section_id
+            current_active = student.is_active
+            
+            # Helper to determine new state
+            target_section = new_section_id
+            target_active = True
+            
+            if new_section_id == 'left_college':
+                target_section = None
+                target_active = False
+            elif new_section_id == 'none' or new_section_id is None:
+                target_section = None
+                target_active = True # Unassigned but still active
+            
+            # Detect change
+            is_section_changed = (current_section != target_section)
+            is_status_changed = (current_active != target_active)
+            
+            if is_section_changed or is_status_changed:
+                # If section changed (and active) AND NOT transferring, reset attendance
+                # (We don't reset if just marking inactive, records should stay for history)
+                if is_section_changed and target_active and not transfer_attendance:
+                     AttendanceRecord.query.filter_by(student_id=student_id, is_deleted=False).update({'is_deleted': True})
+                
+                student.section_id = target_section
+                student.is_active = target_active
+                updated_count += 1
+        
         db.session.commit()
+        return jsonify({'success': True, 'updated': updated_count})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+
+@app.route('/api/admin/students/enroll-subject', methods=['POST'])
+@admin_required
+def api_enroll_students_in_subject():
+    """Enroll students in a specialization subject"""
+    try:
+        data = request.get_json()
+        student_ids = data.get('student_ids', [])
+        subject_id = data.get('subject_id')
+        academic_year = data.get('academic_year')
+        semester = data.get('semester')
+        
+        if not student_ids or not subject_id:
+            return jsonify({'success': False, 'error': 'Missing student_ids or subject_id'}), 400
+        
+        enrolled_count = 0
+        errors = []
+        
+        for student_id in student_ids:
+            # Check if already enrolled
+            existing = StudentSubjectEnrollment.query.filter_by(
+                student_id=student_id,
+                subject_id=subject_id,
+                academic_year=academic_year
+            ).first()
+            
+            if not existing:
+                enrollment = StudentSubjectEnrollment(
+                    student_id=student_id,
+                    subject_id=subject_id,
+                    academic_year=academic_year,
+                    semester=semester
+                )
+                db.session.add(enrollment)
+                enrolled_count += 1
+            else:
+                errors.append(f"Student {student_id} already enrolled")
+        
+        db.session.commit()
+        return jsonify({
+            'success': True, 
+            'enrolled': enrolled_count,
+            'errors': errors
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+
+@app.route('/api/admin/students/unenroll-subject', methods=['POST'])
+@admin_required
+def api_unenroll_student_from_subject():
+    """Remove student enrollment from specialization subject"""
+    try:
+        data = request.get_json()
+        enrollment_id = data.get('enrollment_id')
+        
+        enrollment = StudentSubjectEnrollment.query.get_or_404(enrollment_id)
+        enrollment.is_deleted = True
+        db.session.commit()
+        
         return jsonify({'success': True})
     except Exception as e:
         db.session.rollback()
@@ -1329,7 +1662,7 @@ def download_import_template(import_type):
     from flask import send_file
     
     template_files = {
-        'student': 'students_template.xlsx',
+        'student': 'students_template.csv',
         'faculty': 'faculty_template.csv',
         'subject': 'subjects_template.csv',
         'schedule': 'schedules_template.csv'
@@ -1364,13 +1697,17 @@ def api_bulk_import():
     Handle bulk data import from CSV/Excel files
     Supports: students, faculty, subjects, schedules
     """
+    print("[IMPORT] Starting import request...")  # Debug
     current_user = get_current_user()
     
     if 'file' not in request.files:
+        print("[IMPORT] No file in request")  # Debug
         return jsonify({'success': False, 'error': 'No file uploaded'}), 400
     
     file = request.files['file']
     import_type = request.form.get('import_type')
+    
+    print(f"[IMPORT] File: {file.filename}, Type: {import_type}")  # Debug
     
     if file.filename == '':
         return jsonify({'success': False, 'error': 'No file selected'}), 400
@@ -1388,18 +1725,26 @@ def api_bulk_import():
     try:
         # Read file data
         import pandas as pd
+        print("[IMPORT] Reading file...")  # Debug
         
         if file_ext == '.csv':
             df = pd.read_csv(file)
         else:
             df = pd.read_excel(file)
         
+        print(f"[IMPORT] File read. Rows: {len(df)}, Columns: {list(df.columns)}")  # Debug
+        
         # Process import based on type
+        print("[IMPORT] Starting process_bulk_import...")  # Debug
         result = process_bulk_import(df, import_type, current_user, file.filename)
+        print(f"[IMPORT] Completed: {result}")  # Debug
         
         return jsonify(result)
     
     except Exception as e:
+        print(f"[IMPORT] ERROR: {str(e)}")  # Debug
+        import traceback
+        traceback.print_exc()
         return jsonify({'success': False, 'error': f'Import failed: {str(e)}'}), 400
 
 
@@ -1475,12 +1820,12 @@ def auto_create_work_diary_from_attendance(attendance_session):
     
     # Count students present (assuming records exist)
     students_present = AttendanceRecord.query.filter_by(
-        session_id=attendance_session.session_id,
+        attendance_session_id=attendance_session.attendance_session_id,
         status='present'
     ).count()
     
     students_total = AttendanceRecord.query.filter_by(
-        session_id=attendance_session.session_id
+        attendance_session_id=attendance_session.attendance_session_id
     ).count()
     
     # Create diary entry
@@ -1493,7 +1838,7 @@ def auto_create_work_diary_from_attendance(attendance_session):
         start_time=schedule.start_time,
         end_time=schedule.end_time,
         activity_type=activity_type,
-        attendance_session_id=attendance_session.session_id,
+        attendance_session_id=attendance_session.attendance_session_id,
         students_present=students_present,
         students_total=students_total,
         status='draft'
@@ -1643,21 +1988,12 @@ def process_bulk_import(df, import_type, current_user, filename):
     Process bulk import data from DataFrame
     Returns result dict with success/failure counts
     """
-    import_log = ImportLog(
-        import_type=import_type,
-        imported_by=current_user.user_id,
-        file_name=filename,
-        total_rows=len(df),
-        status='processing'
-    )
-    db.session.add(import_log)
-    db.session.flush()
-    
     success_count = 0
     error_count = 0
     errors = []
     
     try:
+        # Process import based on type
         if import_type == 'student':
             success_count, error_count, errors = import_students(df)
         elif import_type == 'faculty':
@@ -1669,14 +2005,18 @@ def process_bulk_import(df, import_type, current_user, filename):
         else:
             raise ValueError(f'Unknown import type: {import_type}')
         
-        # Update import log
-        import_log.successful_rows = success_count
-        import_log.failed_rows = error_count
-        import_log.status = 'completed' if error_count == 0 else 'completed_with_errors'
-        
-        if errors:
-            import_log.error_log = '\n'.join(errors[:50])  # Store first 50 errors
-        
+        # Create import log AFTER successful import
+        import_log = ImportLog(
+            import_type=import_type,
+            imported_by=current_user.user_id,
+            file_name=filename,
+            total_rows=len(df),
+            successful_rows=success_count,
+            failed_rows=error_count,
+            status='completed' if error_count == 0 else 'completed_with_errors',
+            error_log='\n'.join(errors[:50]) if errors else None
+        )
+        db.session.add(import_log)
         db.session.commit()
         
         return {
@@ -1688,9 +2028,21 @@ def process_bulk_import(df, import_type, current_user, filename):
         }
     
     except Exception as e:
-        import_log.status = 'failed'
-        import_log.error_log = str(e)
-        db.session.commit()
+        db.session.rollback()
+        # Create failed import log
+        try:
+            import_log = ImportLog(
+                import_type=import_type,
+                imported_by=current_user.user_id,
+                file_name=filename,
+                total_rows=len(df),
+                status='failed',
+                error_log=str(e)
+            )
+            db.session.add(import_log)
+            db.session.commit()
+        except:
+            pass
         raise
 
 
@@ -1698,8 +2050,11 @@ def import_students(df):
     """
     Import students from DataFrame
     Creates User account for each student:
-    - Username = roll_number (USN)
+    - Username = USN (roll_number)
     - Password = date_of_birth (DDMMYYYY format)
+    
+    Supports both old format (first_name, last_name, roll_number) and 
+    new format (name, usn)
     """
     import pandas as pd
     from auth import hash_password
@@ -1708,20 +2063,39 @@ def import_students(df):
     error_count = 0
     errors = []
     
-    # Required columns (minimum)
-    required_columns = ['roll_number', 'first_name', 'last_name', 'email', 'date_of_birth']
+    # Normalize column names - support both USN and roll_number
+    if 'usn' in df.columns and 'roll_number' not in df.columns:
+        df['roll_number'] = df['usn']
+    
+    # Support single 'name' field - split into first_name and last_name
+    if 'name' in df.columns:
+        if 'first_name' not in df.columns or 'last_name' not in df.columns:
+            # Split name into first and last
+            df['first_name'] = df['name'].apply(lambda x: str(x).strip().split()[0] if pd.notna(x) and str(x).strip() else '')
+            df['last_name'] = df['name'].apply(lambda x: ' '.join(str(x).strip().split()[1:]) if pd.notna(x) and len(str(x).strip().split()) > 1 else '')
+    
+    # Required columns (minimum) - now supports both formats
+    required_columns = ['roll_number', 'email', 'date_of_birth']
     
     # Validate columns
     missing_cols = set(required_columns) - set(df.columns)
     if missing_cols:
-        raise ValueError(f'Missing required columns: {", ".join(missing_cols)}')
+        raise ValueError(f'Missing required columns: {", ".join(missing_cols)}. Use either (usn, name, email, date_of_birth) or (roll_number, first_name, last_name, email, date_of_birth)')
     
     # Get student role
     student_role = Role.query.filter_by(role_name='student').first()
     if not student_role:
         raise ValueError('Student role not found in database')
     
+    
+    total_rows = len(df)
+    print(f"[IMPORT] Starting to process {total_rows} students...")
+    
     for idx, row in df.iterrows():
+        # Progress logging every 50 rows
+        if (idx + 1) % 50 == 0:
+            print(f"[IMPORT] Progress: {idx + 1}/{total_rows} rows processed...")
+        
         try:
             roll_number = str(row['roll_number']).strip()
             
@@ -1803,12 +2177,20 @@ def import_students(df):
                 if program:
                     program_id = program.program_id
             
+            # Get first_name and last_name (may have been generated from 'name' field)
+            first_name = str(row.get('first_name', '')).strip() if pd.notna(row.get('first_name')) else ''
+            last_name = str(row.get('last_name', '')).strip() if pd.notna(row.get('last_name')) else ''
+            
+            # Fallback: if no first_name, use roll_number
+            if not first_name:
+                first_name = roll_number
+            
             # Create Student record
             student = Student(
                 user_id=user.user_id,
                 roll_number=roll_number,
-                first_name=str(row['first_name']).strip(),
-                last_name=str(row['last_name']).strip(),
+                first_name=first_name,
+                last_name=last_name,
                 email=str(row['email']).strip(),
                 phone=phone,
                 date_of_birth=dob,
@@ -1817,27 +2199,13 @@ def import_students(df):
                 address=address,
                 admission_year=admission_year,
                 program_id=program_id,
-                status='active'
+                status='active',
+                gender=str(row.get('gender', '')).strip().upper()[:1] if pd.notna(row.get('gender')) else None  # M, F, or O
             )
             db.session.add(student)
             
-            # Create Parent account with same credentials but parent role
-            # Username: roll_number_parent (e.g., BCA2024001_parent)
-            # Password: same as student (DOB in DDMMYYYY format)
-            parent_role = Role.query.filter_by(role_name='parent').first()
-            if parent_role:
-                parent_username = f"{roll_number}_parent"
-                existing_parent = User.query.filter_by(username=parent_username).first()
-                if not existing_parent:
-                    parent_email = f"parent_{row['email']}" if '@' in str(row['email']) else f"{roll_number}_parent@bcabub.edu"
-                    parent_user = User(
-                        username=parent_username,
-                        password_hash=hash_password(password),  # Same password as student
-                        email=parent_email,
-                        role_id=parent_role.role_id,
-                        is_active=True
-                    )
-                    db.session.add(parent_user)
+            # NOTE: Parent accounts are no longer created separately
+            # Parents now login using the same student credentials with "Parent" radio option
             
             success_count += 1
             
@@ -1859,6 +2227,9 @@ def import_students(df):
 
 def import_faculty(df):
     """Import faculty from DataFrame"""
+    import pandas as pd
+    from auth import hash_password
+    
     success_count = 0
     error_count = 0
     errors = []
@@ -1869,31 +2240,69 @@ def import_faculty(df):
     if missing_cols:
         raise ValueError(f'Missing required columns: {", ".join(missing_cols)}')
     
+    # Get faculty role
+    faculty_role = Role.query.filter_by(role_name='faculty').first()
+    if not faculty_role:
+        raise ValueError('Faculty role not found in database')
+    
     for idx, row in df.iterrows():
         try:
-            existing = Faculty.query.filter_by(employee_id=row['employee_id']).first()
+            employee_id = str(row['employee_id']).strip()
+            
+            # Check if faculty already exists
+            existing = Faculty.query.filter_by(employee_id=employee_id).first()
             if existing:
-                errors.append(f"Row {idx+2}: Faculty {row['employee_id']} already exists")
+                errors.append(f"Row {idx+2}: Faculty {employee_id} already exists")
                 error_count += 1
                 continue
             
+            # Create User account first
+            # Username = employee_id, Password = employee_id (default)
+            user = User.query.filter_by(username=employee_id).first()
+            
+            # Check if email is already in use by a DIFFERENT user
+            email = str(row['email']).strip()
+            existing_email_user = User.query.filter_by(email=email).first()
+            
+            if existing_email_user:
+                if user and existing_email_user.user_id != user.user_id:
+                     pass 
+                elif not user:
+                     errors.append(f"Row {idx+2}: Email {email} is already in use by user '{existing_email_user.username}'")
+                     error_count += 1
+                     continue
+            
+            if not user:
+                user = User(
+                    username=employee_id,
+                    email=email,
+                    password_hash=hash_password(employee_id), # Default password is employee_id
+                    role_id=faculty_role.role_id,
+                    is_active=True
+                )
+                db.session.add(user)
+                db.session.flush() # Flush to get user_id
+            
             faculty = Faculty(
-                employee_id=row['employee_id'],
+                employee_id=employee_id,
+                user_id=user.user_id,
                 first_name=row['first_name'],
                 last_name=row['last_name'],
                 email=row['email'],
-                phone=row.get('phone'),
-                designation=row.get('designation'),
-                department=row.get('department')
+                phone=row.get('phone') if pd.notna(row.get('phone')) else None,
+                designation=row.get('designation') if pd.notna(row.get('designation')) else None,
+                department=row.get('department') if pd.notna(row.get('department')) else None
             )
             db.session.add(faculty)
+            db.session.commit() # Commit each successful row immediately
             success_count += 1
             
         except Exception as e:
+            db.session.rollback() # Rollback transaction on any error to clean session
             errors.append(f"Row {idx+2}: {str(e)}")
             error_count += 1
     
-    db.session.commit()
+    # db.session.commit() # Removed final commit as we commit per row
     return success_count, error_count, errors
 
 
@@ -1996,8 +2405,2071 @@ def import_schedules(df):
 
 
 # ============================================
+# Campus Check-In System - Geo-fenced Attendance
+# ============================================
+
+def haversine_distance(lat1, lon1, lat2, lon2):
+    """
+    Calculate the great-circle distance between two points on Earth using Haversine formula.
+    Returns distance in meters.
+    """
+    R = 6371000  # Earth's radius in meters
+    
+    # Convert to radians
+    phi1 = math.radians(lat1)
+    phi2 = math.radians(lat2)
+    delta_phi = math.radians(lat2 - lat1)
+    delta_lambda = math.radians(lon2 - lon1)
+    
+    # Haversine formula
+    a = math.sin(delta_phi / 2) ** 2 + \
+        math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2) ** 2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    
+    return R * c
+
+
+def get_campus_config():
+    """
+    Get campus configuration including coordinates and check-in settings.
+    Creates default config if not exists.
+    """
+    config = CollegeConfig.query.filter_by(config_key='campus_location').first()
+    if not config:
+        # Default config - Bangalore University approximate coordinates
+        config = CollegeConfig(
+            config_key='campus_location',
+            campus_latitude=12.9393,  # Default: Bangalore University
+            campus_longitude=77.5829,
+            campus_radius_meters=200,  # 200 meter radius
+            college_name='Bangalore University - BCA Department',
+            checkin_start_time=time(7, 0),   # 7:00 AM
+            checkin_end_time=time(18, 0)     # 6:00 PM
+        )
+        db.session.add(config)
+        db.session.commit()
+    return config
+
+
+@app.route('/api/campus-checkin', methods=['POST'])
+@login_required
+def api_campus_checkin():
+    """
+    Student campus check-in endpoint.
+    Validates location is within campus radius and records check-in.
+    """
+    current_user = get_current_user()
+    
+    # Verify user is a student
+    if not current_user.role or current_user.role.role_name.lower() != 'student':
+        return jsonify({'success': False, 'error': 'Only students can check in'}), 403
+    
+    # Get student record
+    student = Student.query.filter_by(user_id=current_user.user_id, is_deleted=False).first()
+    if not student:
+        return jsonify({'success': False, 'error': 'Student record not found'}), 404
+    
+    data = request.get_json()
+    latitude = data.get('latitude')
+    longitude = data.get('longitude')
+    device_info = data.get('device_info', '')
+    
+    if latitude is None or longitude is None:
+        return jsonify({'success': False, 'error': 'Location coordinates required'}), 400
+    
+    try:
+        latitude = float(latitude)
+        longitude = float(longitude)
+    except (ValueError, TypeError):
+        return jsonify({'success': False, 'error': 'Invalid coordinates format'}), 400
+    
+    # Get campus config
+    config = get_campus_config()
+    
+    # Check if already checked in today
+    today = date.today()
+    existing_checkin = CampusCheckIn.query.filter_by(
+        student_id=student.student_id,
+        checkin_date=today,
+        is_deleted=False
+    ).first()
+    
+    if existing_checkin:
+        return jsonify({
+            'success': False, 
+            'error': 'Already checked in today',
+            'checkin_time': existing_checkin.checkin_time.isoformat()
+        }), 400
+    
+    # Check time restrictions (optional)
+    current_time = datetime.now().time()
+    if config.checkin_start_time and config.checkin_end_time:
+        if current_time < config.checkin_start_time or current_time > config.checkin_end_time:
+            return jsonify({
+                'success': False, 
+                'error': f'Check-in only allowed between {config.checkin_start_time.strftime("%H:%M")} and {config.checkin_end_time.strftime("%H:%M")}'
+            }), 400
+    
+    # Calculate distance from campus
+    distance = haversine_distance(
+        latitude, longitude,
+        config.campus_latitude, config.campus_longitude
+    )
+    
+    is_valid_location = distance <= config.campus_radius_meters
+    
+    if not is_valid_location:
+        return jsonify({
+            'success': False, 
+            'error': f'You are {int(distance)} meters from campus. Please be within {config.campus_radius_meters} meters to check in.',
+            'distance': int(distance),
+            'required_radius': config.campus_radius_meters
+        }), 400
+    
+    # Create check-in record
+    try:
+        checkin = CampusCheckIn(
+            student_id=student.student_id,
+            checkin_date=today,
+            checkin_time=current_time,
+            latitude=latitude,
+            longitude=longitude,
+            is_valid_location=is_valid_location,
+            device_info=device_info[:255] if device_info else None
+        )
+        db.session.add(checkin)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Checked in successfully!',
+            'checkin': checkin.to_dict()
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/campus-checkin/status')
+@login_required
+def api_checkin_status():
+    """
+    Get today's check-in status for the current student.
+    """
+    current_user = get_current_user()
+    
+    if not current_user.role or current_user.role.role_name.lower() != 'student':
+        return jsonify({'success': False, 'error': 'Only students can view check-in status'}), 403
+    
+    student = Student.query.filter_by(user_id=current_user.user_id, is_deleted=False).first()
+    if not student:
+        return jsonify({'success': False, 'error': 'Student record not found'}), 404
+    
+    today = date.today()
+    checkin = CampusCheckIn.query.filter_by(
+        student_id=student.student_id,
+        checkin_date=today,
+        is_deleted=False
+    ).first()
+    
+    config = get_campus_config()
+    
+    return jsonify({
+        'success': True,
+        'checked_in': checkin is not None,
+        'checkin': checkin.to_dict() if checkin else None,
+        'campus_config': {
+            'radius_meters': config.campus_radius_meters,
+            'start_time': config.checkin_start_time.isoformat() if config.checkin_start_time else None,
+            'end_time': config.checkin_end_time.isoformat() if config.checkin_end_time else None
+        }
+    })
+
+
+# ============================================
+# Class Teacher Dashboard Routes
+# ============================================
+
+@app.route('/faculty')
+@faculty_required
+def faculty_dashboard_view():
+    """
+    Main Faculty Dashboard
+    Displays:
+    - Weekly/Monthly teaching hours
+    - Assigned Subjects (Academic & Admin)
+    - Quick Actions
+    """
+    current_user = get_current_user()
+    faculty_record = Faculty.query.filter_by(user_id=current_user.user_id).first()
+    
+    if not faculty_record:
+        return redirect(url_for('login'))
+        
+    # 1. Calculate Stats (Hours)
+    today = date.today()
+    start_of_week = today - timedelta(days=today.weekday()) # Monday
+    start_of_month = today.replace(day=1)
+    
+    # Query sessions for this faculty
+    week_sessions = AttendanceSession.query.filter(
+        AttendanceSession.taken_by_user_id == current_user.user_id,
+        AttendanceSession.taken_at >= datetime.combine(start_of_week, time.min),
+        AttendanceSession.is_deleted == False
+    ).all()
+    
+    month_sessions = AttendanceSession.query.filter(
+        AttendanceSession.taken_by_user_id == current_user.user_id,
+        AttendanceSession.taken_at >= datetime.combine(start_of_month, time.min),
+        AttendanceSession.is_deleted == False
+    ).all()
+    
+    def calculate_session_duration(session):
+        try:
+            if session.schedule and session.schedule.start_time and session.schedule.end_time:
+                # Calculate duration from time objects
+                dummy_date = date.today()
+                start = datetime.combine(dummy_date, session.schedule.start_time)
+                end = datetime.combine(dummy_date, session.schedule.end_time)
+                duration = (end - start).total_seconds() / 3600
+                return round(duration, 2)
+        except:
+            pass
+        return 1.0  # Default to 1 hour if calculation fails
+    
+    hours_week = sum([calculate_session_duration(s) for s in week_sessions])
+    hours_month = sum([calculate_session_duration(s) for s in month_sessions])
+    
+    # 2. Fetch Assigned Work
+    allocations = SubjectAllocation.query.filter_by(faculty_id=faculty_record.faculty_id).all()
+    
+    assigned_work = []
+    for alloc in allocations:
+        subject = alloc.subject
+        section = alloc.section
+        
+        # Check if Admin Work (custom type 'admin')
+        is_admin_work = subject.subject_type and subject.subject_type.lower() == 'admin'
+        
+        # Get progress (Classes conducted for this subject/section)
+        classes_taken = AttendanceSession.query.join(ClassSchedule).filter(
+            ClassSchedule.subject_id == subject.subject_id,
+            ClassSchedule.section_id == section.section_id if section else True,
+            AttendanceSession.taken_by_user_id == current_user.user_id,
+            AttendanceSession.is_deleted == False
+        ).count() if not is_admin_work else 0
+        
+        assigned_work.append({
+            'subject_name': subject.subject_name,
+            'section': section.section_name if section else 'N/A',
+            'type': subject.subject_type,
+            'is_admin': is_admin_work,
+            'description': subject.description,
+            'classes_taken': classes_taken
+        })
+    
+    # 3. Recent Attendance (Last 5 Sessions)
+    recent_sessions = AttendanceSession.query.filter(
+        AttendanceSession.taken_by_user_id == current_user.user_id,
+        AttendanceSession.is_deleted == False
+    ).order_by(AttendanceSession.taken_at.desc()).limit(5).all()
+
+    # Calculate student count for each recent session
+    recent_data = []
+    for sess in recent_sessions:
+        present_count = AttendanceRecord.query.filter_by(attendance_session_id=sess.attendance_session_id, status='present').count()
+        total_count = AttendanceRecord.query.filter_by(attendance_session_id=sess.attendance_session_id).count()
+        
+        recent_data.append({
+            'session_id': sess.attendance_session_id,
+            'subject_name': sess.schedule.subject.subject_name if sess.schedule and sess.schedule.subject else "N/A",
+            'section_name': sess.schedule.section.section_name if sess.schedule and sess.schedule.section else "N/A",
+            'date': sess.taken_at.strftime('%d %b, %H:%M'),
+            'present_count': present_count,
+            'total_count': total_count
+        })
+
+    # 4. Check if Class Teacher
+    managed_section = Section.query.filter_by(class_teacher_id=faculty_record.faculty_id).first()
+    is_class_teacher = managed_section is not None
+    
+    return render_template('faculty/dashboard.html',
+                         faculty=faculty_record,
+                         hours_week=round(hours_week, 1),
+                         hours_month=round(hours_month, 1),
+                         assigned_work=assigned_work,
+                         recent_sessions=recent_data,
+                         is_class_teacher=is_class_teacher)
+
+
+@app.route('/faculty/session/<session_id>')
+@faculty_required
+def faculty_attendance_session_detail(session_id):
+    """
+    View details of a specific attendance session
+    """
+    session = AttendanceSession.query.filter_by(attendance_session_id=session_id).first_or_404()
+    
+    records = AttendanceRecord.query.filter_by(attendance_session_id=session.attendance_session_id).join(Student).order_by(Student.roll_number).all()
+    
+    return render_template('faculty/session_detail.html', session=session, records=records)
+
+
+@app.route('/faculty/session/<session_id>/delete', methods=['POST'])
+@faculty_required
+def faculty_delete_attendance_session(session_id):
+    """
+    Secure delete of attendance session
+    Requires confirmation_date in JSON body
+    """
+    session = AttendanceSession.query.filter_by(attendance_session_id=session_id).first_or_404()
+    
+    current_user = get_current_user()
+    if session.taken_by_user_id != current_user.user_id:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+
+    data = request.get_json()
+    entered_date = data.get('confirmation_date')
+    expected_date = session.taken_at.strftime('%d-%m-%Y')
+    
+    if not entered_date or entered_date.strip() != expected_date:
+        return jsonify({'success': False, 'error': 'Incorrect date confirmation'}), 400
+        
+    try:
+        # Soft Delete
+        session.is_deleted = True
+        
+        # Soft delete records
+        AttendanceRecord.query.filter_by(attendance_session_id=session.attendance_session_id).update({'is_deleted': True})
+        
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/faculty/my-class')
+@faculty_required
+def faculty_my_class_view():
+    """
+    Class Teacher Dashboard - My Class
+    Displays:
+    - Overview of the class (Attendance, Absentees)
+    - List of Students (with edit capability)
+    """
+    current_user = get_current_user()
+    faculty_record = Faculty.query.filter_by(user_id=current_user.user_id).first()
+    
+    if not faculty_record:
+        return redirect(url_for('login'))
+        
+    managed_section = Section.query.filter_by(class_teacher_id=faculty_record.faculty_id).first()
+    
+    # If not a class teacher, redirect or show error (or empty state)
+    if not managed_section:
+        # Check if they are authorized to view this page effectively
+        # For now, let's render the template but it will show "No Class Assigned"
+        return render_template('faculty/my_class.html', faculty=faculty_record, class_data=None)
+
+    # Class Data Logic (Moved from Dashboard)
+    total_students = managed_section.students.filter_by(is_deleted=False).count()
+    
+    # Campus Check-ins for Today
+    checkins_today = CampusCheckIn.query.filter(
+        CampusCheckIn.checkin_date == date.today(),
+        CampusCheckIn.student_id.in_([s.student_id for s in managed_section.students])
+    ).all()
+    present_count = len(checkins_today)
+    present_student_ids = {c.student_id for c in checkins_today}
+    
+    # Identify Absentees and Student List
+    students_list = []
+    absentees = []
+    
+    all_students = managed_section.students.filter_by(is_deleted=False).order_by(Student.roll_number).all()
+    
+    for s in all_students:
+        student_data = {
+            'student_id': s.student_id,
+            'name': f"{s.first_name} {s.last_name}",
+            'roll_number': s.roll_number,
+            'phone': s.phone,
+            'guardian_phone': s.guardian_phone,
+            'address': s.address,
+            'is_present': s.student_id in present_student_ids
+        }
+        students_list.append(student_data)
+        
+        if s.student_id not in present_student_ids:
+            absentees.append(student_data)
+    
+    # Sort students: Low attendance first
+    # Calculate percentage for each student first
+    for s in students_list:
+        # Get overall attendance % (Total sessions vs Attended)
+        # Note: Ideally this should be a DB aggregation for performance, 
+        # but iterating works for class sizes ~60.
+        
+        # Count all UNIQUE sessions applicable to this student's section
+        # Use distinct to avoid counting same session multiple times due to duplicate ClassSchedule entries
+        total_sessions = db.session.query(AttendanceSession.attendance_session_id).join(ClassSchedule).filter(
+            ClassSchedule.section_id == managed_section.section_id,
+            AttendanceSession.is_deleted == False
+        ).distinct().count()
+        
+        # Count UNIQUE attended sessions
+        attended = db.session.query(AttendanceSession.attendance_session_id).join(
+            AttendanceRecord, AttendanceRecord.attendance_session_id == AttendanceSession.attendance_session_id
+        ).join(ClassSchedule).filter(
+            AttendanceRecord.student_id == s['student_id'],
+            AttendanceRecord.status == 'present',
+            ClassSchedule.section_id == managed_section.section_id
+        ).distinct().count()
+        
+        s['attendance_percentage'] = int((attended / total_sessions * 100)) if total_sessions > 0 else 0
+        s['total_attended'] = attended
+        s['total_sessions'] = total_sessions
+
+    # Sort: Ascending order (Low attendance on top)
+    students_list.sort(key=lambda x: x['attendance_percentage'])
+
+    # Syllabus / Days Left Logic (Simplified)
+    last_day = date.today() + timedelta(days=60) 
+    days_left = (last_day - date.today()).days if last_day else 0
+
+    class_data = {
+        'section_name': managed_section.section_name,
+        'present_count': present_count,
+        'total_students': total_students,
+        'absentees': absentees,
+        'students': students_list,
+        'days_left': days_left,
+        'attendance_percentage': int((present_count / total_students * 100)) if total_students > 0 else 0
+    }
+
+    return render_template('faculty/my_class.html', faculty=faculty_record, class_data=class_data, is_class_teacher=True)
+
+
+
+@app.route('/faculty/take-attendance')
+@faculty_required
+def faculty_take_attendance_app():
+    """
+    Render the Swipe Attendance App Container
+    """
+    current_user = get_current_user()
+    faculty_record = Faculty.query.filter_by(user_id=current_user.user_id).first()
+    
+    # Get subjects assigned to this faculty
+    allocations = SubjectAllocation.query.filter_by(faculty_id=faculty_record.faculty_id).all()
+    
+    # Get unique assigned subjects for this faculty
+    unique_allocations = []
+    seen_subjects = set()
+    for a in allocations:
+        if a.subject_id not in seen_subjects:
+            unique_allocations.append({
+                'subject_id': a.subject_id,
+                'subject_name': a.subject.subject_name if a.subject else 'Unknown',
+                'subject_type': a.subject.subject_type if a.subject else 'theory',
+                'semester_id': a.subject.semester_id if a.subject else None
+            })
+            seen_subjects.add(a.subject_id)
+    
+    # Get ALL active sections from the database
+    all_sections = Section.query.filter_by(is_deleted=False).order_by(Section.section_name).all()
+    
+    return render_template('faculty/take_attendance_swipe.html', 
+                         allocations=unique_allocations,
+                         sections=all_sections,
+                         allocations_json=json.dumps(unique_allocations),
+                         date=date)
+
+
+@app.route('/faculty/profile', methods=['GET', 'POST'])
+@faculty_required
+def faculty_profile():
+    """
+    Faculty Profile - View and Edit
+    """
+    from werkzeug.security import generate_password_hash
+    
+    current_user = get_current_user()
+    faculty_record = Faculty.query.filter_by(user_id=current_user.user_id).first()
+    
+    if not faculty_record:
+        flash('Faculty record not found', 'error')
+        return redirect(url_for('login'))
+    
+    if request.method == 'POST':
+        try:
+            # Update faculty information
+            faculty_record.first_name = request.form.get('first_name')
+            faculty_record.last_name = request.form.get('last_name')
+            faculty_record.phone = request.form.get('phone')
+            faculty_record.designation = request.form.get('designation')
+            
+            # Update user information
+            current_user.email = request.form.get('email')
+            new_username = request.form.get('username')
+            
+            # Check if username is being changed and if it's already taken
+            if new_username != current_user.username:
+                existing_user = User.query.filter_by(username=new_username).first()
+                if existing_user:
+                    flash('Username already taken. Please choose another.', 'error')
+                    return render_template('faculty/profile.html', faculty=faculty_record, user=current_user)
+                current_user.username = new_username
+            
+            # Update password if provided
+            new_password = request.form.get('new_password')
+            confirm_password = request.form.get('confirm_password')
+            
+            if new_password:
+                if new_password != confirm_password:
+                    flash('Passwords do not match', 'error')
+                    return render_template('faculty/profile.html', faculty=faculty_record, user=current_user)
+                
+                if len(new_password) < 6:
+                    flash('Password must be at least 6 characters long', 'error')
+                    return render_template('faculty/profile.html', faculty=faculty_record, user=current_user)
+                
+                current_user.password_hash = generate_password_hash(new_password)
+            
+            db.session.commit()
+            flash('Profile updated successfully!', 'success')
+            return redirect(url_for('faculty_profile'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating profile: {str(e)}', 'error')
+            return render_template('faculty/profile.html', faculty=faculty_record, user=current_user)
+    
+    # Check if Class Teacher
+    managed_section = Section.query.filter_by(class_teacher_id=faculty_record.faculty_id).first()
+    is_class_teacher = managed_section is not None
+    
+    return render_template('faculty/profile.html', faculty=faculty_record, user=current_user, is_class_teacher=is_class_teacher)
+
+
+@app.route('/api/faculty/sections-for-subject/<subject_id>')
+@faculty_required
+def api_faculty_sections_for_subject(subject_id):
+    """
+    Get sections assigned to the current faculty for a specific subject
+    """
+    current_user = get_current_user()
+    faculty_record = Faculty.query.filter_by(user_id=current_user.user_id).first()
+    
+    allocations = SubjectAllocation.query.filter_by(
+        faculty_id=faculty_record.faculty_id,
+        subject_id=subject_id
+    ).all()
+    
+    sections = []
+    seen = set()
+    for a in allocations:
+        if a.section and a.section_id not in seen:
+            sections.append({
+                'section_id': a.section_id,
+                'section_name': a.section.section_name
+            })
+            seen.add(a.section_id)
+            
+    return jsonify(sections)
+
+
+@app.route('/api/faculty/subjects-for-section/<section_id>')
+@faculty_required
+def api_faculty_subjects_for_section(section_id):
+    """
+    Get subjects assigned to the current faculty for a specific section
+    """
+    current_user = get_current_user()
+    faculty_record = Faculty.query.filter_by(user_id=current_user.user_id).first()
+    
+    allocations = SubjectAllocation.query.filter_by(
+        faculty_id=faculty_record.faculty_id,
+        section_id=section_id
+    ).all()
+    
+    subjects = []
+    seen = set()
+    for a in allocations:
+        if a.subject and a.subject_id not in seen and a.subject.subject_type != 'admin':
+            subjects.append({
+                'subject_id': a.subject_id,
+                'subject_name': a.subject.subject_name,
+                'subject_type': a.subject.subject_type
+            })
+            seen.add(a.subject_id)
+            
+    return jsonify(subjects)
+
+
+@app.route('/api/attendance/submit', methods=['POST'])
+@faculty_required
+def api_submit_attendance():
+    """
+    Submit attendance from Swipe App
+    """
+    data = request.json
+    current_user = get_current_user()
+    faculty_record = Faculty.query.filter_by(user_id=current_user.user_id).first()
+    
+    try:
+        # Get class start and end times from the request
+        class_start_time_str = data.get('class_start_time')  # e.g., "10:00"
+        class_end_time_str = data.get('class_end_time')      # e.g., "11:00"
+        
+        # Parse times
+        start_time = datetime.strptime(class_start_time_str, '%H:%M').time() if class_start_time_str else None
+        end_time = datetime.strptime(class_end_time_str, '%H:%M').time() if class_end_time_str else None
+        
+        # Use today's date for the class schedule
+        class_date = date.today()
+        
+        # 1. Create ClassSchedule Entry
+        schedule = ClassSchedule(
+            subject_id=data['subject_id'],
+            faculty_id=faculty_record.faculty_id,
+            section_id=data['section_id'],
+            date=class_date,
+            start_time=start_time,
+            end_time=end_time,
+            class_type='theory'  # Default
+        )
+        db.session.add(schedule)
+        db.session.flush()  # Get ID
+        
+        # 2. Create AttendanceSession
+        # IMPORTANT: taken_at is set to NOW (when attendance is actually being entered)
+        session_id = gen_uuid()
+        diary_number = f"DN-{datetime.now().strftime('%Y%m%d')}-{session_id[:4].upper()}"
+        
+        session = AttendanceSession(
+            attendance_session_id=session_id,
+            schedule_id=schedule.schedule_id,
+            taken_by_user_id=current_user.user_id,
+            taken_at=datetime.utcnow(),  # Automatically captured - when attendance was entered
+            status='finalized',
+            topic_taught=data.get('topic', ''),
+            diary_number=diary_number
+        )
+        db.session.add(session)
+        db.session.flush()
+        
+        # 3. Create Records
+        for rec in data['records']:
+            status = 'present' if rec['status'] == 'present' else 'absent'
+            record = AttendanceRecord(
+                attendance_session_id=session.attendance_session_id,
+                student_id=rec['student_id'],
+                status=status,
+                remarks=''
+            )
+            db.session.add(record)
+            
+        db.session.commit()
+        return jsonify({'success': True, 'session_id': session.attendance_session_id})
+        
+    except Exception as e:
+        db.session.rollback()
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/section/<section_id>/students')
+@login_required # Allow faculty/admin
+def api_get_section_students(section_id):
+    """
+    Get all students in a specific section
+    For Swipe Attendance App
+    """
+    section = Section.query.get(section_id)
+    if not section:
+        return jsonify([]), 404
+        
+    students = section.students.filter_by(is_deleted=False).all()
+    
+    return jsonify([{
+        'student_id': s.student_id,
+        'first_name': s.first_name,
+        'last_name': s.last_name,
+        'usn': s.roll_number or s.usn,
+        'roll_number': s.roll_number
+    } for s in students])
+
+@app.route('/class-teacher/dashboard')
+@faculty_required
+def class_teacher_dashboard():
+    """
+    Class teacher dashboard showing today's check-ins and attendance comparison.
+    """
+    current_user = get_current_user()
+    faculty = Faculty.query.filter_by(user_id=current_user.user_id).first()
+    
+    if not faculty:
+        flash('Faculty record not found', 'error')
+        return redirect(url_for('index'))
+    
+    # Get sections where this faculty is class teacher
+    sections = Section.query.filter_by(
+        class_teacher_id=faculty.faculty_id,
+        is_deleted=False
+    ).all()
+    
+    if not sections:
+        flash('You are not assigned as class teacher for any section', 'warning')
+        return redirect(url_for('index'))
+    
+    # Get today's check-in data for each section
+    today = date.today()
+    section_data = []
+    
+    for section in sections:
+        # Get all active students in section
+        students = Student.query.filter_by(
+            section_id=section.section_id,
+            is_deleted=False,
+            is_active=True
+        ).all()
+        
+        total_students = len(students)
+        student_ids = [s.student_id for s in students]
+        
+        # Get today's check-ins for these students
+        checkins = CampusCheckIn.query.filter(
+            CampusCheckIn.student_id.in_(student_ids),
+            CampusCheckIn.checkin_date == today,
+            CampusCheckIn.is_deleted == False
+        ).all()
+        
+        checked_in_ids = {c.student_id for c in checkins}
+        
+        # Separate checked-in and not checked-in students
+        checked_in_students = []
+        not_checked_in_students = []
+        
+        for student in students:
+            if student.student_id in checked_in_ids:
+                checkin = next(c for c in checkins if c.student_id == student.student_id)
+                checked_in_students.append({
+                    'student': student,
+                    'checkin_time': checkin.checkin_time
+                })
+            else:
+                not_checked_in_students.append(student)
+        
+        section_data.append({
+            'section': section,
+            'total_students': total_students,
+            'checked_in_count': len(checked_in_students),
+            'checked_in_students': checked_in_students,
+            'not_checked_in_students': not_checked_in_students
+        })
+    
+    return render_template('class_teacher_dashboard.html',
+                         faculty=faculty,
+                         section_data=section_data,
+                         today=today)
+
+
+@app.route('/api/class-teacher/today-checkins')
+@faculty_required
+def api_class_teacher_checkins():
+    """
+    API endpoint for class teacher to get today's check-in data.
+    """
+    current_user = get_current_user()
+    faculty = Faculty.query.filter_by(user_id=current_user.user_id).first()
+    
+    if not faculty:
+        return jsonify({'success': False, 'error': 'Faculty record not found'}), 404
+    
+    section_id = request.args.get('section_id')
+    today = date.today()
+    
+    # Get section(s)
+    if section_id:
+        sections = Section.query.filter_by(
+            section_id=section_id,
+            class_teacher_id=faculty.faculty_id,
+            is_deleted=False
+        ).all()
+    else:
+        sections = Section.query.filter_by(
+            class_teacher_id=faculty.faculty_id,
+            is_deleted=False
+        ).all()
+    
+    result = []
+    for section in sections:
+        students = Student.query.filter_by(
+            section_id=section.section_id,
+            is_deleted=False
+        ).all()
+        
+        student_ids = [s.student_id for s in students]
+        
+        checkins = CampusCheckIn.query.filter(
+            CampusCheckIn.student_id.in_(student_ids) if student_ids else False,
+            CampusCheckIn.checkin_date == today,
+            CampusCheckIn.is_deleted == False
+        ).all()
+        
+        result.append({
+            'section': section.to_dict(),
+            'total_students': len(students),
+            'checked_in_count': len(checkins),
+            'checkins': [c.to_dict() for c in checkins]
+        })
+    
+    return jsonify({'success': True, 'data': result})
+
+
+# ============================================
+# Monthly Attendance Report Routes
+# ============================================
+
+@app.route('/attendance/monthly-report')
+@faculty_required
+def monthly_attendance_report():
+    """
+    Monthly attendance report page for class teachers.
+    """
+    current_user = get_current_user()
+    faculty = Faculty.query.filter_by(user_id=current_user.user_id).first()
+    
+    # Get sections for this faculty (class teacher sections)
+    sections = Section.query.filter_by(
+        class_teacher_id=faculty.faculty_id,
+        is_deleted=False
+    ).all() if faculty else []
+    
+    # If admin/HOD, show all sections
+    if current_user.role and current_user.role.role_name.lower() in ['admin', 'hod']:
+        sections = Section.query.filter_by(is_deleted=False).all()
+    
+    return render_template('monthly_report.html',
+                         sections=sections,
+                         current_month=datetime.now().month,
+                         current_year=datetime.now().year)
+
+
+@app.route('/api/attendance/monthly-report')
+@faculty_required
+def api_monthly_attendance_report():
+    """
+    API endpoint for generating monthly attendance report.
+    Parameters: section_id, month, year
+    """
+    section_id = request.args.get('section_id')
+    month = request.args.get('month', type=int, default=datetime.now().month)
+    year = request.args.get('year', type=int, default=datetime.now().year)
+    
+    if not section_id:
+        return jsonify({'success': False, 'error': 'Section ID required'}), 400
+    
+    # Verify permission
+    current_user = get_current_user()
+    faculty = Faculty.query.filter_by(user_id=current_user.user_id).first()
+    section = Section.query.get(section_id)
+    
+    if not section:
+        return jsonify({'success': False, 'error': 'Section not found'}), 404
+    
+    # Check if user has permission (class teacher, admin, or HOD)
+    is_admin = current_user.role and current_user.role.role_name.lower() in ['admin', 'hod']
+    is_class_teacher = faculty and section.class_teacher_id == faculty.faculty_id
+    
+    if not is_admin and not is_class_teacher:
+        return jsonify({'success': False, 'error': 'Permission denied'}), 403
+    
+    # Get date range for the month
+    first_day = date(year, month, 1)
+    if month == 12:
+        last_day = date(year + 1, 1, 1) - timedelta(days=1)
+    else:
+        last_day = date(year, month + 1, 1) - timedelta(days=1)
+    
+    # Get students in section
+    students = Student.query.filter_by(
+        section_id=section_id,
+        is_deleted=False
+    ).order_by(Student.roll_number).all()
+    
+    # Get all attendance sessions for the section in this month
+    sessions = AttendanceSession.query.join(ClassSchedule).filter(
+        ClassSchedule.section_id == section_id,
+        AttendanceSession.taken_at >= datetime.combine(first_day, time.min),
+        AttendanceSession.taken_at <= datetime.combine(last_day, time.max),
+        AttendanceSession.is_deleted == False
+    ).all()
+    
+    total_classes = len(sessions)
+    session_ids = [s.attendance_session_id for s in sessions]
+    
+    # Calculate attendance for each student
+    report_data = []
+    for student in students:
+        # Get ALL attendance records for this student in this month (across any section if transferred)
+        # We filter by date range on the joined AttendanceSession
+        records = AttendanceRecord.query.join(AttendanceSession).filter(
+            AttendanceRecord.student_id == student.student_id,
+            AttendanceSession.taken_at >= datetime.combine(first_day, time.min),
+            AttendanceSession.taken_at <= datetime.combine(last_day, time.max),
+            AttendanceRecord.is_deleted == False
+        ).all()
+        
+        present_count = sum(1 for r in records if r.status == 'present')
+        absent_count = sum(1 for r in records if r.status == 'absent')
+        late_count = sum(1 for r in records if r.status == 'late')
+        
+        # Use student's total records as denominator if they have any (handles transfer cases)
+        # If no records, use section's total classes (new student with 0 attendance)
+        student_total_classes = len(records)
+        effective_total = student_total_classes if student_total_classes > 0 else total_classes
+        
+        percentage = round((present_count / effective_total) * 100, 1) if effective_total > 0 else 0
+        
+        report_data.append({
+            'student_id': student.student_id,
+            'roll_number': student.roll_number,
+            'name': f"{student.first_name} {student.last_name}",
+            'total_classes': total_classes,
+            'present': present_count,
+            'absent': absent_count,
+            'late': late_count,
+            'percentage': percentage
+        })
+    
+    # Also include daily check-in data
+    student_ids = [s.student_id for s in students]
+    checkins = CampusCheckIn.query.filter(
+        CampusCheckIn.student_id.in_(student_ids) if student_ids else False,
+        CampusCheckIn.checkin_date >= first_day,
+        CampusCheckIn.checkin_date <= last_day,
+        CampusCheckIn.is_deleted == False
+    ).all()
+    
+    # Count unique check-in days per student
+    checkin_days = {}
+    for checkin in checkins:
+        if checkin.student_id not in checkin_days:
+            checkin_days[checkin.student_id] = set()
+        checkin_days[checkin.student_id].add(checkin.checkin_date)
+    
+    # Add check-in days to report
+    for data in report_data:
+        data['checkin_days'] = len(checkin_days.get(data['student_id'], set()))
+    
+    return jsonify({
+        'success': True,
+        'section': section.to_dict(),
+        'month': month,
+        'year': year,
+        'total_classes': total_classes,
+        'total_working_days': (last_day - first_day).days + 1,
+        'report': report_data
+    })
+
+
+@app.route('/api/admin/campus-config', methods=['GET', 'PUT'])
+@admin_required
+def api_campus_config():
+    """
+    Admin endpoint to view/update campus configuration.
+    """
+    config = get_campus_config()
+    
+    if request.method == 'PUT':
+        data = request.get_json()
+        try:
+            if 'campus_latitude' in data:
+                config.campus_latitude = float(data['campus_latitude'])
+            if 'campus_longitude' in data:
+                config.campus_longitude = float(data['campus_longitude'])
+            if 'campus_radius_meters' in data:
+                config.campus_radius_meters = int(data['campus_radius_meters'])
+            if 'college_name' in data:
+                config.college_name = data['college_name']
+            if 'checkin_start_time' in data:
+                config.checkin_start_time = datetime.strptime(data['checkin_start_time'], '%H:%M').time()
+            if 'checkin_end_time' in data:
+                config.checkin_end_time = datetime.strptime(data['checkin_end_time'], '%H:%M').time()
+            
+            db.session.commit()
+            return jsonify({'success': True, 'config': config.to_dict()})
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'error': str(e)}), 400
+    
+    return jsonify({'success': True, 'config': config.to_dict()})
+
+
+
+
+from math import radians, sin, cos, sqrt, atan2
+
+def calculate_distance(lat1, lon1, lat2, lon2):
+    """
+    Calculate distance between two GPS coordinates using Haversine formula
+    Returns distance in meters
+    """
+    R = 6371000  # Earth's radius in meters
+    
+    lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+    
+    a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+    c = 2 * atan2(sqrt(a), sqrt(1-a))
+    distance = R * c
+    
+    return distance
+
+
+@app.route('/api/faculty/check-in', methods=['POST'])
+@faculty_required
+def api_faculty_checkin():
+    """Faculty check-in (can be done from anywhere)"""
+    from models import FacultyAttendance
+    
+    current_user = get_current_user()
+    faculty_record = Faculty.query.filter_by(user_id=current_user.user_id).first()
+    
+    data = request.get_json()
+    latitude = data.get('latitude')
+    longitude = data.get('longitude')
+    
+    if not latitude or not longitude:
+        return jsonify({'success': False, 'error': 'GPS location required'}), 400
+    
+    today = date.today()
+    
+    # Check if already checked in today
+    existing = FacultyAttendance.query.filter_by(
+        faculty_id=faculty_record.faculty_id,
+        date=today
+    ).first()
+    
+    if existing and existing.check_in_time:
+        return jsonify({'success': False, 'error': 'Already checked in today'}), 400
+    
+    # Create or update attendance record
+    if not existing:
+        attendance = FacultyAttendance(
+            faculty_id=faculty_record.faculty_id,
+            date=today
+        )
+    else:
+        attendance = existing
+    
+    attendance.check_in_time = datetime.now()
+    attendance.check_in_latitude = latitude
+    attendance.check_in_longitude = longitude
+    
+    if not existing:
+        db.session.add(attendance)
+    
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'check_in_time': attendance.check_in_time.isoformat(),
+        'message': 'Checked in successfully!'
+    })
+
+
+@app.route('/api/faculty/check-out', methods=['POST'])
+@faculty_required
+def api_faculty_checkout():
+    """Faculty check-out (must be at department location)"""
+    from models import FacultyAttendance, CollegeConfig
+    
+    current_user = get_current_user()
+    faculty_record = Faculty.query.filter_by(user_id=current_user.user_id).first()
+    
+    data = request.get_json()
+    latitude = data.get('latitude')
+    longitude = data.get('longitude')
+    
+    if not latitude or not longitude:
+        return jsonify({'success': False, 'error': 'GPS location required'}), 400
+    
+    today = date.today()
+    
+    # Get today's attendance record
+    attendance = FacultyAttendance.query.filter_by(
+        faculty_id=faculty_record.faculty_id,
+        date=today
+    ).first()
+    
+    if not attendance or not attendance.check_in_time:
+        return jsonify({'success': False, 'error': 'Please check in first'}), 400
+    
+    if attendance.check_out_time:
+        return jsonify({'success': False, 'error': 'Already checked out today'}), 400
+    
+    # Get campus location from config
+    config = CollegeConfig.query.first()
+    if not config or not config.campus_latitude or not config.campus_longitude:
+        # If no config, allow checkout (fallback)
+        attendance.check_out_time = datetime.now()
+        attendance.check_out_latitude = latitude
+        attendance.check_out_longitude = longitude
+        attendance.check_out_valid = True
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'message': 'Checked out successfully!',
+            'hours_worked': attendance.get_hours_worked()
+        })
+    
+    # Calculate distance from campus
+    distance = calculate_distance(
+        latitude, longitude,
+        config.campus_latitude, config.campus_longitude
+    )
+    
+    radius = config.campus_radius_meters or 100  # Default 100m
+    
+    if distance > radius:
+        return jsonify({
+            'success': False,
+            'error': f'You are not at the department! You are {int(distance)}m away. Please come to campus to check out.',
+            'distance': int(distance),
+            'required_radius': radius
+        }), 400
+    
+    # Valid checkout
+    attendance.check_out_time = datetime.now()
+    attendance.check_out_latitude = latitude
+    attendance.check_out_longitude = longitude
+    attendance.check_out_valid = True
+    
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'check_out_time': attendance.check_out_time.isoformat(),
+        'hours_worked': attendance.get_hours_worked(),
+        'message': 'Checked out successfully!'
+    })
+
+
+@app.route('/api/faculty/attendance-status')
+@faculty_required
+def api_faculty_attendance_status():
+    """Get today's check-in/out status"""
+    from models import FacultyAttendance
+    
+    current_user = get_current_user()
+    faculty_record = Faculty.query.filter_by(user_id=current_user.user_id).first()
+    
+    today = date.today()
+    attendance = FacultyAttendance.query.filter_by(
+        faculty_id=faculty_record.faculty_id,
+        date=today
+    ).first()
+    
+    if not attendance:
+        return jsonify({
+            'checked_in': False,
+            'checked_out': False
+        })
+    
+    return jsonify({
+        'checked_in': bool(attendance.check_in_time),
+        'checked_out': bool(attendance.check_out_time),
+        'check_in_time': attendance.check_in_time.isoformat() if attendance.check_in_time else None,
+        'check_out_time': attendance.check_out_time.isoformat() if attendance.check_out_time else None,
+        'hours_worked': attendance.get_hours_worked()
+    })
+
+
+@app.route('/api/faculty/students/<student_id>/analytics')
+@faculty_required
+def api_faculty_student_analytics(student_id):
+    """
+    Get detailed attendance analytics for a student
+    """
+    print(f"=" * 80)
+    print(f"ANALYTICS ENDPOINT CALLED - Student ID: {student_id}")
+    print(f"=" * 80)
+    
+    try:
+        from models import Student, AttendanceRecord, AttendanceSession, ClassSchedule, Subject
+        
+        print(f"Step 1: Fetching student with ID: {student_id}")
+        student = Student.query.get(student_id)
+        if not student:
+            print(f"ERROR: Student not found with ID: {student_id}")
+            return jsonify({'success': False, 'error': 'Student not found'}), 404
+        
+        print(f"Step 2: Found student: {student.first_name} {student.last_name}")
+        print(f"Step 3: Student section_id: {student.section_id}")
+        
+        # Get the student's section to find the semester
+        from models import Section
+        section = Section.query.get(student.section_id)
+        if not section:
+            return jsonify({'success': False, 'error': 'Section not found'}), 404
+        
+        print(f"Step 4: Section current_semester: {section.current_semester}")
+        
+        # Get ALL subjects for this semester
+        subjects = Subject.query.filter_by(semester_id=section.current_semester).all()
+        
+        print(f"Step 5: Found {len(subjects)} subjects for semester {section.current_semester}")
+        
+        # Initialize stats for ALL subjects in this semester
+        subject_stats = {}
+        for subject in subjects:
+            subject_stats[subject.subject_id] = {
+                'subject_name': subject.subject_name,
+                'subject_code': subject.subject_code,
+                'total_classes': 0,
+                'attended': 0
+            }
+        
+        # Get all sessions for the student's section
+        # This counts ALL classes conducted, even if multiple classes of same subject on same day
+        all_sessions = db.session.query(
+            AttendanceSession, 
+            ClassSchedule,
+            Subject
+        ).join(
+            ClassSchedule, AttendanceSession.schedule_id == ClassSchedule.schedule_id
+        ).join(
+            Subject, ClassSchedule.subject_id == Subject.subject_id
+        ).filter(
+            ClassSchedule.section_id == student.section_id,
+            AttendanceSession.is_deleted == False
+        ).all()
+        
+        print(f"Step 5: Found {len(all_sessions)} total sessions conducted")
+        
+        # Get all attendance records for this student
+        student_records = AttendanceRecord.query.filter_by(
+            student_id=student_id,
+            is_deleted=False
+        ).all()
+        
+        print(f"Step 6: Found {len(student_records)} attendance records for student")
+        
+        # Create a map of session_id -> status
+        attendance_map = {r.attendance_session_id: r.status for r in student_records}
+        
+        # Process Stats - Count EVERY session (allows multiple classes per day)
+        day_analysis = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0} # 0=Mon, 6=Sun
+        days_map = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+        
+        for session, schedule, subject in all_sessions:
+            sub_id = subject.subject_id
+            
+            # Only count if this subject is allocated to the section
+            if sub_id in subject_stats:
+                # Count every session (even if multiple per day)
+                subject_stats[sub_id]['total_classes'] += 1
+                
+                # Check attendance
+                status = attendance_map.get(session.attendance_session_id, 'absent')
+                
+                if status == 'present':
+                    subject_stats[sub_id]['attended'] += 1
+                else:
+                    # Analyze absence
+                    day_idx = session.taken_at.weekday()
+                    day_analysis[day_idx] += 1
+                
+        print(f"Step 6: Processed {len(subject_stats)} subjects")
+        
+        # Format Subject Stats
+        final_subject_stats = []
+        for sub_id, stats in subject_stats.items():
+            total = stats['total_classes']
+            attended = stats['attended']
+            percentage = round((attended / total * 100), 1) if total > 0 else 0
+            
+            final_subject_stats.append({
+                'subject_name': stats['subject_name'],
+                'subject_code': stats['subject_code'],
+                'total_classes': total,
+                'attended': attended,
+                'percentage': percentage
+            })
+            
+        # Format Day Analysis (only if count > 0)
+        final_day_analysis = []
+        total_absences = sum(day_analysis.values())
+        
+        for day_idx, count in day_analysis.items():
+            if count > 0:
+                percentage = round((count / total_absences * 100), 1) if total_absences > 0 else 0
+                final_day_analysis.append({
+                    'day': days_map[day_idx],
+                    'count': count,
+                    'percentage': percentage
+                })
+                
+        # Sort days by count desc
+        final_day_analysis.sort(key=lambda x: x['count'], reverse=True)
+        
+        print(f"Step 7: Returning success response")
+        print(f"=" * 80)
+        
+        return jsonify({
+            'success': True,
+            'student_name': f"{student.first_name} {student.last_name}",
+            'roll_number': student.roll_number,
+            'subject_stats': final_subject_stats,
+            'day_analysis': final_day_analysis
+        })
+    except Exception as e:
+        import traceback
+        print(f"=" * 80)
+        print(f"ANALYTICS ERROR:")
+        print(f"Error Type: {type(e).__name__}")
+        print(f"Error Message: {str(e)}")
+        print(f"Full Traceback:")
+        print(traceback.format_exc())
+        print(f"=" * 80)
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+
+@app.route('/api/faculty/students/<student_id>', methods=['PUT'])
+@faculty_required
+def api_faculty_update_student(student_id):
+    """
+    Update student details (Phone, Address)
+    """
+    from models import Student
+    
+    student = Student.query.get_or_404(student_id)
+    data = request.get_json()
+    
+    if 'phone' in data:
+        student.phone = data['phone']
+    if 'guardian_phone' in data:
+        student.guardian_phone = data['guardian_phone']
+    if 'address' in data:
+        student.address = data['address']
+        
+    try:
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Updated successfully'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+
+# ============================================
 # Main Application Entry
 # ============================================
+
+
+# ============================================
+# Student Dashboard Routes
+# ============================================
+
+# Motivational quotes list
+MOTIVATIONAL_QUOTES = [
+    "Success is not final, failure is not fatal: it is the courage to continue that counts.",
+    "Believe you can and you're halfway there.",
+    "The future belongs to those who believe in the beauty of their dreams.",
+    "Education is the most powerful weapon which you can use to change the world.",
+    "Your attitude, not your aptitude, will determine your altitude.",
+    "The only way to do great work is to love what you do.",
+    "Don't watch the clock; do what it does. Keep going.",
+    "The expert in anything was once a beginner.",
+    "Success is the sum of small efforts repeated day in and day out.",
+    "Dream big, work hard, stay focused, and surround yourself with good people.",
+    "The beautiful thing about learning is that no one can take it away from you.",
+    "Strive for progress, not perfection.",
+    "Your only limit is you.",
+    "Great things never come from comfort zones.",
+    "The harder you work for something, the greater you'll feel when you achieve it."
+]
+
+@app.route('/student/dashboard')
+@student_required
+def student_dashboard():
+    """
+    Student Dashboard - Main page for students
+    Shows attendance analytics, holidays, check-in status, and motivational quote
+    """
+    current_user = get_current_user()
+    student_record = Student.query.filter_by(user_id=current_user.user_id).first()
+    
+    if not student_record:
+        flash('Student record not found.', 'danger')
+        return redirect(url_for('login'))
+    
+    # Get student's section
+    section = Section.query.get(student_record.section_id)
+    
+    # Calculate overall attendance percentage
+    total_sessions = db.session.query(AttendanceSession.attendance_session_id).join(ClassSchedule).filter(
+        ClassSchedule.section_id == student_record.section_id,
+        AttendanceSession.is_deleted == False
+    ).distinct().count()
+    
+    attended = db.session.query(AttendanceSession.attendance_session_id).join(
+        AttendanceRecord, AttendanceRecord.attendance_session_id == AttendanceSession.attendance_session_id
+    ).join(ClassSchedule).filter(
+        AttendanceRecord.student_id == student_record.student_id,
+        AttendanceRecord.status == 'present',
+        ClassSchedule.section_id == student_record.section_id
+    ).distinct().count()
+    
+    overall_percentage = int((attended / total_sessions * 100)) if total_sessions > 0 else 0
+    
+    # Check if in red zone (<75%)
+    is_red_zone = overall_percentage < 75
+    
+    # Get random motivational quote
+    import random
+    motivational_quote = random.choice(MOTIVATIONAL_QUOTES)
+    
+    # Check today's check-in status
+    today = date.today()
+    checkin_today = CampusCheckIn.query.filter_by(
+        student_id=student_record.student_id,
+        checkin_date=today
+    ).first()
+    
+    has_checked_in = bool(checkin_today)
+    
+    dashboard_data = {
+        'student': student_record,
+        'section': section,
+        'overall_percentage': overall_percentage,
+        'total_sessions': total_sessions,
+        'attended': attended,
+        'is_red_zone': is_red_zone,
+        'motivational_quote': motivational_quote,
+        'has_checked_in': has_checked_in,
+        'current_checkin': checkin_today
+    }
+    
+    return render_template('student/dashboard.html', **dashboard_data)
+
+
+@app.route('/api/student/analytics')
+@student_required
+def api_student_analytics():
+    """
+    Get detailed attendance analytics for the logged-in student
+    Returns subject-wise breakdown with percentages
+    """
+    current_user = get_current_user()
+    student_record = Student.query.filter_by(user_id=current_user.user_id).first()
+    
+    if not student_record:
+        return jsonify({'success': False, 'error': 'Student not found'}), 404
+    
+    try:
+        # Get student's section
+        section = Section.query.get(student_record.section_id)
+        if not section:
+            return jsonify({'success': False, 'error': 'Section not found'}), 404
+        
+        # Get ALL subjects for this semester
+        subjects = Subject.query.filter_by(semester_id=section.current_semester).all()
+        
+        # Initialize stats for ALL subjects in this semester
+        subject_stats = {}
+        for subject in subjects:
+            subject_stats[subject.subject_id] = {
+                'subject_name': subject.subject_name,
+                'subject_code': subject.subject_code,
+                'total_classes': 0,
+                'attended': 0
+            }
+        
+        # Get all sessions for the student's section
+        all_sessions = db.session.query(
+            AttendanceSession, 
+            ClassSchedule,
+            Subject
+        ).join(
+            ClassSchedule, AttendanceSession.schedule_id == ClassSchedule.schedule_id
+        ).join(
+            Subject, ClassSchedule.subject_id == Subject.subject_id
+        ).filter(
+            ClassSchedule.section_id == student_record.section_id,
+            AttendanceSession.is_deleted == False
+        ).all()
+        
+        # Get all attendance records for this student
+        student_records = AttendanceRecord.query.filter_by(
+            student_id=student_record.student_id,
+            is_deleted=False
+        ).all()
+        
+        # Create a map of session_id -> status
+        attendance_map = {r.attendance_session_id: r.status for r in student_records}
+        
+        # Process Stats - Count EVERY session
+        for session, schedule, subject in all_sessions:
+            sub_id = subject.subject_id
+            
+            # Only count if this subject is in the semester
+            if sub_id in subject_stats:
+                subject_stats[sub_id]['total_classes'] += 1
+                
+                # Check attendance
+                status = attendance_map.get(session.attendance_session_id, 'absent')
+                
+                if status == 'present':
+                    subject_stats[sub_id]['attended'] += 1
+        
+        # Format Subject Stats
+        final_subject_stats = []
+        for sub_id, stats in subject_stats.items():
+            total = stats['total_classes']
+            attended = stats['attended']
+            percentage = round((attended / total * 100), 1) if total > 0 else 0
+            
+            final_subject_stats.append({
+                'subject_name': stats['subject_name'],
+                'subject_code': stats['subject_code'],
+                'total_classes': total,
+                'attended': attended,
+                'percentage': percentage
+            })
+        
+        # Calculate overall percentage
+        total_all = sum(s['total_classes'] for s in final_subject_stats)
+        attended_all = sum(s['attended'] for s in final_subject_stats)
+        overall_percentage = round((attended_all / total_all * 100), 1) if total_all > 0 else 0
+        
+        return jsonify({
+            'success': True,
+            'student_name': f"{student_record.first_name} {student_record.last_name}",
+            'roll_number': student_record.roll_number,
+            'overall_percentage': overall_percentage,
+            'is_red_zone': overall_percentage < 75,
+            'subject_stats': final_subject_stats
+        })
+    except Exception as e:
+        import traceback
+        print(f"Analytics Error: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+
+@app.route('/api/student/check-in', methods=['POST'])
+@student_required
+def api_student_checkin():
+    """
+    Student campus check-in with GPS verification
+    """
+    current_user = get_current_user()
+    student_record = Student.query.filter_by(user_id=current_user.user_id).first()
+    
+    if not student_record:
+        return jsonify({'success': False, 'error': 'Student not found'}), 404
+    
+    data = request.get_json()
+    latitude = data.get('latitude')
+    longitude = data.get('longitude')
+    
+    if not latitude or not longitude:
+        return jsonify({'success': False, 'error': 'GPS location required'}), 400
+    
+    today = date.today()
+    
+    try:
+        # Check if already checked in today
+        existing = CampusCheckIn.query.filter_by(
+            student_id=student_record.student_id,
+            checkin_date=today
+        ).first()
+        
+        if existing:
+            return jsonify({'success': False, 'error': 'Already checked in today'}), 400
+        
+        # Get campus location from config
+        config = CollegeConfig.query.first()
+        
+        # Ensure lat/long are floats
+        try:
+            latitude = float(latitude)
+            longitude = float(longitude)
+        except (ValueError, TypeError):
+            return jsonify({'success': False, 'error': 'Invalid GPS coordinates'}), 400
+        
+        # Verify location if config exists and has valid coordinates
+        if config and config.campus_latitude and config.campus_longitude:
+            from math import radians, sin, cos, sqrt, atan2
+            
+            # Calculate distance
+            R = 6371000  # Earth's radius in meters
+            lat1, lon1, lat2, lon2 = map(radians, [latitude, longitude, config.campus_latitude, config.campus_longitude])
+            dlat = lat2 - lat1
+            dlon = lon2 - lon1
+            a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+            c = 2 * atan2(sqrt(a), sqrt(1-a))
+            distance = R * c
+            
+            radius = config.campus_radius_meters or 500  # Default 500m
+            
+            if distance > radius:
+                return jsonify({
+                    'success': False,
+                    'error': f'You are not at campus! You are {int(distance)}m away.',
+                    'distance': int(distance)
+                }), 400
+        
+        # Create check-in record
+        now_dt = datetime.now()
+        checkin = CampusCheckIn(
+            student_id=student_record.student_id,
+            checkin_date=today,
+            checkin_time=now_dt.time(), # Use .time() to match db.Time column
+            latitude=latitude,
+            longitude=longitude
+        )
+        
+        db.session.add(checkin)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Checked in successfully!',
+            'checkin_time': now_dt.strftime('%I:%M %p')
+        })
+    except Exception as e:
+        print(f"CHECKIN ERROR: {str(e)}") # Debug to console
+        db.session.rollback()
+        return jsonify({'success': False, 'error': f'Server Error: {str(e)}'}), 500
+
+
+@app.route('/api/student/check-out', methods=['POST'])
+@student_required
+def api_student_checkout():
+    """
+    Student campus check-out
+    """
+    current_user = get_current_user()
+    student_record = Student.query.filter_by(user_id=current_user.user_id).first()
+    
+    if not student_record:
+        return jsonify({'success': False, 'error': 'Student not found'}), 404
+        
+    data = request.get_json()
+    latitude = data.get('latitude')
+    longitude = data.get('longitude')
+    
+    today = date.today()
+    
+    # Find today's check-in
+    checkin = CampusCheckIn.query.filter_by(
+        student_id=student_record.student_id,
+        checkin_date=today
+    ).first()
+    
+    if not checkin:
+        return jsonify({'success': False, 'error': 'You have not checked in today!'}), 400
+        
+    if checkin.checkout_time:
+        return jsonify({'success': False, 'error': 'Already checked out today'}), 400
+
+    if latitude and longitude:
+        print(f"CHECKOUT ATTEMPT for {student_record.roll_number}: Lat={latitude}, Lon={longitude}")
+        
+    try:
+        now_dt = datetime.now()
+        checkin.checkout_time = now_dt.time()
+        
+        # Save checkout location if provided
+        if latitude and longitude:
+            try:
+                checkin.checkout_latitude = float(latitude)
+                checkin.checkout_longitude = float(longitude)
+            except:
+                pass # Ignore invalid coords for checkout
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True, 
+            'message': 'Checked out successfully!',
+            'checkout_time': now_dt.strftime('%I:%M %p')
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': f'Server Error: {str(e)}'}), 500
+
+
+@app.route('/admin/config', methods=['GET', 'POST'])
+@admin_required
+def admin_config():
+    """
+    Admin page to configure campus GPS location
+    """
+    config = CollegeConfig.query.first()
+    
+    if request.method == 'POST':
+        try:
+            latitude = float(request.form.get('latitude'))
+            longitude = float(request.form.get('longitude'))
+            radius = int(request.form.get('radius'))
+            
+            if not config:
+                config = CollegeConfig(
+                    campus_latitude=latitude,
+                    campus_longitude=longitude,
+                    campus_radius_meters=radius
+                )
+                db.session.add(config)
+            else:
+                config.campus_latitude = latitude
+                config.campus_longitude = longitude
+                config.campus_radius_meters = radius
+                
+            db.session.commit()
+            flash('Campus configuration updated successfully!', 'success')
+        except ValueError:
+            flash('Invalid input values. Please enter valid numbers.', 'danger')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating config: {str(e)}', 'danger')
+            
+    return render_template('admin_config.html', config=config)
+
+
+@app.route('/api/student/recent-absences')
+@student_required
+def api_student_recent_absences():
+    """
+    Get student's absences from the past 3 days
+    """
+    current_user = get_current_user()
+    student_record = Student.query.filter_by(user_id=current_user.user_id).first()
+    
+    if not student_record:
+        return jsonify({'success': False, 'error': 'Student not found'}), 404
+    
+    # Get absences from past 3 days
+    three_days_ago = date.today() - timedelta(days=3)
+    
+    absences = db.session.query(
+        AttendanceRecord,
+        AttendanceSession,
+        ClassSchedule,
+        Subject
+    ).join(
+        AttendanceSession, AttendanceRecord.attendance_session_id == AttendanceSession.attendance_session_id
+    ).join(
+        ClassSchedule, AttendanceSession.schedule_id == ClassSchedule.schedule_id
+    ).join(
+        Subject, ClassSchedule.subject_id == Subject.subject_id
+    ).filter(
+        AttendanceRecord.student_id == student_record.student_id,
+        AttendanceRecord.status == 'absent',
+        AttendanceSession.taken_at >= three_days_ago,
+        AttendanceRecord.is_deleted == False
+    ).order_by(AttendanceSession.taken_at.desc()).all()
+    
+    absence_list = []
+    for record, session, schedule, subject in absences:
+        absence_list.append({
+            'date': session.taken_at.strftime('%d %b %Y'),
+            'day': session.taken_at.strftime('%A'),
+            'subject_name': subject.subject_name,
+            'subject_code': subject.subject_code
+        })
+    
+    return jsonify({
+        'success': True,
+        'absences': absence_list
+    })
+
+
+@app.route('/api/student/holidays')
+@student_required
+def api_student_holidays():
+    """
+    Get upcoming and recent holidays
+    """
+    from models import Holiday
+    
+    today = date.today()
+    tomorrow = today + timedelta(days=1)
+    
+    # Get upcoming holidays (next 30 days)
+    upcoming = Holiday.query.filter(
+        Holiday.holiday_date >= today,
+        Holiday.holiday_date <= today + timedelta(days=30)
+    ).order_by(Holiday.holiday_date).all()
+    
+    # Get recent holidays (past 7 days)
+    recent = Holiday.query.filter(
+        Holiday.holiday_date >= today - timedelta(days=7),
+        Holiday.holiday_date < today
+    ).order_by(Holiday.holiday_date.desc()).all()
+    
+    # Check if tomorrow is a holiday
+    tomorrow_holiday = Holiday.query.filter_by(holiday_date=tomorrow).first()
+    
+    upcoming_list = [{
+        'date': h.holiday_date.strftime('%d %b %Y'),
+        'day': h.holiday_date.strftime('%A'),
+        'name': h.holiday_name,
+        'is_tomorrow': h.holiday_date == tomorrow
+    } for h in upcoming]
+    
+    recent_list = [{
+        'date': h.holiday_date.strftime('%d %b %Y'),
+        'day': h.holiday_date.strftime('%A'),
+        'name': h.holiday_name
+    } for h in recent]
+    
+    return jsonify({
+        'success': True,
+        'tomorrow_is_holiday': bool(tomorrow_holiday),
+        'tomorrow_holiday_name': tomorrow_holiday.holiday_name if tomorrow_holiday else None,
+        'upcoming': upcoming_list,
+        'recent': recent_list
+    })
+
+
+
+
+MOTIVATIONAL_QUOTES = [
+    "The only way to do great work is to love what you do. – Steve Jobs",
+    "Believe you can and you're halfway there. – Theodore Roosevelt",
+    "Success is not final, failure is not fatal: It is the courage to continue that counts. – Winston Churchill",
+    "Don't watch the clock; do what it does. Keep going. – Sam Levenson",
+    "The future belongs to those who believe in the beauty of their dreams. – Eleanor Roosevelt",
+    "Education is the most powerful weapon which you can use to change the world. – Nelson Mandela",
+    "Expert in anything was once a beginner. – Helen Hayes",
+    "There are no shortcuts to any place worth going. – Beverly Sills",
+    "Motivation is what gets you started. Habit is what keeps you going. – Jim Ryun",
+    "Your time is limited, so don't waste it living someone else's life. – Steve Jobs",
+    "The beautiful thing about learning is that no one can take it away from you. – B.B. King",
+    "Start where you are. Use what you have. Do what you can. – Arthur Ashe",
+    "Success doesn't come to you, you've got to go to it. – Marva Collins",
+    "Dream big and dare to fail. – Norman Vaughan",
+    "It always seems impossible until it's done. – Nelson Mandela"
+]
+
+@app.route('/api/student/motivational-quote')
+@student_required
+def api_student_motivational_quote():
+    """
+    Get a random motivational quote
+    """
+    import random
+    quote = random.choice(MOTIVATIONAL_QUOTES)
+    
+    return jsonify({
+        'success': True,
+        'quote': quote
+    })
+
+
+@app.route('/student/profile')
+@student_required
+def student_profile():
+    """
+    Student profile view and edit page
+    """
+    current_user = get_current_user()
+    student_record = Student.query.filter_by(user_id=current_user.user_id).first()
+    
+    if not student_record:
+        flash('Student record not found.', 'danger')
+        return redirect(url_for('login'))
+    
+    section = Section.query.get(student_record.section_id)
+    
+    return render_template('student/profile.html', student=student_record, section=section)
+
+
+@app.route('/api/student/profile', methods=['PUT'])
+@student_required
+def api_student_update_profile():
+    """
+    Update student profile (phone, address only)
+    """
+    current_user = get_current_user()
+    student_record = Student.query.filter_by(user_id=current_user.user_id).first()
+    
+    if not student_record:
+        return jsonify({'success': False, 'error': 'Student not found'}), 404
+    
+    data = request.get_json()
+    
+    # Students can only update specific fields
+    if 'phone' in data:
+        student_record.phone = data['phone']
+    if 'address' in data:
+        student_record.address = data['address']
+    
+    try:
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Profile updated successfully'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+
+
+# ============================================
+# Parent Dashboard Routes
+# ============================================
+
+@app.route('/parent/dashboard')
+@student_required
+def parent_dashboard():
+    """
+    Parent Dashboard - Read Only View
+    """
+    if not session.get('login_as_parent'):
+        return redirect(url_for('student_dashboard'))
+
+    current_user = get_current_user()
+    student_record = Student.query.filter_by(user_id=current_user.user_id).first()
+    
+    # Calculate attendance logic (Same as student dashboard)
+    enrollments = StudentSubjectEnrollment.query.filter_by(student_id=student_record.student_id).all()
+    subject_ids = [e.subject_id for e in enrollments]
+    
+    total_sessions = 0
+    attended = 0
+    
+    for sub_id in subject_ids:
+        # Get schedules for this subject
+        schedules = ClassSchedule.query.filter_by(subject_id=sub_id, is_deleted=False).all()
+        schedule_ids = [s.schedule_id for s in schedules]
+        
+        # Get sessions
+        sessions = AttendanceSession.query.filter(
+            AttendanceSession.schedule_id.in_(schedule_ids),
+            AttendanceSession.status == 'finalized',
+            AttendanceSession.is_deleted == False
+        ).all()
+        
+        for sess in sessions:
+            total_sessions += 1
+            record = AttendanceRecord.query.filter_by(
+                attendance_session_id=sess.attendance_session_id,
+                student_id=student_record.student_id
+            ).first()
+            if record and record.status == 'present':
+                attended += 1
+
+    overall_percentage = round((attended / total_sessions * 100), 1) if total_sessions > 0 else 0
+    
+    # Red zone calculation
+    is_red_zone = overall_percentage < 75
+    
+    # Get current checkin status
+    today = date.today()
+    checkin_today = CampusCheckIn.query.filter_by(
+        student_id=student_record.student_id,
+        checkin_date=today,
+        is_deleted=False
+    ).first()
+    
+    has_checked_in = bool(checkin_today)
+    
+    # Motivational Quote (for parent context, maybe just a welcome)
+    import random
+    quote = random.choice(MOTIVATIONAL_QUOTES)
+
+    section = Section.query.get(student_record.section_id) if student_record.section_id else None
+
+    dashboard_data = {
+        'student': student_record,
+        'section': section,
+        'overall_percentage': overall_percentage,
+        'total_sessions': total_sessions,
+        'attended': attended,
+        'is_red_zone': is_red_zone,
+        'motivational_quote': quote,
+        'has_checked_in': has_checked_in,
+        'current_checkin': checkin_today,
+        'is_parent_view': True # Flag for template
+    }
+    
+    return render_template('parent/dashboard.html', **dashboard_data)
+
+@app.route('/parent/profile')
+@student_required
+def parent_profile():
+    """
+    Parent View: Read-only student profile
+    """
+    if not session.get('login_as_parent'):
+        return redirect(url_for('student_dashboard'))
+
+    current_user = get_current_user()
+    student_record = Student.query.filter_by(user_id=current_user.user_id).first()
+    section = Section.query.get(student_record.section_id) if student_record.section_id else None
+    
+    return render_template('parent/profile.html', student=student_record, section=section)
+
+@app.route('/parent/contact-teacher')
+@student_required
+def parent_contact_teacher():
+    """
+    Parent View: Contact Class Teacher
+    """
+    if not session.get('login_as_parent'):
+        return redirect(url_for('student_dashboard'))
+
+    current_user = get_current_user()
+    student_record = Student.query.filter_by(user_id=current_user.user_id).first()
+    section = Section.query.get(student_record.section_id) if student_record.section_id else None
+    
+    class_teacher = None
+    if section and section.class_teacher_id:
+        class_teacher = Faculty.query.get(section.class_teacher_id)
+        
+    return render_template('parent/contact_teacher.html', 
+                         student=student_record, 
+                         section=section,
+                         teacher=class_teacher)
+
+@app.route('/api/parent/student-status')
+@student_required
+def api_parent_student_status():
+    """
+    API for polling student status
+    """
+    current_user = get_current_user()
+    student_record = Student.query.filter_by(user_id=current_user.user_id).first()
+    
+    today = date.today()
+    checkin = CampusCheckIn.query.filter_by(
+        student_id=student_record.student_id,
+        checkin_date=today,
+        is_deleted=False
+    ).first()
+    
+    status = 'not_reported'
+    if checkin:
+        if checkin.checkout_time:
+            status = 'checked_out'
+        else:
+            status = 'checked_in'
+            
+    return jsonify({
+        'success': True,
+        'status': status, # checked_in, checked_out, not_reported
+        'last_updated': datetime.now().isoformat(),
+        'student_name': student_record.first_name
+    })
+
 
 if __name__ == '__main__':
     # Create database tables if they don't exist
@@ -2016,3 +4488,5 @@ if __name__ == '__main__':
     print("="*50 + "\n")
     
     app.run(debug=True, host='0.0.0.0', port=5000)
+# Faculty Check-In/Checkout API Endpoints
+# Add these to app.py

@@ -297,6 +297,129 @@
             </div>
         </div>
 
+        <!-- Campus Check-In Card -->
+        <div class="checkin-card" id="checkinCard">
+            <div class="checkin-header">
+                <i class="material-icons">location_on</i>
+                <h3>Campus Check-In</h3>
+            </div>
+            <div id="checkinStatus" class="checkin-status">
+                <i class="material-icons spin">sync</i>
+                <span>Checking status...</span>
+            </div>
+            <div id="checkinContent" style="display: none;">
+                <p id="checkinMessage" class="checkin-message"></p>
+                <button id="checkinBtn" class="checkin-btn" onclick="performCampusCheckIn()">
+                    <i class="material-icons">login</i>
+                    Check In Now
+                </button>
+            </div>
+            <div id="checkedInContent" style="display: none;">
+                <div class="checked-in-badge">
+                    <i class="material-icons">check_circle</i>
+                    <span>Checked In Today</span>
+                </div>
+                <p id="checkinTime" class="checkin-time"></p>
+            </div>
+        </div>
+
+        <style>
+            .checkin-card {
+                background: linear-gradient(135deg, #4caf50, #2e7d32);
+                border-radius: 16px;
+                padding: 20px;
+                margin-bottom: 20px;
+                color: white;
+                box-shadow: 0 4px 20px rgba(76, 175, 80, 0.3);
+            }
+
+            .checkin-header {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                margin-bottom: 15px;
+            }
+
+            .checkin-header h3 {
+                margin: 0;
+                font-size: 1.1rem;
+            }
+
+            .checkin-header i {
+                font-size: 1.5rem;
+            }
+
+            .checkin-status {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                opacity: 0.9;
+            }
+
+            .checkin-message {
+                margin: 0 0 15px;
+                opacity: 0.9;
+                font-size: 0.9rem;
+            }
+
+            .checkin-btn {
+                background: white;
+                color: #2e7d32;
+                border: none;
+                padding: 12px 25px;
+                border-radius: 25px;
+                font-weight: 600;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                cursor: pointer;
+                transition: transform 0.2s, box-shadow 0.2s;
+                font-size: 1rem;
+            }
+
+            .checkin-btn:hover {
+                transform: scale(1.02);
+                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            }
+
+            .checkin-btn:disabled {
+                opacity: 0.7;
+                cursor: not-allowed;
+            }
+
+            .checked-in-badge {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                font-weight: 600;
+                font-size: 1.1rem;
+            }
+
+            .checked-in-badge i {
+                font-size: 1.5rem;
+            }
+
+            .checkin-time {
+                margin: 10px 0 0;
+                opacity: 0.9;
+                font-size: 0.9rem;
+            }
+
+            .spin {
+                animation: spin 1s linear infinite;
+            }
+
+            @keyframes spin {
+                100% {
+                    transform: rotate(360deg);
+                }
+            }
+
+            .checkin-error {
+                background: linear-gradient(135deg, #f44336, #c62828);
+            }
+        </style>
+
         <!-- My Subjects -->
         <h3 class="section-title">
             <i class="material-icons">menu_book</i>
@@ -347,6 +470,139 @@
             <span>Logout</span>
         </a>
     </nav>
+
+    <script>
+        // Campus Check-In Functions
+        document.addEventListener('DOMContentLoaded', function () {
+            checkCheckinStatus();
+        });
+
+        function checkCheckinStatus() {
+            fetch('/api/campus-checkin/status')
+                .then(response => response.json())
+                .then(data => {
+                    const statusDiv = document.getElementById('checkinStatus');
+                    const checkinContent = document.getElementById('checkinContent');
+                    const checkedInContent = document.getElementById('checkedInContent');
+
+                    statusDiv.style.display = 'none';
+
+                    if (data.success && data.checked_in) {
+                        // Already checked in
+                        checkedInContent.style.display = 'block';
+                        const timeStr = data.checkin.checkin_time;
+                        document.getElementById('checkinTime').textContent =
+                            'Checked in at ' + formatTime(timeStr);
+                    } else {
+                        // Not checked in yet
+                        checkinContent.style.display = 'block';
+                        document.getElementById('checkinMessage').textContent =
+                            'Check in when you reach campus to mark your arrival.';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking status:', error);
+                    document.getElementById('checkinStatus').innerHTML =
+                        '<i class="material-icons">error</i><span>Unable to check status</span>';
+                });
+        }
+
+        function formatTime(timeStr) {
+            if (!timeStr) return '';
+            const parts = timeStr.split(':');
+            let hours = parseInt(parts[0]);
+            const mins = parts[1];
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12 || 12;
+            return hours + ':' + mins + ' ' + ampm;
+        }
+
+        function performCampusCheckIn() {
+            const btn = document.getElementById('checkinBtn');
+            const card = document.getElementById('checkinCard');
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="material-icons spin">sync</i> Getting location...';
+
+            if (!navigator.geolocation) {
+                showCheckinError('Geolocation is not supported by your browser');
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                // Success callback
+                function (position) {
+                    btn.innerHTML = '<i class="material-icons spin">sync</i> Checking in...';
+
+                    fetch('/api/campus-checkin', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            latitude: position.coords.latitude,
+                            longitude: position.coords.longitude,
+                            device_info: navigator.userAgent
+                        })
+                    })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                // Success! Show checked in state
+                                document.getElementById('checkinContent').style.display = 'none';
+                                document.getElementById('checkedInContent').style.display = 'block';
+                                document.getElementById('checkinTime').textContent =
+                                    'Checked in at ' + formatTime(data.checkin.checkin_time);
+                                card.style.background = 'linear-gradient(135deg, #4caf50, #2e7d32)';
+                            } else {
+                                showCheckinError(data.error);
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            showCheckinError('Network error. Please try again.');
+                        });
+                },
+                // Error callback
+                function (error) {
+                    let msg = 'Unable to get your location.';
+                    switch (error.code) {
+                        case error.PERMISSION_DENIED:
+                            msg = 'Please allow location access to check in.';
+                            break;
+                        case error.POSITION_UNAVAILABLE:
+                            msg = 'Location information is unavailable.';
+                            break;
+                        case error.TIMEOUT:
+                            msg = 'Location request timed out.';
+                            break;
+                    }
+                    showCheckinError(msg);
+                },
+                // Options
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                }
+            );
+        }
+
+        function showCheckinError(message) {
+            const btn = document.getElementById('checkinBtn');
+            const card = document.getElementById('checkinCard');
+            const msgEl = document.getElementById('checkinMessage');
+
+            btn.disabled = false;
+            btn.innerHTML = '<i class="material-icons">login</i> Try Again';
+            msgEl.textContent = message;
+            card.classList.add('checkin-error');
+
+            setTimeout(() => {
+                card.classList.remove('checkin-error');
+            }, 3000);
+        }
+    </script>
 </body>
 
 </html>

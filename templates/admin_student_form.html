@@ -257,10 +257,13 @@
 
                         <div class="form-row">
                             <div class="form-group">
-                                <label class="form-label">Roll Number <span class="required">*</span></label>
+                                <label class="form-label">Roll Number / USN <span class="required"
+                                        title="Required for permanent, optional for temp">*</span></label>
                                 <input type="text" name="roll_number" class="form-input"
-                                    value="{{ student.roll_number if student else '' }}" {{ 'readonly' if student
-                                    else 'required' }} placeholder="e.g., BCA2024001">
+                                    value="{{ student.roll_number if student else '' }}"
+                                    placeholder="Leave blank to auto-generate Temp USN">
+                                <small style="color: #666; font-size: 12px; display: block; margin-top: 4px;">If USN is
+                                    not yet assigned, leave empty to generate a temporary ID.</small>
                             </div>
 
                             <div class="form-group">
@@ -399,9 +402,10 @@
 
                         <div class="form-row">
                             <div class="form-group">
-                                <label class="form-label">Username <span class="required">*</span></label>
-                                <input type="text" name="username" class="form-input" required
-                                    placeholder="Username for login">
+                                <label class="form-label">Username <span class="required"
+                                        title="Optional if generating Temp USN">*</span></label>
+                                <input type="text" name="username" class="form-input"
+                                    placeholder="Leave blank to use Roll Number/USN">
                             </div>
 
                             <div class="form-group">

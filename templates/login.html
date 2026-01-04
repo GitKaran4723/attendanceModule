@@ -163,6 +163,60 @@
             color: #667eea;
         }
 
+        /* Login Type Selector Styles */
+        .login-type-selector {
+            animation: slideDown 0.3s ease;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .radio-group {
+            display: flex;
+            gap: 15px;
+        }
+
+        .radio-option {
+            flex: 1;
+            cursor: pointer;
+        }
+
+        .radio-option input {
+            display: none;
+        }
+
+        .radio-label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            transition: all 0.3s;
+            font-weight: 500;
+            color: #666;
+        }
+
+        .radio-option input:checked+.radio-label {
+            border-color: #1a237e;
+            background: linear-gradient(135deg, rgba(26, 35, 126, 0.1), rgba(92, 70, 156, 0.1));
+            color: #1a237e;
+        }
+
+        .radio-label i {
+            font-size: 20px;
+        }
+
         @media (max-width: 480px) {
             .login-container {
                 width: 95%;
@@ -175,6 +229,11 @@
 
             .login-form {
                 padding: 24px 20px;
+            }
+
+            .radio-group {
+                flex-direction: column;
+                gap: 10px;
             }
         }
     </style>
@@ -216,6 +275,27 @@
                     <button type="button" class="password-toggle" onclick="togglePassword()">
                         <i class="material-icons" id="toggleIcon">visibility</i>
                     </button>
+                </div>
+            </div>
+
+            <!-- Login Type Selector - Shows only for USN pattern -->
+            <div class="form-group login-type-selector" id="loginTypeSelector" style="display: none;">
+                <label class="form-label">Login as</label>
+                <div class="radio-group">
+                    <label class="radio-option">
+                        <input type="radio" name="login_type" value="student" checked>
+                        <span class="radio-label">
+                            <i class="material-icons">school</i>
+                            Student
+                        </span>
+                    </label>
+                    <label class="radio-option">
+                        <input type="radio" name="login_type" value="parent">
+                        <span class="radio-label">
+                            <i class="material-icons">family_restroom</i>
+                            Parent
+                        </span>
+                    </label>
                 </div>
             </div>
 
@@ -274,8 +354,27 @@
         // Add enter key support
         document.addEventListener('DOMContentLoaded', function () {
             const form = document.querySelector('.login-form');
+            const usernameInput = document.getElementById('username');
+            const loginTypeSelector = document.getElementById('loginTypeSelector');
+
+            // Detect USN pattern and show login type selector
+            function checkUSNPattern() {
+                const username = usernameInput.value.trim().toUpperCase();
+                // USN pattern starts with U03NK
+                if (username.startsWith('U03')) {
+                    loginTypeSelector.style.display = 'block';
+                } else {
+                    loginTypeSelector.style.display = 'none';
+                }
+            }
+
+            // Listen for input changes
+            usernameInput.addEventListener('input', checkUSNPattern);
+            usernameInput.addEventListener('change', checkUSNPattern);
+
+            // Form validation
             form.addEventListener('submit', function (e) {
-                const username = document.getElementById('username').value.trim();
+                const username = usernameInput.value.trim();
                 const password = document.getElementById('password').value;
 
                 if (!username || !password) {

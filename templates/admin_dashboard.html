@@ -59,9 +59,9 @@
                 </a>
             </li>
             <li class="admin-nav-item">
-                <a href="{{ url_for('admin_batches') }}">
-                    <i class="material-icons">groups</i>
-                    <span>Batches & Sections</span>
+                <a href="{{ url_for('admin_sections') }}">
+                    <i class="material-icons">class</i>
+                    <span>Sections</span>
                 </a>
             </li>
             <li class="admin-nav-item">
@@ -71,7 +71,7 @@
                 </a>
             </li>
             <li class="admin-nav-item">
-                <a href="{{ url_for('work_diary_list') }}">
+                <a href="{{ url_for('admin_work_diary') }}">
                     <i class="material-icons">assignment</i>
                     <span>Work Diaries</span>
                 </a>
@@ -126,6 +126,14 @@
             <!-- Quick Actions -->
             <h2 class="admin-section-title">Quick Actions</h2>
             <div class="admin-modules-grid">
+                <a href="{{ url_for('admin_assign_students') }}" class="admin-module-card">
+                    <div class="module-icon">
+                        <i class="material-icons">assignment_ind</i>
+                    </div>
+                    <h3>Assign Students</h3>
+                    <p>Assign students to sections & enroll in subjects</p>
+                </a>
+
                 <a href="{{ url_for('admin_faculty') }}" class="admin-module-card">
                     <div class="module-icon">
                         <i class="material-icons">school</i>
@@ -151,12 +159,12 @@
                     <div class="module-desc">Add subjects, units, chapters, and concepts for curriculum</div>
                 </a>
 
-                <a href="{{ url_for('admin_batches') }}" class="admin-module-card">
+                <a href="{{ url_for('admin_sections') }}" class="admin-module-card">
                     <div class="module-icon">
-                        <i class="material-icons">groups</i>
+                        <i class="material-icons">class</i>
                     </div>
-                    <div class="module-title">Batches & Sections</div>
-                    <div class="module-desc">Create academic year batches, manage sections and classrooms</div>
+                    <h3>Sections & Classes</h3>
+                    <p>Manage academic sections</p>
                 </a>
 
                 <a href="{{ url_for('admin_import') }}" class="admin-module-card">
@@ -167,21 +175,21 @@
                     <div class="module-desc">Import students and faculty from Excel/CSV files</div>
                 </a>
 
-                <a href="{{ url_for('work_diary_list') }}" class="admin-module-card">
+                <a href="{{ url_for('admin_work_diary') }}" class="admin-module-card">
                     <div class="module-icon">
                         <i class="material-icons">assignment</i>
                     </div>
                     <div class="module-title">Work Diaries</div>
                     <div class="module-desc">Review and approve faculty work diary entries</div>
                 </a>
-
-                <a href="{{ url_for('attendance') }}" class="admin-module-card">
+                <!-- 
+                <a href="{{ url_for('admin_work_diary') }}" class="admin-module-card">
                     <div class="module-icon">
                         <i class="material-icons">fact_check</i>
                     </div>
                     <div class="module-title">Attendance Records</div>
-                    <div class="module-desc">View and manage all attendance sessions and records</div>
-                </a>
+                    <div class="module-desc">View faculty work diaries and attendance records</div>
+                </a> -->
 
                 <a href="{{ url_for('public_home') }}" class="admin-module-card">
                     <div class="module-icon">

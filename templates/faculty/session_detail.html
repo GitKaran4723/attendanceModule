@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Session Details - {{ session.schedule.subject.subject_name }}</title>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #6200ea;
+            --primary-light: #b388ff;
+            --bg-color: #f5f5f7;
+            --surface-color: rgba(255, 255, 255, 0.8);
+            --text-primary: #1d1d1f;
+            --text-secondary: #86868b;
+            --glass-bg: rgba(255, 255, 255, 0.7);
+            --glass-border: 1px solid rgba(255, 255, 255, 0.5);
+            --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
+            --backdrop-blur: blur(8px);
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 0;
+            color: var(--text-primary);
+        }
+
+        .app-bar {
+            background: var(--surface-color);
+            backdrop-filter: var(--backdrop-blur);
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            border-bottom: var(--glass-border);
+        }
+
+        .back-btn {
+            color: var(--text-primary);
+            cursor: pointer;
+        }
+
+        .header-title {
+            flex-grow: 1;
+        }
+
+        .header-title h1 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .header-title p {
+            margin: 0;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .container {
+            padding: 20px;
+        }
+
+        .stats-summary {
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
+            border-radius: 20px;
+            padding: 20px;
+            color: white;
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-around;
+            box-shadow: 0 10px 20px rgba(98, 0, 234, 0.2);
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            display: block;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        .student-list {
+            background: var(--glass-bg);
+            backdrop-filter: var(--backdrop-blur);
+            border: var(--glass-border);
+            border-radius: 20px;
+            box-shadow: var(--glass-shadow);
+            overflow: hidden;
+        }
+
+        .list-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+            font-weight: 700;
+            font-size: 14px;
+            color: var(--text-secondary);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .student-item {
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.03);
+        }
+
+        .student-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            background: #f0f0f0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .student-info {
+            flex-grow: 1;
+        }
+
+        .student-name {
+            font-weight: 600;
+            font-size: 15px;
+            margin-bottom: 2px;
+        }
+
+        .student-roll {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .status-badge {
+            padding: 6px 12px;
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: capitalize;
+        }
+
+        .status-present {
+            background: rgba(0, 191, 165, 0.1);
+            color: #00bfa5;
+        }
+
+        .status-absent {
+            background: rgba(255, 82, 82, 0.1);
+            color: #ff5252;
+        }
+    </style>
+</head>
+
+<body>
+    <header class="app-bar">
+        <i class="material-icons-round back-btn" onclick="history.back()">arrow_back_ios_new</i>
+        <div class="header-title">
+            <h1>{{ session.schedule.subject.subject_name }}</h1>
+            <p>{{ session.schedule.section.section_name }} • {{ session.taken_at.strftime('%d %b, %Y') }}</p>
+        </div>
+        <button onclick="promptDeleteSession()"
+            style="background:none; border:none; color:#ef4444; font-weight:600; cursor:pointer;"
+            title="Delete Session">
+            <i class="material-icons-round">delete</i>
+        </button>
+    </header>
+
+    <div class="container">
+        <div class="stats-summary">
+            <div class="stat-item">
+                <span class="stat-value">{{ records|selectattr('status', 'equalto', 'present')|list|length }}</span>
+                <span class="stat-label">Present</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-value">{{ records|selectattr('status', 'equalto', 'absent')|list|length }}</span>
+                <span class="stat-label">Absent</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-value">{{ records|length }}</span>
+                <span class="stat-label">Total</span>
+            </div>
+        </div>
+
+        <div class="student-list">
+            <div class="list-header">
+                <span>STUDENT LIST</span>
+                <span>STATUS</span>
+            </div>
+            {% for record in records %}
+            <div class="student-item">
+                <div class="student-avatar">{{ record.student.first_name[0] }}</div>
+                <div class="student-info">
+                    <div class="student-name">{{ record.student.first_name }} {{ record.student.last_name }}</div>
+                    <div class="student-roll">Roll: {{ record.student.roll_number }}</div>
+                </div>
+                <div class="status-badge status-{{ record.status }}">
+                    {{ record.status }}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    </div>
+
+    <script>
+        function promptDeleteSession() {
+            const expectedDate = "{{ session.taken_at.strftime('%d-%m-%Y') }}";
+            const input = prompt(`To delete this session, please enter the date in DD-MM-YYYY format:\n(Required: ${expectedDate})`);
+
+            if (input === null) return; // Cancelled
+
+            if (input.trim() === expectedDate) {
+                if (confirm('Are you absolutely sure? This cannot be undone from the app.')) {
+                    deleteSession();
+                }
+            } else {
+                alert('Incorrect date entered. Deletion cancelled.');
+            }
+        }
+
+        async function deleteSession() {
+            try {
+                const response = await fetch("{{ url_for('faculty_delete_attendance_session', session_id=session.attendance_session_id) }}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ confirmation_date: "{{ session.taken_at.strftime('%d-%m-%Y') }}" })
+                });
+
+                const res = await response.json();
+                if (res.success) {
+                    alert('Session deleted successfully.');
+                    window.location.href = "{{ url_for('faculty_dashboard_view') }}";
+                } else {
+                    alert('Error: ' + res.error);
+                }
+            } catch (e) {
+                console.error(e);
+                alert('Failed to delete session.');
+            }
+        }
+    </script>
+</body>
+
+</html>

@@ -1,6 +1,6 @@
-roll_number,first_name,last_name,email,date_of_birth,phone,guardian_name,guardian_phone,admission_year,program_code
-BCA2024001,Raj,Kumar,raj.kumar@bcabub.edu,2004-05-15,9876543210,Mr. Kumar,9876543220,2024,BCA
-BCA2024002,Priya,Sharma,priya.sharma@bcabub.edu,2004-08-22,9876543211,Mr. Sharma,9876543221,2024,BCA
-BCA2024003,Amit,Singh,amit.singh@bcabub.edu,2004-06-10,9876543212,Mr. Singh,9876543222,2024,BCA
-BCA2024004,Neha,Verma,neha.verma@bcabub.edu,2004-07-18,9876543213,Mr. Verma,9876543223,2024,BCA
-BCA2024005,Rohit,Gupta,rohit.gupta@bcabub.edu,2004-04-25,9876543214,Mr. Gupta,9876543224,2024,BCA
+usn,name,email,date_of_birth,gender,phone,guardian_name,guardian_phone,admission_year,program_code
+U03NK24001,Raj Kumar,raj.kumar@bcabub.edu,2004-05-15,M,9876543210,Mr. Kumar,9876543220,2024,BCA
+U03NK24002,Priya Sharma,priya.sharma@bcabub.edu,2004-08-22,F,9876543211,Mr. Sharma,9876543221,2024,BCA
+U03NK24003,Amit Singh,amit.singh@bcabub.edu,2004-06-10,M,9876543212,Mr. Singh,9876543222,2024,BCA
+U03NK24004,Neha Verma,neha.verma@bcabub.edu,2004-07-18,F,9876543213,Mr. Verma,9876543223,2024,BCA
+U03NK24005,Rohit Gupta,rohit.gupta@bcabub.edu,2004-04-25,M,9876543214,Mr. Gupta,9876543224,2024,BCA

@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>My Class - {{ class_data.section_name if class_data else 'Faculty' }}</title>
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <meta name="theme-color" content="#6200ea">
+
+    <!-- Google Fonts & Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary-color: #6200ea;
+            --primary-light: #b388ff;
+            --success-color: #00c853;
+            --warning-color: #ffab00;
+            --danger-color: #ff1744;
+            --bg-gradient: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            /* Glassmorphism Variables */
+            --glass-bg: rgba(255, 255, 255, 0.7);
+            --glass-border: 1px solid rgba(255, 255, 255, 0.5);
+            --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
+            --backdrop-blur: blur(12px);
+            --text-primary: #2d3436;
+            --text-secondary: #636e72;
+            --border-radius: 20px;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-gradient);
+            background-attachment: fixed;
+            /* Parallax-like feel */
+            margin: 0;
+            padding-bottom: 90px;
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        /* Glass App Bar */
+        .app-bar {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(10px);
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            border-bottom: var(--glass-border);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+        }
+
+        .app-bar h1 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 700;
+            flex-grow: 1;
+            text-align: center;
+            background: -webkit-linear-gradient(45deg, #6200ea, #b388ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .container {
+            padding: 20px;
+        }
+
+        /* Glass Card */
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: var(--backdrop-blur);
+            -webkit-backdrop-filter: var(--backdrop-blur);
+            border: var(--glass-border);
+            border-radius: var(--border-radius);
+            padding: 24px;
+            box-shadow: var(--glass-shadow);
+            margin-bottom: 20px;
+            transition: transform 0.2s ease;
+        }
+
+        .glass-card:active {
+            transform: scale(0.98);
+        }
+
+        /* Stats Styles */
+        .stat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 12px;
+        }
+
+        .stat-title {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--primary-color);
+        }
+
+        .progress-track {
+            height: 10px;
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 5px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            border-radius: 5px;
+            transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Search Bar */
+        .search-box {
+            background: rgba(255, 255, 255, 0.9);
+            border: none;
+            border-radius: 16px;
+            padding: 16px;
+            width: 100%;
+            box-sizing: border-box;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            font-family: inherit;
+            font-size: 16px;
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .search-box:focus {
+            outline: none;
+            box-shadow: 0 6px 20px rgba(98, 0, 234, 0.15);
+            transform: translateY(-2px);
+        }
+
+        /* Student Item - Glassy */
+        .student-item {
+            background: rgba(255, 255, 255, 0.75);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 12px;
+            display: flex;
+            flex-direction: column;
+            /* Stacked for more details */
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.03);
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Red Alert Style */
+        .student-item.alert-danger {
+            background: rgba(255, 235, 238, 0.85);
+            /* Reddish tint */
+            border: 1px solid rgba(255, 23, 68, 0.3);
+            box-shadow: 0 4px 15px rgba(255, 23, 68, 0.1);
+        }
+
+        .student-item.alert-danger::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background: var(--danger-color);
+        }
+
+        .student-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+
+        .student-name {
+            font-size: 17px;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .student-meta {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
+        .attendance-pill {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .pill-high {
+            background: rgba(0, 200, 83, 0.15);
+            color: #008035;
+        }
+
+        .pill-med {
+            background: rgba(255, 171, 0, 0.15);
+            color: #bf8000;
+        }
+
+        .pill-low {
+            background: rgba(255, 23, 68, 0.15);
+            color: #c62828;
+        }
+
+        /* Action Buttons Row */
+        .action-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .action-btn {
+            flex: 1;
+            padding: 8px 12px;
+            /* Smaller padding */
+            border-radius: 10px;
+            border: none;
+            font-size: 12px;
+            /* Smaller font */
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            cursor: pointer;
+            transition: 0.2s;
+            text-decoration: none !important;
+        }
+
+        .btn-call {
+            background: rgba(0, 0, 0, 0.04);
+            color: var(--text-primary);
+        }
+
+        .btn-call-danger {
+            background: rgba(255, 23, 68, 0.1);
+            color: var(--danger-color);
+        }
+
+        .btn-analytics {
+            background: var(--primary-color);
+            color: white;
+            box-shadow: 0 4px 12px rgba(98, 0, 234, 0.3);
+        }
+
+        .btn-edit {
+            width: 40px;
+            flex: none;
+            background: transparent;
+            color: var(--text-secondary);
+        }
+
+        /* Modal - Glassy Overlay */
+        .modal-overlay {
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(5px);
+            z-index: 200;
+        }
+
+        .modal {
+            background: rgba(255, 255, 255, 0.95);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+        }
+
+        /* Analytics Chart Bars */
+        .chart-bar-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+            font-size: 13px;
+        }
+
+        .chart-label {
+            width: 80px;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .chart-track {
+            flex-grow: 1;
+            height: 8px;
+            background: #eee;
+            border-radius: 4px;
+            margin: 0 10px;
+            position: relative;
+        }
+
+        .chart-fill {
+            height: 100%;
+            border-radius: 4px;
+            background: var(--primary-color);
+        }
+
+        .chart-val {
+            width: 35px;
+            text-align: right;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        /* Bottom Nav - Glassy Style */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            display: flex;
+            justify-content: space-around;
+            padding: 12px 0 24px 0;
+            /* Extra padding for iOS home indicator */
+            box-shadow: 0 -2px 20px rgba(0, 0, 0, 0.05);
+            z-index: 1000;
+            border-top: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 11px;
+            font-weight: 500;
+            gap: 4px;
+            transition: all 0.3s ease;
+            width: 25%;
+        }
+
+        .nav-item.active {
+            color: var(--primary-color);
+            transform: translateY(-2px);
+        }
+
+        .nav-item i {
+            font-size: 24px;
+            transition: all 0.3s ease;
+        }
+
+        .nav-item.active i {
+            font-variation-settings: 'FILL' 1;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Glass App Bar with Back and Logout -->
+    <header class="app-bar" style="justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <button onclick="window.location.href='{{ url_for('faculty_dashboard_view') }}'"
+                style="background: none; border: none; padding: 0; cursor: pointer; color: var(--text-primary); display: flex; align-items: center;">
+                <i class="material-icons-round" style="font-size: 24px;">arrow_back</i>
+            </button>
+            <h1
+                style="margin: 0; font-size: 20px; font-weight: 700; background: -webkit-linear-gradient(45deg, #6200ea, #b388ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                {{ class_data.section_name if class_data else 'My Class' }}
+            </h1>
+        </div>
+
+        <a href="{{ url_for('logout') }}"
+            style="color: var(--text-secondary); text-decoration: none; display: flex; align-items: center;">
+            <i class="material-icons-round">logout</i>
+        </a>
+    </header>
+
+    {% if not class_data %}
+    <div style="text-align: center; padding: 60px 40px; color: var(--text-secondary);">
+        <i class="material-icons-round" style="font-size: 64px; margin-bottom: 16px; opacity: 0.3;">school</i>
+        <p style="font-size: 18px; line-height: 1.5;">You are not assigned as a Class Teacher for any section.</p>
+    </div>
+    {% else %}
+
+    <div class="container">
+
+        <!-- Stats Card -->
+        <div class="glass-card">
+            <div class="stat-header">
+                <span class="stat-title">Attendance Today</span>
+                <span class="stat-value">{{ class_data.attendance_percentage }}%</span>
+            </div>
+            <div class="progress-track">
+                <div class="progress-fill"
+                    style="width: {{ class_data.attendance_percentage }}%; background: {{ '#00c853' if class_data.attendance_percentage > 75 else '#ffab00' }}">
+                </div>
+            </div>
+            <div
+                style="text-align: right; font-size: 14px; font-weight: 500; color: var(--text-secondary); margin-top: 8px;">
+                {{ class_data.present_count }} Present <span style="font-weight: 400; opacity: 0.6;">/ {{
+                    class_data.total_students }} Total</span>
+            </div>
+        </div>
+
+        <!-- Absentees Alert -->
+        {% if class_data.absentees %}
+        <div style="margin-bottom: 24px;">
+            <h3
+                style="margin: 0 0 12px 4px; color: var(--danger-color); display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 600;">
+                <i class="material-icons-round">warning</i> Today's Absentees
+            </h3>
+
+            <div id="absenteesList">
+                {% for student in class_data.absentees %}
+                <div class="student-item absentee-item"
+                    style="border-left: 4px solid var(--danger-color); padding: 12px 16px; {{ 'display:none;' if loop.index > 3 else '' }}">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <div class="student-name" style="font-size: 15px;">{{ student.name }}</div>
+                            <div class="student-meta">{{ student.roll_number }}</div>
+                        </div>
+                        {% if student.guardian_phone or student.phone %}
+                        <a href="tel:{{ student.guardian_phone or student.phone }}" class="action-btn btn-call-danger"
+                            style="flex: none; width: 36px; height: 36px; border-radius: 50%; padding: 0;">
+                            <i class="material-icons-round" style="font-size: 18px;">call</i>
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            {% if class_data.absentees|length > 3 %}
+            <div id="viewMoreAbsentees" style="text-align: center; margin-top: 8px;">
+                <button onclick="viewAllAbsentees()"
+                    style="background: none; border: none; color: var(--danger-color); font-weight: 500; cursor: pointer; font-size: 13px;">
+                    View All {{ class_data.absentees|length }} Absentees
+                </button>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Student List Header -->
+        <h2 style="font-size: 20px; font-weight: 700; margin: 0 0 16px 4px;">All Students</h2>
+
+        <input type="text" class="search-box" placeholder="Search by name or roll number..."
+            onkeyup="filterStudents(this.value)">
+
+        <div id="studentsList">
+            {% for student in class_data.students %}
+            {% set is_low = student.attendance_percentage < 75 %} <div
+                class="student-item {{ 'alert-danger' if is_low else '' }}" data-name="{{ student.name|lower }}"
+                data-roll="{{ student.roll_number|lower }}" style="{{ 'display:none;' if loop.index > 3 else '' }}">
+
+                <div class="student-header">
+                    <div>
+                        <div class="student-name">{{ student.name }}</div>
+                        <div class="student-meta">{{ student.roll_number }}</div>
+                    </div>
+                    <div
+                        class="attendance-pill {{ 'pill-low' if is_low else ('pill-high' if student.attendance_percentage >= 85 else 'pill-med') }}">
+                        {{ student.attendance_percentage }}%
+                    </div>
+                </div>
+
+                <div class="action-row">
+                    <button class="action-btn btn-analytics" onclick="openAnalytics('{{ student.student_id }}')">
+                        <i class="material-icons-round" style="font-size: 18px">bar_chart</i> Analytics
+                    </button>
+
+                    {% if student.guardian_phone or student.phone %}
+                    <a href="tel:{{ student.guardian_phone or student.phone }}"
+                        class="action-btn {{ 'btn-call-danger' if is_low else 'btn-call' }}">
+                        <i class="material-icons-round" style="font-size: 18px">call</i> Call
+                    </a>
+                    {% endif %}
+
+                    <button class="action-btn btn-edit"
+                        onclick="openEditModal('{{ student.student_id }}', '{{ student.name }}', '{{ student.phone or '' }}', '{{ student.guardian_phone or '' }}', `{{ student.address or '' }}`)">
+                        <i class="material-icons-round">edit</i>
+                    </button>
+                </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if class_data.students|length > 3 %}
+    <div id="viewMoreContainer" style="text-align: center; margin-top: 10px;">
+        <button onclick="viewAllStudents()"
+            style="background: white; border: 1px solid #ddd; padding: 10px 20px; border-radius: 20px; color: var(--text-secondary); font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 5px; margin: 0 auto;">
+            View All {{ class_data.students|length }} Students <i class="material-icons-round">expand_more</i>
+        </button>
+    </div>
+    {% endif %}
+    </div>
+    </div>
+    {% endif %}
+
+    <!-- Analytics Modal -->
+    <div class="modal-overlay" id="analyticsModal"
+        style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; align-items: center; justify-content: center;">
+        <div class="modal" id="analyticsContent"
+            style="width: 90%; max-width: 400px; max-height: 80vh; overflow-y: auto; padding: 24px; border-radius: 24px;">
+            <!-- Content Injected via JS -->
+            <div style="text-align: center; padding: 40px;">
+                <div class="spinner"
+                    style="width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto;">
+                </div>
+                <p>Loading analytics...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Modal (Reused Logic) -->
+    <div class="modal-overlay" id="editModal"
+        style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; align-items: center; justify-content: center;">
+        <div class="modal" style="width: 90%; max-width: 400px; border-radius: 20px;">
+            <h2 style="margin-top: 0; font-size: 20px;">Edit Contact Info</h2>
+            <p id="studentNameDisplay" style="color: var(--text-secondary); margin-bottom: 20px; font-size: 14px;"></p>
+
+            <form id="editForm" onsubmit="handleEditSubmit(event)">
+                <input type="hidden" id="editStudentId">
+
+                <div class="form-group">
+                    <label>Student Phone</label>
+                    <input type="tel" id="editPhone" name="phone" placeholder="Student's mobile number">
+                </div>
+
+                <div class="form-group">
+                    <label>Guardian Phone (Priority)</label>
+                    <input type="tel" id="editGuardianPhone" name="guardian_phone"
+                        placeholder="Guardian's mobile number" style="border-color: var(--primary-light);">
+                </div>
+
+                <div class="form-group">
+                    <label>Address</label>
+                    <textarea id="editAddress" name="address" rows="3" placeholder="Student's address"></textarea>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-cancel"
+                        onclick="document.getElementById('editModal').style.display='none'">Cancel</button>
+                    <button type="submit" class="btn btn-save"
+                        style="background: var(--primary-color); color: white;">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav">
+        <a href="{{ url_for('faculty_dashboard_view') }}" class="nav-item">
+            <i class="material-icons-round">dashboard</i>
+            <span>Home</span>
+        </a>
+        {% if is_class_teacher %}
+        <a href="{{ url_for('faculty_my_class_view') }}" class="nav-item active">
+            <i class="material-icons-round">school</i>
+            <span>My Class</span>
+        </a>
+        {% endif %}
+        <a href="{{ url_for('faculty_work_diary') }}" class="nav-item">
+            <i class="material-icons-round">book</i>
+            <span>Diary</span>
+        </a>
+        <a href="{{ url_for('faculty_profile') }}" class="nav-item">
+            <i class="material-icons-round">person</i>
+            <span>Profile</span>
+        </a>
+    </nav>
+
+    <style>
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+
+    <script>
+        function filterStudents(query) {
+            query = query.toLowerCase();
+            const items = document.querySelectorAll('.student-item');
+            const viewMoreBtn = document.getElementById('viewMoreContainer');
+
+            // If searching, show all items first (remove limit) and hide View More button
+            if (query.length > 0) {
+                if (viewMoreBtn) viewMoreBtn.style.display = 'none';
+                items.forEach(item => {
+                    item.style.display = ''; // Reset inline display from loop
+                    const name = item.dataset.name;
+                    const roll = item.dataset.roll;
+                    if (name.includes(query) || roll.includes(query)) {
+                        item.style.display = 'flex';
+                    } else {
+                        item.style.display = 'none';
+                    }
+                });
+            } else {
+                // If query cleared, reset to default state (Top 3 only)
+                if (viewMoreBtn) viewMoreBtn.style.display = 'block';
+                items.forEach((item, index) => {
+                    if (index < 3) item.style.display = 'flex';
+                    else item.style.display = 'none';
+                });
+            }
+        }
+
+        function viewAllStudents() {
+            const items = document.querySelectorAll('.student-item:not(.absentee-item)'); // Exclude absentees from this selector if needed, but class targeting is safer
+            // Actually, we should target specific lists.
+            // Let's rely on the fact that the main list items don't have .absentee-item class
+            const mainItems = document.querySelectorAll('#studentsList .student-item');
+            mainItems.forEach(item => item.style.display = 'flex');
+            document.getElementById('viewMoreContainer').style.display = 'none';
+        }
+
+        function viewAllAbsentees() {
+            const items = document.querySelectorAll('.absentee-item');
+            items.forEach(item => item.style.display = 'flex');
+            document.getElementById('viewMoreAbsentees').style.display = 'none';
+        }
+
+        /* --- Analytics Modal Logic --- */
+        async function openAnalytics(studentId) {
+            const modal = document.getElementById('analyticsModal');
+            const content = document.getElementById('analyticsContent');
+
+            modal.style.display = 'flex';
+            content.innerHTML = `
+                <div style="text-align: center; padding: 40px;">
+                    <div style="width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto;"></div>
+                    <p style="margin-top: 15px; color: #666;">Analyzing attendance patterns...</p>
+                </div>
+            `;
+
+            try {
+                const res = await fetch(`/api/faculty/students/${studentId}/analytics`);
+                const data = await res.json();
+
+                if (!data.success) throw new Error(data.error);
+
+                // Build table rows
+                let tableRows = '';
+                data.subject_stats.forEach((sub, index) => {
+                    let percentageColor = '#00c853'; // Green
+                    if (sub.percentage < 75) percentageColor = '#ff1744'; // Red
+                    else if (sub.percentage < 85) percentageColor = '#ffab00'; // Orange
+
+                    tableRows += `
+                        <tr style="border-bottom: 1px solid #eee;">
+                            <td style="padding: 12px 8px; text-align: center; font-weight: 500;">${index + 1}</td>
+                            <td style="padding: 12px 8px; font-weight: 500;">${sub.subject_name}</td>
+                            <td style="padding: 12px 8px; text-align: center;">${sub.total_classes}</td>
+                            <td style="padding: 12px 8px; text-align: center;">${sub.attended}</td>
+                            <td style="padding: 12px 8px; text-align: center; font-weight: 700; color: ${percentageColor};">${sub.percentage}%</td>
+                        </tr>
+                    `;
+                });
+
+                content.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h2 style="margin: 0; font-size: 20px; font-weight: 700;">${data.student_name}</h2>
+                        <button onclick="document.getElementById('analyticsModal').style.display='none'" style="background: none; border: none; font-size: 28px; color: #666; cursor: pointer; line-height: 1;">&times;</button>
+                    </div>
+                    
+                    <div style="font-size: 13px; color: #999; margin-bottom: 16px;">Roll No: ${data.roll_number}</div>
+                    
+                    <div style="overflow-x: auto; margin-bottom: 20px;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                            <thead>
+                                <tr style="background: #f5f5f7; border-bottom: 2px solid #ddd;">
+                                    <th style="padding: 12px 8px; text-align: center; font-weight: 600; color: #666;">Sl No</th>
+                                    <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: #666;">Subject Name</th>
+                                    <th style="padding: 12px 8px; text-align: center; font-weight: 600; color: #666;">Conducted</th>
+                                    <th style="padding: 12px 8px; text-align: center; font-weight: 600; color: #666;">Attended</th>
+                                    <th style="padding: 12px 8px; text-align: center; font-weight: 600; color: #666;">%</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${tableRows}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div style="margin-top: 25px; text-align: center;">
+                        <button onclick="document.getElementById('analyticsModal').style.display='none'" style="padding: 12px 32px; background: var(--primary-color); color: white; border: none; border-radius: 12px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 12px rgba(98, 0, 234, 0.3);">Close</button>
+                    </div>
+                `;
+
+            } catch (e) {
+                content.innerHTML = `
+                     <div style="text-align: center; padding: 20px;">
+                        <i class="material-icons-round" style="font-size: 48px; color: #ff1744;">error</i>
+                        <p>Failed to load data.</p>
+                        <button onclick="document.getElementById('analyticsModal').style.display='none'" class="btn btn-cancel">Close</button>
+                    </div>
+                `;
+            }
+        }
+
+        /* --- Edit Modal Logic --- */
+        function openEditModal(id, name, phone, gPhone, address) {
+            document.getElementById('editStudentId').value = id;
+            document.getElementById('studentNameDisplay').textContent = name;
+            document.getElementById('editPhone').value = phone;
+            document.getElementById('editGuardianPhone').value = gPhone;
+            document.getElementById('editAddress').value = address;
+            document.getElementById('editModal').style.display = 'flex';
+        }
+
+        async function handleEditSubmit(e) {
+            e.preventDefault();
+            const btn = e.target.querySelector('button[type="submit"]');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = 'Saving...';
+            btn.disabled = true;
+
+            const studentId = document.getElementById('editStudentId').value;
+            const data = {
+                phone: document.getElementById('editPhone').value,
+                guardian_phone: document.getElementById('editGuardianPhone').value,
+                address: document.getElementById('editAddress').value
+            };
+
+            try {
+                const response = await fetch(`/api/faculty/students/${studentId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    location.reload();
+                } else {
+                    alert('Error: ' + (result.error || 'Failed to update'));
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                }
+            } catch (error) {
+                console.error(error);
+                alert('Network error occurred');
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        // Close overlay clicks
+        window.onclick = function (event) {
+            if (event.target.classList.contains('modal-overlay')) {
+                event.target.style.display = "none";
+            }
+        }
+    </script>
+</body>
+
+</html>

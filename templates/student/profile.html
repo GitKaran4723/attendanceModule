@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Profile - BCA BUB</title>
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --glass-bg: rgba(255, 255, 255, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.5);
+            --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        body {
+            background: #f0f2f5;
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+            min-height: 100vh;
+            margin: 0;
+            padding-bottom: 80px;
+        }
+
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            box-shadow: var(--glass-shadow);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .profile-header {
+            text-align: center;
+            padding: 30px 20px;
+            background: var(--primary-gradient);
+            color: white;
+            border-radius: 0 0 20px 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(118, 75, 162, 0.3);
+        }
+
+        .profile-avatar {
+            width: 80px;
+            height: 80px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+            margin: 0 auto 15px;
+            border: 3px solid rgba(255, 255, 255, 0.4);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 13px;
+            color: #718096;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            background: rgba(255, 255, 255, 0.8);
+            font-family: inherit;
+            font-size: 15px;
+            outline: none;
+            transition: border 0.2s;
+            box-sizing: border-box;
+        }
+
+        .form-control:focus {
+            border-color: #764ba2;
+            background: white;
+        }
+
+        .form-control[readonly] {
+            background: rgba(226, 232, 240, 0.5);
+            cursor: not-allowed;
+        }
+
+        .btn-save {
+            width: 100%;
+            padding: 15px;
+            background: var(--primary-gradient);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            transition: transform 0.2s;
+        }
+
+        .btn-save:active {
+            transform: scale(0.98);
+        }
+
+        /* Bottom Nav */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            display: flex;
+            justify-content: space-around;
+            padding: 15px 0;
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.05);
+            z-index: 1000;
+            border-top: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .nav-item {
+            text-align: center;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 11px;
+            transition: color 0.2s;
+        }
+
+        .nav-item.active {
+            color: #764ba2;
+            font-weight: 600;
+        }
+
+        .nav-icon {
+            font-size: 20px;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .alert-success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .alert-error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="profile-header">
+        <div class="profile-avatar">
+            <i class="fas fa-user"></i>
+        </div>
+        <h2 style="margin: 0;">{{ student.first_name }} {{ student.last_name }}</h2>
+        <p style="margin: 5px 0 0; opacity: 0.8;">{{ student.roll_number }}</p>
+    </div>
+
+    <div style="padding: 0 20px;">
+        <div id="alertMessage" class="alert"></div>
+
+        <form id="profileForm" onsubmit="updateProfile(event)">
+            <div class="glass-card">
+                <h3 style="margin: 0 0 20px; font-size: 16px; color: #4a5568;">Academic Details (Read Only)</h3>
+
+                <div class="form-group">
+                    <label class="form-label">Section</label>
+                    <input type="text" class="form-control" value="{{ section.section_name }}" readonly>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Program</label>
+                    <input type="text" class="form-control"
+                        value="{{ section.program.program_name if section.program else 'BCA' }}" readonly>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Semester</label>
+                    <input type="text" class="form-control" value="Semester {{ section.current_semester }}" readonly>
+                </div>
+            </div>
+
+            <div class="glass-card">
+                <h3 style="margin: 0 0 20px; font-size: 16px; color: #4a5568;">Contact Information</h3>
+
+                <div class="form-group">
+                    <label class="form-label">Mobile Number</label>
+                    <input type="tel" name="phone" class="form-control" value="{{ student.phone or '' }}"
+                        placeholder="Enter mobile number">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Guardian Phone</label>
+                    <input type="tel" class="form-control" value="{{ student.guardian_phone or '' }}" readonly>
+                    <small style="color: #a0aec0; font-size: 11px;">Contact admin to update guardian phone</small>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Address</label>
+                    <textarea name="address" class="form-control" rows="3"
+                        placeholder="Enter your address">{{ student.address or '' }}</textarea>
+                </div>
+
+                <button type="submit" id="btnSave" class="btn-save">Save Changes</button>
+            </div>
+
+            <div style="text-align: center; margin-bottom: 20px;">
+                <a href="{{ url_for('logout') }}" style="color: #e53e3e; text-decoration: none; font-weight: 600;">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Bottom Nav -->
+    <div class="bottom-nav">
+        <a href="{{ url_for('student_dashboard') }}" class="nav-item">
+            <span class="nav-icon"><i class="fas fa-home"></i></span>
+            Home
+        </a>
+        <a href="{{ url_for('student_dashboard') }}" class="nav-item">
+            <span class="nav-icon"><i class="fas fa-chart-pie"></i></span>
+            Analytics
+        </a>
+        <a href="#" class="nav-item">
+            <span class="nav-icon"><i class="fas fa-bell"></i></span>
+            Notice
+        </a>
+        <a href="{{ url_for('student_profile') }}" class="nav-item active">
+            <span class="nav-icon"><i class="fas fa-user"></i></span>
+            Profile
+        </a>
+    </div>
+
+    <script>
+        function updateProfile(e) {
+            e.preventDefault();
+
+            const btn = document.getElementById('btnSave');
+            const alertBox = document.getElementById('alertMessage');
+            const formData = new FormData(e.target);
+
+            const data = {
+                phone: formData.get('phone'),
+                address: formData.get('address')
+            };
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+            fetch('/api/student/profile', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+                .then(response => response.json())
+                .then(data => {
+                    btn.disabled = false;
+                    btn.innerHTML = 'Save Changes';
+
+                    if (data.success) {
+                        alertBox.className = 'alert alert-success';
+                        alertBox.innerHTML = '<i class="fas fa-check-circle"></i> Profile updated successfully!';
+                        alertBox.style.display = 'block';
+
+                        setTimeout(() => {
+                            alertBox.style.display = 'none';
+                        }, 3000);
+                    } else {
+                        alertBox.className = 'alert alert-error';
+                        alertBox.innerHTML = '<i class="fas fa-exclamation-circle"></i> ' + data.error;
+                        alertBox.style.display = 'block';
+                    }
+                })
+                .catch(error => {
+                    btn.disabled = false;
+                    btn.innerHTML = 'Save Changes';
+                    alertBox.className = 'alert alert-error';
+                    alertBox.innerHTML = '<i class="fas fa-exclamation-circle"></i> Network error occurred';
+                    alertBox.style.display = 'block';
+                });
+        }
+    </script>
+</body>
+
+</html>

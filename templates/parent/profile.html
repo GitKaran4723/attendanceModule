@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Student Profile | Parent Portal</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --glass-bg: rgba(255, 255, 255, 0.85);
+            --glass-border: rgba(255, 255, 255, 0.6);
+            --glass-shadow: 0 8px 32px 0 rgba(4, 120, 87, 0.1);
+            --bg-gradient: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+            --text-primary: #064e3b;
+            --text-secondary: #065f46;
+        }
+
+        body {
+            background: var(--bg-gradient);
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+            margin: 0;
+            padding-bottom: 80px;
+            color: var(--text-primary);
+        }
+
+        .header {
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .back-btn {
+            background: white;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            color: #059669;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            text-decoration: none;
+        }
+
+        .page-title {
+            font-size: 20px;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .profile-header {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .profile-avatar {
+            width: 100px;
+            height: 100px;
+            background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            color: white;
+            margin: 0 auto 15px;
+            box-shadow: 0 8px 20px rgba(5, 150, 105, 0.2);
+        }
+
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            box-shadow: var(--glass-shadow);
+            padding: 20px;
+            margin: 0 20px 20px;
+        }
+
+        .info-group {
+            margin-bottom: 15px;
+        }
+
+        .info-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+            font-weight: 600;
+        }
+
+        .info-value {
+            font-size: 15px;
+            color: var(--text-primary);
+            font-weight: 500;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.5);
+            border-radius: 8px;
+            border: 1px solid rgba(6, 95, 70, 0.1);
+        }
+
+        .readonly-badge {
+            display: inline-block;
+            background: #d1fae5;
+            color: #065f46;
+            font-size: 10px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin-top: 5px;
+            font-weight: 600;
+        }
+
+        /* Bottom Nav */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            display: flex;
+            justify-content: space-around;
+            padding: 15px 0;
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.05);
+            z-index: 1000;
+            border-top: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .nav-item {
+            text-align: center;
+            color: #64748b;
+            text-decoration: none;
+            font-size: 11px;
+            transition: color 0.2s;
+        }
+
+        .nav-item.active {
+            color: #059669;
+            font-weight: 600;
+        }
+
+        .nav-icon {
+            font-size: 20px;
+            display: block;
+            margin-bottom: 4px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="header">
+        <a href="{{ url_for('parent_dashboard') }}" class="back-btn">
+            <i class="fas fa-arrow-left"></i>
+        </a>
+        <h1 class="page-title">Student Profile</h1>
+    </div>
+
+    <div class="profile-header">
+        <div class="profile-avatar">
+            {{ student.first_name[0] }}{{ student.last_name[0] }}
+        </div>
+        <h2 style="margin: 0; font-size: 20px;">{{ student.first_name }} {{ student.last_name }}</h2>
+        <div class="readonly-badge"><i class="fas fa-lock"></i> Read Only View</div>
+    </div>
+
+    <div class="glass-card">
+        <div class="info-group">
+            <div class="info-label">Register Number (USN)</div>
+            <div class="info-value">{{ student.usn }}</div>
+        </div>
+
+        <div class="info-group">
+            <div class="info-label">Roll Number</div>
+            <div class="info-value">{{ student.roll_number }}</div>
+        </div>
+
+        <div class="info-group">
+            <div class="info-label">Section / Class</div>
+            <div class="info-value">{{ section.section_name if section else 'Not Assigned' }}</div>
+        </div>
+    </div>
+
+    <div class="glass-card">
+        <h3 style="margin: 0 0 15px; font-size: 16px;">Contact Information</h3>
+
+        <div class="info-group">
+            <div class="info-label">Email Address</div>
+            <div class="info-value">{{ student.email }}</div>
+        </div>
+
+        <div class="info-group">
+            <div class="info-label">Phone Number</div>
+            <div class="info-value">{{ student.phone or 'Not Provided' }}</div>
+        </div>
+
+        <div class="info-group">
+            <div class="info-label">Address</div>
+            <div class="info-value" style="min-height: 60px;">{{ student.address or 'Not Provided' }}</div>
+        </div>
+
+        <div class="info-group">
+            <div class="info-label">Parent / Guardian Name</div>
+            <div class="info-value">{{ student.guardian_name or 'Not Provided' }}</div>
+        </div>
+
+        <div class="info-group">
+            <div class="info-label">Parent Phone Number</div>
+            <div class="info-value">{{ student.guardian_phone or 'Not Provided' }}</div>
+        </div>
+    </div>
+
+    <!-- Bottom Nav -->
+    <div class="bottom-nav">
+        <a href="{{ url_for('parent_dashboard') }}" class="nav-item">
+            <span class="nav-icon"><i class="fas fa-home"></i></span>
+            Dashboard
+        </a>
+        <a href="#" class="nav-item active">
+            <span class="nav-icon"><i class="fas fa-user-graduate"></i></span>
+            Student Profile
+        </a>
+        <a href="{{ url_for('parent_contact_teacher') }}" class="nav-item">
+            <span class="nav-icon"><i class="fas fa-chalkboard-teacher"></i></span>
+            Contact Teacher
+        </a>
+    </div>
+
+</body>
+
+</html>

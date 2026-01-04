@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Faculty Dashboard</title>
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <meta name="theme-color" content="#6200ea">
+
+    <!-- Google Fonts & Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary-color: #6200ea;
+            --primary-light: #b388ff;
+            --secondary-color: #00bfa5;
+            --bg-color: #f5f5f7;
+            --surface-color: #ffffff;
+            --text-primary: #1d1d1f;
+            --text-secondary: #86868b;
+            --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            --border-radius: 16px;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding-bottom: 80px;
+            /* Space for bottom nav */
+            color: var(--text-primary);
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* App Bar */
+        .app-bar {
+            background: var(--surface-color);
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+        }
+
+        .avatar-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .avatar {
+            width: 40px;
+            height: 40px;
+            background: var(--primary-light);
+            color: var(--primary-color);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 18px;
+        }
+
+        .user-info h2 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .user-info p {
+            margin: 0;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            padding: 20px;
+        }
+
+        .stat-card {
+            background: var(--surface-color);
+            padding: 16px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--card-shadow);
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .stat-icon {
+            background: rgba(98, 0, 234, 0.1);
+            color: var(--primary-color);
+            padding: 8px;
+            border-radius: 12px;
+            margin-bottom: 12px;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            margin: 4px 0;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        /* Section Title */
+        .section-header {
+            padding: 0 20px;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        /* Assigned Work List */
+        .work-list {
+            padding: 0 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .work-card {
+            background: var(--surface-color);
+            border-radius: var(--border-radius);
+            padding: 16px;
+            box-shadow: var(--card-shadow);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .work-card.admin-type {
+            border-left: 4px solid var(--secondary-color);
+        }
+
+        .work-card.academic-type {
+            border-left: 4px solid var(--primary-color);
+        }
+
+        .work-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 8px;
+        }
+
+        .subject-name {
+            font-weight: 600;
+            font-size: 16px;
+            margin-bottom: 4px;
+        }
+
+        .work-details {
+            font-size: 13px;
+            color: var(--text-secondary);
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .tag {
+            background: #f0f0f0;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+
+        .admin-tag {
+            background: #e0f2f1;
+            color: #00695c;
+        }
+
+        .theory-tag {
+            background: #ede7f6;
+            color: #4527a0;
+        }
+
+        /* Progress Bar */
+        .progress-container {
+            margin-top: 12px;
+        }
+
+        .progress-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+        }
+
+        .progress-track {
+            height: 6px;
+            background: #eee;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--primary-color);
+            border-radius: 3px;
+        }
+
+        /* FAB - Take Attendance */
+        .fab {
+            position: fixed;
+            bottom: 90px;
+            right: 20px;
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
+            border-radius: 16px;
+            box-shadow: 0 4px 15px rgba(98, 0, 234, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            z-index: 200;
+            transition: transform 0.2s;
+            cursor: pointer;
+        }
+
+        .fab:active {
+            transform: scale(0.95);
+        }
+
+        /* Bottom Nav - Glassy Style */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            display: flex;
+            justify-content: space-around;
+            padding: 12px 0 24px 0;
+            /* Extra padding for iOS home indicator */
+            box-shadow: 0 -2px 20px rgba(0, 0, 0, 0.05);
+            z-index: 1000;
+            border-top: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 11px;
+            font-weight: 500;
+            gap: 4px;
+            transition: all 0.3s ease;
+            width: 25%;
+        }
+
+        .nav-item.active {
+            color: var(--primary-color);
+            transform: translateY(-2px);
+        }
+
+        .nav-item i {
+            font-size: 24px;
+            transition: all 0.3s ease;
+        }
+
+        .nav-item.active i {
+            font-variation-settings: 'FILL' 1;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- App Bar -->
+    <header class="app-bar">
+        <div class="avatar-container">
+            <div class="avatar">{{ faculty.first_name[0] }}</div>
+            <div class="user-info">
+                <h2>Hi, {{ faculty.first_name }}</h2>
+                <p>{{ faculty.designation or 'Faculty' }}</p>
+            </div>
+        </div>
+        <div class="actions">
+            <i class="material-icons-round" onclick="location.href='{{ url_for('logout') }}'"
+                style="color: var(--text-secondary);">logout</i>
+        </div>
+    </header>
+
+    <!-- Stats Grid -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="material-icons-round">schedule</i>
+            </div>
+            <span class="stat-value">{{ hours_week }}h</span>
+            <span class="stat-label">This Week</span>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon" style="color: var(--secondary-color); background: rgba(0, 191, 165, 0.1);">
+                <i class="material-icons-round">calendar_today</i>
+            </div>
+            <span class="stat-value">{{ hours_month }}h</span>
+            <span class="stat-label">This Month</span>
+        </div>
+    </div>
+
+
+
+    <!-- Recent Attendance -->
+    <div class="section-header">
+        <span class="section-title">Recent Attendance</span>
+    </div>
+
+    <div class="work-list" style="margin-bottom: 20px;">
+        {% for session in recent_sessions %}
+        <div class="work-card academic-type"
+            onclick="location.href='{{ url_for('faculty_attendance_session_detail', session_id=session.session_id) }}'"
+            style="cursor: pointer;">
+            <div class="work-header">
+                <div>
+                    <div class="subject-name">{{ session.subject_name }}</div>
+                    <div class="work-details">
+                        <i class="material-icons-round" style="font-size: 14px;">calendar_today</i>
+                        {{ session.date }}
+                    </div>
+                </div>
+                <div class="status-badge"
+                    style="background: rgba(98, 0, 234, 0.1); color: var(--primary-color); padding: 4px 8px; border-radius: 8px; font-size: 12px; font-weight: 600;">
+                    {{ session.present_count }}/{{ session.total_count }}
+                </div>
+            </div>
+            <div class="work-details">
+                <i class="material-icons-round" style="font-size: 14px;">groups</i>
+                {{ session.section_name }}
+            </div>
+        </div>
+        {% endfor %}
+
+        {% if not recent_sessions %}
+        <div style="text-align: center; color: #999; padding: 20px;">
+            <p>No recent attendance sessions found.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Floating Action Button -->
+    <div class="fab" onclick="location.href='{{ url_for('faculty_take_attendance_app') }}'">
+        <i class="material-icons-round" style="font-size: 28px;">add_task</i>
+    </div>
+
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav">
+        <a href="{{ url_for('faculty_dashboard_view') }}" class="nav-item active">
+            <i class="material-icons-round">dashboard</i>
+            <span>Home</span>
+        </a>
+        {% if is_class_teacher %}
+        <a href="{{ url_for('faculty_my_class_view') }}" class="nav-item">
+            <i class="material-icons-round">school</i>
+            <span>My Class</span>
+        </a>
+        {% endif %}
+        <a href="{{ url_for('faculty_work_diary') }}" class="nav-item">
+            <i class="material-icons-round">book</i>
+            <span>Diary</span>
+        </a>
+        <a href="{{ url_for('faculty_profile') }}" class="nav-item">
+            <i class="material-icons-round">person</i>
+            <span>Profile</span>
+        </a>
+    </nav>
+
+</body>
+
+</html>

@@ -218,9 +218,13 @@ class Section(db.Model, TimestampMixin, SoftDeleteMixin):
     year_of_study = db.Column(db.Integer)
     academic_year = db.Column(db.String(20))  # e.g., "2024-2025"
     current_semester = db.Column(db.Integer)  # Which semester they're in
+    
+    # Class Teacher - Faculty assigned as class teacher for this section
+    class_teacher_id = db.Column(db.String(36), db.ForeignKey("faculties.faculty_id"), nullable=True, index=True)
 
     # Relationships
     program = db.relationship("Program", back_populates="sections")
+    class_teacher = db.relationship("Faculty", foreign_keys=[class_teacher_id], backref="class_teacher_sections")
     students = db.relationship("Student", back_populates="section", lazy="dynamic")
     allocations = db.relationship("SubjectAllocation", back_populates="section", lazy="dynamic")
     schedules = db.relationship("ClassSchedule", back_populates="section", lazy="dynamic")
@@ -235,9 +239,14 @@ class Section(db.Model, TimestampMixin, SoftDeleteMixin):
         return {
             'section_id': self.section_id,
             'name': self.name,
+            'section_name': self.section_name,
             'program_id': self.program_id,
             'program_name': self.program.name if self.program else None,
             'year_of_study': self.year_of_study,
+            'academic_year': self.academic_year,
+            'current_semester': self.current_semester,
+            'class_teacher_id': self.class_teacher_id,
+            'class_teacher_name': f"{self.class_teacher.first_name} {self.class_teacher.last_name}" if self.class_teacher else None,
             'student_count': self.students.count()
         }
 
@@ -277,6 +286,8 @@ class Student(db.Model, TimestampMixin, SoftDeleteMixin):
     current_semester = db.Column(db.Integer)  # Which semester (1-8)
     semester_id = db.Column(db.String(36), db.ForeignKey("semesters.semester_id"), nullable=True)
     status = db.Column(db.String(32), default="active")
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    gender = db.Column(db.String(10))  # M, F, or Other
 
     # Relationships
     user = db.relationship("User", back_populates="student")
@@ -363,6 +374,7 @@ class Subject(db.Model, TimestampMixin, SoftDeleteMixin):
     semester_id = db.Column(db.Integer, nullable=True)  # Which semester (1-8)
     description = db.Column(db.Text)
     total_hours = db.Column(db.Integer)  # Total teaching hours
+    is_specialization = db.Column(db.Boolean, default=False)  # True for elective/specialization subjects
 
     # Legacy field for backward compatibility
     code = db.Column(db.String(64), nullable=True)  # Old field kept for compatibility
@@ -505,7 +517,7 @@ class SubjectAllocation(db.Model, TimestampMixin, SoftDeleteMixin):
     allocation_id = db.Column(db.String(36), primary_key=True, default=gen_uuid)
     subject_id = db.Column(db.String(36), db.ForeignKey("subjects.subject_id"), nullable=False, index=True)
     faculty_id = db.Column(db.String(36), db.ForeignKey("faculties.faculty_id"), nullable=False, index=True)
-    section_id = db.Column(db.String(36), db.ForeignKey("sections.section_id"), nullable=False, index=True)
+    section_id = db.Column(db.String(36), db.ForeignKey("sections.section_id"), nullable=True, index=True)
     semester_id = db.Column(db.String(36), db.ForeignKey("semesters.semester_id"), nullable=True)
     allocation_type = db.Column(db.String(64))  # e.g. "primary", "co-teacher"
 
@@ -600,6 +612,8 @@ class AttendanceSession(db.Model, TimestampMixin, SoftDeleteMixin):
                       nullable=False, default="draft")
     approved_by = db.Column(db.String(36), db.ForeignKey("users.user_id"), nullable=True)
     approved_at = db.Column(db.DateTime)
+    topic_taught = db.Column(db.String(255)) # content delivered in class
+    diary_number = db.Column(db.String(20), unique=True, index=True) # Unique identifier for each class entry (e.g., BCA-2024-001)
 
     # Relationships
     schedule = db.relationship("ClassSchedule", back_populates="attendance_sessions")
@@ -924,3 +938,195 @@ class ImportLog(db.Model, TimestampMixin):
 
     def __repr__(self):
         return f"<ImportLog {self.import_type} - {self.status}>"
+
+
+# ---------------------------------------------------------------------
+# Student Subject Enrollment - For specialization/elective subjects
+# ---------------------------------------------------------------------
+class StudentSubjectEnrollment(db.Model, TimestampMixin, SoftDeleteMixin):
+    """
+    Individual student enrollment in specialization/elective subjects.
+    For regular subjects, students are enrolled based on their section.
+    For specialization subjects, students enroll individually.
+    """
+    __tablename__ = "student_subject_enrollments"
+
+    enrollment_id = db.Column(db.String(36), primary_key=True, default=gen_uuid)
+    student_id = db.Column(db.String(36), db.ForeignKey("students.student_id"), nullable=False, index=True)
+    subject_id = db.Column(db.String(36), db.ForeignKey("subjects.subject_id"), nullable=False, index=True)
+    academic_year = db.Column(db.String(20))  # e.g., "2024-2025"
+    semester = db.Column(db.Integer)  # 1-8
+
+    # Relationships
+    student = db.relationship("Student", backref=db.backref("subject_enrollments", lazy="dynamic"))
+    subject = db.relationship("Subject", backref=db.backref("student_enrollments", lazy="dynamic"))
+
+    __table_args__ = (
+        UniqueConstraint("student_id", "subject_id", "academic_year", name="uix_student_subject_year"),
+    )
+
+    def to_dict(self):
+        """Convert enrollment to dictionary"""
+        return {
+            'enrollment_id': self.enrollment_id,
+            'student_id': self.student_id,
+            'student_name': f"{self.student.first_name} {self.student.last_name}" if self.student else None,
+            'student_usn': self.student.roll_number if self.student else None,
+            'subject_id': self.subject_id,
+            'subject_name': self.subject.subject_name if self.subject else None,
+            'subject_code': self.subject.subject_code if self.subject else None,
+            'academic_year': self.academic_year,
+            'semester': self.semester
+        }
+
+    def __repr__(self):
+        return f"<StudentSubjectEnrollment {self.student_id} -> {self.subject_id}>"
+
+
+# ---------------------------------------------------------------------
+# Campus Check-In System - Geo-fenced student attendance
+# ---------------------------------------------------------------------
+class CampusCheckIn(db.Model, TimestampMixin, SoftDeleteMixin):
+    """
+    Student daily campus check-in with location verification.
+    Students can check in once per day when they are within campus premises.
+    """
+    __tablename__ = "campus_checkins"
+
+    checkin_id = db.Column(db.String(36), primary_key=True, default=gen_uuid)
+    student_id = db.Column(db.String(36), db.ForeignKey("students.student_id"), nullable=False, index=True)
+    checkin_date = db.Column(db.Date, nullable=False, index=True)
+    checkin_time = db.Column(db.Time, nullable=False)
+    latitude = db.Column(db.Float, nullable=False)
+    longitude = db.Column(db.Float, nullable=False)
+    
+    # Check-out fields (nullable as initally not checked out)
+    checkout_time = db.Column(db.Time, nullable=True)
+    checkout_latitude = db.Column(db.Float, nullable=True)
+    checkout_longitude = db.Column(db.Float, nullable=True)
+    
+    is_valid_location = db.Column(db.Boolean, default=True)  # Within campus bounds
+    device_info = db.Column(db.String(255))  # Optional: browser/device info
+
+    # Relationships
+    student = db.relationship("Student", backref=db.backref("campus_checkins", lazy="dynamic"))
+
+    __table_args__ = (
+        UniqueConstraint("student_id", "checkin_date", name="uix_student_daily_checkin"),
+        Index("ix_checkin_date_section", "checkin_date"),
+    )
+
+    def to_dict(self):
+        """Convert campus check-in to dictionary for JSON responses"""
+        return {
+            'checkin_id': self.checkin_id,
+            'student_id': self.student_id,
+            'student_name': f"{self.student.first_name} {self.student.last_name}" if self.student else None,
+            'student_roll': self.student.roll_number if self.student else None,
+            'checkin_date': self.checkin_date.isoformat() if self.checkin_date else None,
+            'checkin_time': self.checkin_time.isoformat() if self.checkin_time else None,
+            'latitude': self.latitude,
+            'longitude': self.longitude,
+            'is_valid_location': self.is_valid_location,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+
+    def __repr__(self):
+        return f"<CampusCheckIn {self.student_id} on {self.checkin_date}>"
+
+
+class CollegeConfig(db.Model, TimestampMixin):
+    """
+    System configuration including campus location coordinates.
+    Used to validate student check-in locations.
+    """
+    __tablename__ = "college_config"
+
+    config_id = db.Column(db.String(36), primary_key=True, default=gen_uuid)
+    config_key = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    
+    # Campus location settings
+    campus_latitude = db.Column(db.Float, nullable=True)
+    campus_longitude = db.Column(db.Float, nullable=True)
+    campus_radius_meters = db.Column(db.Integer, default=100)  # Check-in radius
+    
+    # College information
+    college_name = db.Column(db.String(255))
+    
+    # Check-in time restrictions
+    checkin_start_time = db.Column(db.Time)  # e.g., 07:00
+    checkin_end_time = db.Column(db.Time)    # e.g., 18:00
+    
+    # General config value (for other settings)
+    config_value = db.Column(db.Text)
+
+    def to_dict(self):
+        """Convert config to dictionary"""
+        return {
+            'config_id': self.config_id,
+            'config_key': self.config_key,
+            'campus_latitude': self.campus_latitude,
+            'campus_longitude': self.campus_longitude,
+            'campus_radius_meters': self.campus_radius_meters,
+            'college_name': self.college_name,
+            'checkin_start_time': self.checkin_start_time.isoformat() if self.checkin_start_time else None,
+            'checkin_end_time': self.checkin_end_time.isoformat() if self.checkin_end_time else None,
+            'config_value': self.config_value
+        }
+
+    def __repr__(self):
+        return f"<CollegeConfig {self.config_key}>"
+
+
+# ---------------------------------------------------------------------
+# Faculty Attendance - Check-In/Checkout Tracking
+# ---------------------------------------------------------------------
+class FacultyAttendance(db.Model, TimestampMixin):
+    """
+    Track faculty check-in and checkout times with GPS validation
+    """
+    __tablename__ = 'faculty_attendance'
+    
+    attendance_id = db.Column(db.String(36), primary_key=True, default=gen_uuid)
+    faculty_id = db.Column(db.String(36), nullable=False)  # Foreign key removed - table already created
+    date = db.Column(db.Date, nullable=False)
+    
+    # Check-in details
+    check_in_time = db.Column(db.DateTime)
+    check_in_latitude = db.Column(db.Float)
+    check_in_longitude = db.Column(db.Float)
+    
+    # Check-out details
+    check_out_time = db.Column(db.DateTime)
+    check_out_latitude = db.Column(db.Float)
+    check_out_longitude = db.Column(db.Float)
+    check_out_valid = db.Column(db.Boolean, default=False)  # True if checkout was within campus radius
+    
+    # Relationships
+    
+    # Indexes
+    __table_args__ = (
+        Index('idx_faculty_date', 'faculty_id', 'date'),
+    )
+    
+    def to_dict(self):
+        """Convert to dictionary"""
+        return {
+            'attendance_id': self.attendance_id,
+            'faculty_id': self.faculty_id,
+            'date': self.date.isoformat() if self.date else None,
+            'check_in_time': self.check_in_time.isoformat() if self.check_in_time else None,
+            'check_out_time': self.check_out_time.isoformat() if self.check_out_time else None,
+            'check_out_valid': self.check_out_valid,
+            'hours_worked': self.get_hours_worked()
+        }
+    
+    def get_hours_worked(self):
+        """Calculate hours worked"""
+        if self.check_in_time and self.check_out_time:
+            delta = self.check_out_time - self.check_in_time
+            return round(delta.total_seconds() / 3600, 2)
+        return 0
+    
+    def __repr__(self):
+        return f"<FacultyAttendance {self.faculty_id} {self.date}>"

@@ -419,7 +419,17 @@
                                 </span>
                                 {% if student.section %}
                                 <span class="section-badge">{{ student.section.section_name }}</span>
+                                {% else %}
+                                <span class="section-badge"
+                                    style="background: rgba(0,0,0,0.05); color: #666; border-color: #eee;">Unassigned</span>
                                 {% endif %}
+                                <span
+                                    class="section-badge {{ 'status-active' if student.is_active else 'status-inactive' }}"
+                                    style="background: {{ 'rgba(76, 175, 80, 0.1)' if student.is_active else 'rgba(244, 67, 54, 0.1)' }}; 
+                                             color: {{ '#4caf50' if student.is_active else '#f44336' }}; 
+                                             border-color: {{ '#4caf50' if student.is_active else '#f44336' }};">
+                                    {{ 'Active' if student.is_active else 'Inactive/Left' }}
+                                </span>
                             </div>
                             <div class="student-meta" style="margin-top: 8px;">
                                 <span class="meta-item">
@@ -435,12 +445,6 @@
                             <i class="material-icons" style="font-size: 18px;">edit</i>
                             Edit
                         </button>
-                        {% if not student.section %}
-                        <button class="btn-action btn-section" onclick="assignSection('{{ student.student_id }}')">
-                            <i class="material-icons" style="font-size: 18px;">group_add</i>
-                            Assign
-                        </button>
-                        {% endif %}
                         <button class="btn-action btn-delete"
                             onclick="deleteStudent('{{ student.student_id }}', '{{ student.first_name }} {{ student.last_name }}')">
                             <i class="material-icons" style="font-size: 18px;">delete</i>
@@ -475,9 +479,9 @@
             <i class="material-icons">school</i>
             <span>Faculty</span>
         </a>
-        <a href="{{ url_for('admin_students') }}" class="active">
-            <i class="material-icons">people</i>
-            <span>Students</span>
+        <a href="{{ url_for('admin_sections') }}">
+            <i class="material-icons">class</i>
+            <span>Sections</span>
         </a>
         <a href="{{ url_for('admin_subjects') }}">
             <i class="material-icons">book</i>
