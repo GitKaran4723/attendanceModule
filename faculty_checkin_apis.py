@@ -2,6 +2,11 @@
 # Add these to app.py
 
 from math import radians, sin, cos, sqrt, atan2
+import app
+from auth import get_current_user
+import datetime
+from datetime import date, datetime
+
 
 def calculate_distance(lat1, lon1, lat2, lon2):
     """

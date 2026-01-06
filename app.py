@@ -78,8 +78,13 @@ def login():
     User login page and handler
     Supports student/parent login type selection for USN-based logins
     """
+    # debug code
+    print("Login attempt at", datetime.now())
+    print("Corrent session:", dict(session))
+
     # If already logged in, redirect to appropriate dashboard
     current_user = get_current_user()
+
     if current_user:
         # Check if user is admin
         if current_user.role and current_user.role.role_name.lower() == 'admin':
@@ -92,6 +97,8 @@ def login():
         login_type = request.form.get('login_type', 'student')  # 'student' or 'parent'
         
         user = User.query.filter_by(username=username, is_active=True, is_deleted=False).first()
+
+        print("User fetched:", user)
         
         if user and verify_password(user.password_hash, password):
             login_user(user)
@@ -102,6 +109,7 @@ def login():
                 session['login_as_parent'] = True
             else:
                 session['login_as_parent'] = False
+
             
             # Redirect to next page or appropriate dashboard based on role
             next_page = request.args.get('next')
