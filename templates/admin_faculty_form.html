@@ -366,25 +366,20 @@
 
                         <div class="form-row">
                             <div class="form-group">
-                                <label class="form-label">Department</label>
-                                <select name="department" class="form-select">
-                                    <option value="">Select Department</option>
-                                    <option value="Computer Science" {{ 'selected' if faculty and
-                                        faculty.department=='Computer Science' else '' }}>Computer Science</option>
-                                    <option value="Information Technology" {{ 'selected' if faculty and
-                                        faculty.department=='Information Technology' else '' }}>Information Technology
+                                <label class="form-label">Program / Department</label>
+                                <select name="program_id" class="form-select">
+                                    <option value="">Select Program</option>
+                                    {% for program in programs %}
+                                    <option value="{{ program.program_id }}" {% if faculty and
+                                        faculty.program_id==program.program_id %}selected{% endif %}>
+                                        {{ program.program_code or program.program_name }} - {{ program.program_name }}
                                     </option>
-                                    <option value="BCA" {{ 'selected' if faculty and faculty.department=='BCA' else ''
-                                        }}>BCA</option>
-                                    <option value="MCA" {{ 'selected' if faculty and faculty.department=='MCA' else ''
-                                        }}>MCA</option>
-                                    <option value="Electronics" {{ 'selected' if faculty and
-                                        faculty.department=='Electronics' else '' }}>Electronics</option>
-                                    <option value="Mathematics" {{ 'selected' if faculty and
-                                        faculty.department=='Mathematics' else '' }}>Mathematics</option>
-                                    <option value="Other" {{ 'selected' if faculty and faculty.department=='Other'
-                                        else '' }}>Other</option>
+                                    {% endfor %}
                                 </select>
+                                <small style="display: block; margin-top: 6px; color: #666; font-size: 13px;">
+                                    <i class="material-icons" style="font-size: 14px; vertical-align: middle;">info</i>
+                                    Assign faculty to a specific program/department
+                                </small>
                             </div>
 
                             <div class="form-group">

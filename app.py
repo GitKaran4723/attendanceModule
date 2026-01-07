@@ -724,7 +724,7 @@ def admin_faculty():
         ).all()
         faculty.subjects = [alloc.subject for alloc in allocations if alloc.subject and not alloc.subject.is_deleted]
     
-    return render_template('admin_faculty.html', faculty_list=faculty_list)
+    return render_template('admin_faculty.html', faculty_list=faculty_list, programs=Program.query.filter_by(is_deleted=False).order_by(Program.program_name).all())
 
 
 @app.route('/admin/faculty/add', methods=['GET', 'POST'])
@@ -739,7 +739,7 @@ def admin_faculty_add():
             last_name = request.form.get('last_name')
             email = request.form.get('email')
             phone = request.form.get('phone')
-            department = request.form.get('department')
+            program_id = request.form.get('program_id')
             designation = request.form.get('designation')
             qualification = request.form.get('qualification')
             username = request.form.get('username')
@@ -781,7 +781,7 @@ def admin_faculty_add():
                 name=f"{first_name} {last_name}",
                 email=email,
                 phone=phone,
-                department=department,
+                program_id=program_id if program_id else None,
                 designation=designation,
                 qualification=qualification
             )
@@ -808,7 +808,8 @@ def admin_faculty_add():
     
     # GET request
     subjects = Subject.query.filter_by(is_deleted=False).all()
-    return render_template('admin_faculty_form.html', subjects=subjects)
+    programs = Program.query.filter_by(is_deleted=False).all()
+    return render_template('admin_faculty_form.html', subjects=subjects, programs=programs)
 
 
 @app.route('/admin/faculty/<faculty_id>/edit', methods=['GET', 'POST'])
@@ -824,7 +825,8 @@ def admin_faculty_edit(faculty_id):
             faculty.name = f"{faculty.first_name} {faculty.last_name}"
             faculty.email = request.form.get('email')
             faculty.phone = request.form.get('phone')
-            faculty.department = request.form.get('department')
+            program_id = request.form.get('program_id')
+            faculty.program_id = program_id if program_id else None
             faculty.designation = request.form.get('designation')
             faculty.qualification = request.form.get('qualification')
             
@@ -859,11 +861,13 @@ def admin_faculty_edit(faculty_id):
     
     # GET request
     subjects = Subject.query.filter_by(is_deleted=False).all()
+    programs = Program.query.filter_by(is_deleted=False).all()
     allocations = SubjectAllocation.query.filter_by(faculty_id=faculty_id).all()
     faculty_subject_ids = [a.subject_id for a in allocations]
     return render_template('admin_faculty_form.html', 
                          faculty=faculty,
                          subjects=subjects,
+                         programs=programs,
                          faculty_subject_ids=faculty_subject_ids)
 
 
@@ -1075,6 +1079,66 @@ def admin_student_edit(student_id):
                          sections=sections)
 
 
+# ---------------------------------------------
+# Semester Promotion Routes
+# ---------------------------------------------
+
+@app.route('/admin/students/promote')
+@admin_required
+def admin_promote_students():
+    """Bulk promote students to next semester"""
+    program_id = request.args.get('program_id')
+    current_semester = request.args.get('semester')
+    
+    students = []
+    if program_id and current_semester:
+        students = Student.query.filter_by(
+            program_id=program_id,
+            current_semester=int(current_semester),
+            status='active',
+            is_deleted=False
+        ).all()
+    
+    programs = Program.query.filter_by(is_deleted=False).all()
+    return render_template('admin_promote_students.html',
+                         students=students,
+                         programs=programs,
+                         selected_program=program_id,
+                         selected_semester=current_semester)
+
+
+@app.route('/api/admin/students/promote', methods=['POST'])
+@admin_required
+def api_promote_students():
+    """Promote students to next semester"""
+    try:
+        from models import StudentEnrollment
+        
+        data = request.get_json()
+        student_ids = data.get('student_ids', [])
+        
+        promoted_count = 0
+        for student_id in student_ids:
+            student = Student.query.get(student_id)
+            if student and student.current_semester < 8:  # Max 8 semesters
+                # Mark current semester enrollments as completed
+                db.session.query(StudentEnrollment).filter_by(
+                    student_id=student_id,
+                    semester_enrolled=student.current_semester,
+                    enrollment_status='active'
+                ).update({'enrollment_status': 'completed'})
+                
+                # Increment semester
+                student.current_semester += 1
+                promoted_count += 1
+        
+        db.session.commit()
+        return jsonify({'success': True, 'promoted_count': promoted_count})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+
 @app.route('/api/admin/students/<student_id>', methods=['DELETE'])
 @admin_required
 def api_delete_student(student_id):
@@ -1210,7 +1274,7 @@ def admin_subjects():
             for chapter in unit.chapters:
                 chapter.concepts = Concept.query.filter_by(chapter_id=chapter.chapter_id, is_deleted=False).all()
     
-    return render_template('admin_subjects.html', subjects=subjects)
+    return render_template('admin_subjects.html', subjects=subjects, programs=Program.query.filter_by(is_deleted=False).order_by(Program.program_name).all())
 
 
 @app.route('/admin/sections')
@@ -1332,6 +1396,158 @@ def api_delete_subject(subject_id):
         return jsonify({'success': False, 'error': str(e)}), 400
 
 
+# ---------------------------------------------
+# Subject Enrollment Management Routes
+# ---------------------------------------------
+
+@app.route('/api/admin/subjects/<subject_id>/auto-enroll', methods=['POST'])
+@admin_required
+def auto_enroll_subject(subject_id):
+    """
+    Auto-enroll all eligible students in a core subject
+    Eligibility: Active students where current_semester matches subject.semester_id
+    """
+    try:
+        from models import StudentEnrollment
+        from datetime import datetime
+        
+        subject = Subject.query.get_or_404(subject_id)
+        
+        # Find eligible students  
+        eligible_students = Student.query.filter_by(
+            program_id=subject.program_id,
+            current_semester=subject.semester_id,
+            status='active',
+            is_deleted=False
+        ).all()
+        
+        enrolled_count = 0
+        for student in eligible_students:
+            # Check if already enrolled
+            existing = db.session.query(StudentEnrollment).filter_by(
+                student_id=student.student_id,
+                subject_id=subject_id,
+                is_deleted=False
+            ).first()
+            
+            if not existing:
+                # Get current academic year
+                now = datetime.now()
+                academic_year = f"{now.year}-{str(now.year + 1)[-2:]}" if now.month >= 6 else f"{now.year - 1}-{str(now.year)[-2:]}"
+                
+                enrollment = StudentEnrollment(
+                    student_id=student.student_id,
+                    subject_id=subject_id,
+                    section_id=student.section_id,
+                    enrollment_type='core',
+                    enrollment_status='active',
+                    semester_enrolled=student.current_semester,
+                    academic_year=academic_year
+                )
+                db.session.add(enrollment)
+                enrolled_count += 1
+        
+        db.session.commit()
+        return jsonify({'success': True, 'enrolled_count': enrolled_count})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+
+@app.route('/admin/subjects/<subject_id>/enroll-students')
+@admin_required
+def admin_enroll_students(subject_id):
+    """Page for manually enrolling students in elective subjects"""
+    from models import StudentEnrollment
+    
+    subject = Subject.query.get_or_404(subject_id)
+    
+    # Get active students matching program and semester
+    eligible_students = Student.query.filter_by(
+        program_id=subject.program_id,
+        current_semester=subject.semester_id,
+        status='active',
+        is_deleted=False
+    ).all()
+    
+    # Get already enrolled student IDs
+    enrolled_ids_query = db.session.query(StudentEnrollment.student_id).filter_by(
+        subject_id=subject_id,
+        is_deleted=False
+    )
+    enrolled_student_ids = [row[0] for row in enrolled_ids_query.all()]
+    
+    # Filter available students
+    available_students = [s for s in eligible_students if s.student_id not in enrolled_student_ids]
+    
+    # Get enrolled students with their enrollment details
+    enrollments = db.session.query(StudentEnrollment).filter_by(
+        subject_id=subject_id,
+        is_deleted=False
+    ).all()
+    enrolled_students = [{'student': e.student, 'enrollment': e} for e in enrollments]
+    
+    return render_template('admin_enroll_students.html',
+                         subject=subject,
+                         available_students=available_students,
+                         enrolled_students=enrolled_students)
+
+
+@app.route('/api/admin/enrollments/add', methods=['POST'])
+@admin_required
+def api_add_enrollments():
+    """Enroll multiple students in a subject"""
+    try:
+        from models import StudentEnrollment
+        from datetime import datetime
+        
+        data = request.get_json()
+        subject_id = data.get('subject_id')
+        student_ids = data.get('student_ids', [])
+        
+        # Get current academic year
+        now = datetime.now()
+        academic_year = f"{now.year}-{str(now.year + 1)[-2:]}" if now.month >= 6 else f"{now.year - 1}-{str(now.year)[-2:]}"
+        
+        enrolled_count = 0
+        for student_id in student_ids:
+            student = Student.query.get(student_id)
+            if student:
+                enrollment = StudentEnrollment(
+                    student_id=student_id,
+                    subject_id=subject_id,
+                    section_id=student.section_id,
+                    enrollment_type='elective',
+                    enrollment_status='active',
+                    semester_enrolled=student.current_semester,
+                    academic_year=academic_year
+                )
+                db.session.add(enrollment)
+                enrolled_count += 1
+        
+        db.session.commit()
+        return jsonify({'success': True, 'enrolled_count': enrolled_count})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+
+@app.route('/api/admin/enrollments/<enrollment_id>', methods=['DELETE'])
+@admin_required
+def api_delete_enrollment(enrollment_id):
+    """Remove student enrollment"""
+    try:
+        from models import StudentEnrollment
+        
+        enrollment = db.session.query(StudentEnrollment).get_or_404(enrollment_id)
+        enrollment.is_deleted = True
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+
 # Unit/Chapter/Concept CRUD APIs
 @app.route('/api/admin/units', methods=['POST'])
 @admin_required
@@ -1444,14 +1660,23 @@ def api_delete_concept(concept_id):
 
 
 # ---------------------------------------------
-# Batch/Section Management Routes
+# Program Management Routes
 # ---------------------------------------------
 
-@app.route('/admin/batches')
+@app.route('/admin/programs')
 @admin_required
-def admin_batches():
-    """Manage programs and sections"""
-    return redirect(url_for('admin_sections'))
+def admin_programs():
+    """List all programs (departments)"""
+    programs = Program.query.filter_by(is_deleted=False).all()
+    
+    # Calculate section counts for each program
+    for program in programs:
+        program.section_count = Section.query.filter_by(
+            program_id=program.program_id, 
+            is_deleted=False
+        ).count()
+    
+    return render_template('admin_programs.html', programs=programs)
 
 
 @app.route('/api/admin/programs', methods=['POST'])
@@ -1461,16 +1686,143 @@ def api_create_program():
     try:
         data = request.get_json()
         
+        # Validate required fields
+        program_code = data.get('program_code')
+        program_name = data.get('program_name')
+        
+        if not program_code or not program_name:
+            return jsonify({
+                'success': False, 
+                'error': 'Program code and name are required'
+            }), 400
+        
+        # Check if program code already exists
+        existing = Program.query.filter_by(
+            program_code=program_code, 
+            is_deleted=False
+        ).first()                                                                                                     
+        
+        if existing:
+            return jsonify({
+                'success': False, 
+                'error': f'Program code "{program_code}" already exists'
+            }), 400
+        
         program = Program(
-            program_code=data['program_code'],
-            program_name=data['program_name'],
-            name=data['program_name'],
-            duration_years=int(data.get('duration_years', 3)),
+            program_code=program_code,
+            program_name=program_name,
+            name=program_name,
+           duration_years=int(data.get('duration_years', 3)),
             duration=int(data.get('duration_years', 3))
         )
         db.session.add(program)
         db.session.commit()
-        return jsonify({'success': True, 'program_id': program.program_id})
+        
+        return jsonify({
+            'success': True, 
+            'program': {
+                'program_id': program.program_id,
+                'program_code': program.program_code,
+                'program_name': program.program_name,
+                'duration_years': program.duration_years
+            }
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+
+@app.route('/api/admin/programs/<program_id>', methods=['GET'])
+@admin_required
+def api_get_program(program_id):
+    """Get program details"""
+    try:
+        program = Program.query.get_or_404(program_id)
+        
+        if program.is_deleted:
+            return jsonify({'success': False, 'error': 'Program not found'}), 404
+        
+        return jsonify({
+            'success': True,
+            'program': {
+                'program_id': program.program_id,
+                'program_code': program.program_code,
+                'program_name': program.program_name,
+                'duration_years': program.duration_years
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+
+@app.route('/api/admin/programs/<program_id>', methods=['PUT'])
+@admin_required
+def api_update_program(program_id):
+    """Update existing program"""
+    try:
+        program = Program.query.get_or_404(program_id)
+        
+        if program.is_deleted:
+            return jsonify({'success': False, 'error': 'Program not found'}), 404
+        
+        data = request.get_json()
+        
+        # Update fields
+        if 'program_name' in data:
+            program.program_name = data['program_name']
+            program.name = data['program_name']
+        
+        if 'duration_years' in data:
+            duration = int(data['duration_years'])
+            program.duration_years = duration
+            program.duration = duration
+        
+        # Note: program_code is typically not editable after creation
+        # to maintain referential integrity
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'program': {
+                'program_id': program.program_id,
+                'program_code': program.program_code,
+                'program_name': program.program_name,
+                'duration_years': program.duration_years
+            }
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+
+@app.route('/api/admin/programs/<program_id>', methods=['DELETE'])
+@admin_required
+def api_delete_program(program_id):
+    """Delete program (soft delete)"""
+    try:
+        program = Program.query.get_or_404(program_id)
+        
+        # Check if there are active sections using this program
+        active_sections = Section.query.filter_by(
+            program_id=program_id, 
+            is_deleted=False
+        ).count()
+        
+        if active_sections > 0:
+            return jsonify({
+                'success': False, 
+                'error': f'Cannot delete program. {active_sections} active section(s) are using this program.'
+            }), 400
+        
+        program.is_deleted = True
+        db.session.commit()
+        
+        return jsonify({'success': True})
+        
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 400
@@ -1485,13 +1837,37 @@ def api_create_program():
 @admin_required
 def admin_assign_students():
     """Student-section assignment and specialization enrollment page"""
-    students = Student.query.filter_by(is_deleted=False).all()
-    sections = Section.query.filter_by(is_deleted=False).all()
+    # Get optional program filter from query params
+    program_id = request.args.get('program_id')
+    
+    # Get all programs for the selector
+    programs = Program.query.filter_by(is_deleted=False).order_by(Program.program_name).all()
+    
+    # Filter students and sections by program if specified
+    if program_id:
+        students = Student.query.filter_by(
+            program_id=program_id,
+            is_deleted=False
+        ).all()
+        sections = Section.query.filter_by(
+            program_id=program_id,
+            is_deleted=False
+        ).all()
+        selected_program = Program.query.get(program_id)
+    else:
+        # If no program selected, show empty state
+        students = []
+        sections = []
+        selected_program = None
+    
     subjects = Subject.query.filter_by(is_deleted=False).all()
+    
     return render_template('admin_assign_students.html', 
                          students=students, 
                          sections=sections,
-                         subjects=subjects)
+                         subjects=subjects,
+                         programs=programs,
+                         selected_program=selected_program)
 
 
 @app.route('/api/admin/students/assign-section', methods=['POST'])

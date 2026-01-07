@@ -368,6 +368,14 @@
                     <input type="text" class="search-input" id="searchInput"
                         placeholder="Search by name, employee ID, or department..." onkeyup="filterFaculty()">
                 </div>
+                <select id="programFilter" class="search-input"
+                    style="min-width: 250px; padding-left: 16px; flex: 0 0 auto;" onchange="filterFaculty()">
+                    <option value="">All Programs</option>
+                    {% for program in programs %}
+                    <option value="{{ program.program_id }}">{{ program.program_code or program.program_name }} - {{
+                        program.program_name }}</option>
+                    {% endfor %}
+                </select>
                 <button class="admin-btn admin-btn-primary"
                     onclick="location.href='{{ url_for('admin_faculty_add') }}'">
                     <i class="material-icons">add</i>
@@ -380,7 +388,9 @@
                 {% if faculty_list %}
                 {% for faculty in faculty_list %}
                 <div class="faculty-card" data-name="{{ faculty.first_name }} {{ faculty.last_name }}"
-                    data-id="{{ faculty.employee_id }}" data-dept="{{ faculty.department or '' }}">
+                    data-id="{{ faculty.employee_id }}"
+                    data-dept="{{ faculty.program.program_name if faculty.program else '' }}"
+                    data-program="{{ faculty.program_id or '' }}">
 
                     <div class="card-header">
                         <div class="avatar">
@@ -401,7 +411,8 @@
                     <div class="card-body">
                         <div class="info-row">
                             <i class="material-icons">business</i>
-                            <span>{{ faculty.department or 'Department not assigned' }}</span>
+                            <span>{{ faculty.program.program_name if faculty.program else 'Program not assigned'
+                                }}</span>
                         </div>
                         <div class="info-row">
                             <i class="material-icons">email</i>
@@ -476,14 +487,23 @@
     <script>
         function filterFaculty() {
             const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const selectedProgram = document.getElementById('programFilter').value;
             const cards = document.querySelectorAll('.faculty-card');
 
             cards.forEach(card => {
                 const name = card.getAttribute('data-name').toLowerCase();
                 const id = card.getAttribute('data-id').toLowerCase();
                 const dept = card.getAttribute('data-dept').toLowerCase();
+                const programId = card.getAttribute('data-program');
 
-                if (name.includes(searchTerm) || id.includes(searchTerm) || dept.includes(searchTerm)) {
+                // Check search term match
+                const matchesSearch = name.includes(searchTerm) || id.includes(searchTerm) || dept.includes(searchTerm);
+
+                // Check program filter match
+                const matchesProgram = !selectedProgram || programId === selectedProgram;
+
+                // Show card only if both conditions are met
+                if (matchesSearch && matchesProgram) {
                     card.style.display = 'block';
                 } else {
                     card.style.display = 'none';

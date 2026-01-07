@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Programs - BCA BUB Admin</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        .page-header {
+            background: var(--admin-gradient);
+            padding: 24px;
+            margin: -24px -24px 24px -24px;
+            border-radius: 0 0 var(--admin-radius-xl) var(--admin-radius-xl);
+            color: white;
+        }
+
+        .program-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 16px;
+            padding-bottom: 100px;
+        }
+
+        .program-card {
+            background: var(--admin-card-bg);
+            border-radius: var(--admin-radius-lg);
+            overflow: hidden;
+            box-shadow: var(--admin-shadow-sm);
+            transition: all 0.3s;
+        }
+
+        .program-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--admin-shadow-lg);
+        }
+
+        .card-content {
+            padding: 20px;
+        }
+
+        .program-name {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+
+        .program-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            font-size: 14px;
+            color: var(--admin-text-secondary);
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .meta-item i {
+            font-size: 18px;
+            color: var(--admin-primary);
+        }
+
+        .card-actions {
+            padding: 12px 20px;
+            background: #fafafa;
+            display: flex;
+            gap: 8px;
+            border-top: 1px solid #f0f0f0;
+        }
+
+        .btn-action {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: var(--admin-radius-sm);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        .btn-edit {
+            background:rgba(26, 35, 126, 0.08);
+            color: var(--admin-primary);
+        }
+
+        .btn-edit:hover {
+            background: var(--admin-primary);
+            color: white;
+        }
+
+        .btn-delete {
+            background: rgba(239, 68, 68, 0.08);
+            color: #ef4444;
+        }
+
+        .btn-delete:hover {
+            background: #ef4444;
+            color: white;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 24px;
+            border-radius: var(--admin-radius-lg);
+            max-width: 500px;
+            width: 90%;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: var(--admin-radius-md);
+            font-size: 14px;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+    </style>
+</head>
+
+<body class="admin-page">
+    <header class="admin-app-bar">
+        <button class="menu-btn" onclick="location.href='{{ url_for('admin_dashboard') }}'">
+            <i class="material-icons">arrow_back</i>
+        </button>
+        <h1 class="app-title">Programs</h1>
+        <button class="icon-btn" onclick="location.href='{{ url_for('logout') }}'">
+            <i class="material-icons">logout</i>
+        </button>
+    </header>
+
+    <main class="admin-main">
+        <div class="admin-container">
+            <div class="page-header">
+                <h2>🎓 Programs / Departments</h2>
+                <p>Manage academic programs and departments</p>
+            </div>
+
+            <div style="margin-bottom: 24px;">
+                <button class="admin-btn admin-btn-primary" onclick="openAddModal()">
+                    <i class="material-icons">add</i>
+                    Add Program
+                </button>
+            </div>
+
+            <div class="program-grid">
+                {% if programs %}
+                {% for program in programs %}
+                <div class="program-card">
+                    <div class="card-content">
+                        <h3 class="program-name">{{ program.program_name or program.name }}</h3>
+                        <div class="program-meta">
+                            <div class="meta-item">
+                                <i class="material-icons">tag</i>
+                                <span><strong>Code:</strong> {{ program.program_code }}</span>
+                            </div>
+                            <div class="meta-item">
+                                <i class="material-icons">schedule</i>
+                                <span><strong>Duration:</strong> {{ program.duration_years or program.duration }} Years</span>
+                            </div>
+                            <div class="meta-item">
+                                <i class="material-icons">class</i>
+                                <span>{{ program.section_count }} Section(s)</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-actions">
+                        <button class="btn-action btn-edit"
+                            onclick="openEditModal('{{ program.program_id }}', '{{ program.program_code }}', '{{ program.program_name or program.name }}', '{{ program.duration_years or program.duration }}')">
+                            <i class="material-icons">edit</i>
+                            Edit
+                        </button>
+                        <button class="btn-action btn-delete"
+                            onclick="deleteProgram('{{ program.program_id }}', '{{ program.program_name or program.name }}')">
+                            <i class="material-icons">delete</i>
+                            Delete
+                        </button>
+                    </div>
+                </div>
+                {% endfor %}
+                {% else %}
+                <div style="text-align: center; padding: 60px; grid-column: 1/-1;">
+                    <i class="material-icons" style="font-size: 64px; opacity: 0.3;">school</i>
+                    <h3>No Programs Yet</h3>
+                    <p>Click "Add Program" to create your first program</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </main>
+
+    <!-- Add Program Modal -->
+    <div class="modal" id="addModal">
+        <div class="modal-content">
+            <h2>Add New Program</h2>
+            <form id="addForm" onsubmit="addProgram(event)">
+                <div class="form-group">
+                    <label>Program Code *</label>
+                    <input type="text" name="program_code" required placeholder="e.g., BCA, MCA, BCOM">
+                </div>
+                <div class="form-group">
+                    <label>Program Name *</label>
+                    <input type="text" name="program_name" required placeholder="e.g., Bachelor of Computer Applications">
+                </div>
+                <div class="form-group">
+                    <label>Duration (Years) *</label>
+                    <input type="number" name="duration_years" min="1" max="10" value="3" required>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="admin-btn admin-btn-secondary"
+                        onclick="closeAddModal()">Cancel</button>
+                    <button type="submit" class="admin-btn admin-btn-primary">Create Program</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Program Modal -->
+    <div class="modal" id="editModal">
+        <div class="modal-content">
+            <h2>Edit Program</h2>
+            <form id="editForm" onsubmit="editProgram(event)">
+                <input type="hidden" id="editProgramId" name="program_id">
+                <div class="form-group">
+                    <label>Program Code</label>
+                    <input type="text" id="editProgramCode" name="program_code" disabled 
+                           style="background: #f5f5f5; cursor: not-allowed;">
+                    <small style="color: #666;">Program code cannot be changed</small>
+                </div>
+                <div class="form-group">
+                    <label>Program Name *</label>
+                    <input type="text" id="editProgramName" name="program_name" required 
+                           placeholder="e.g., Bachelor of Computer Applications">
+                </div>
+                <div class="form-group">
+                    <label>Duration (Years) *</label>
+                    <input type="number" id="editDurationYears" name="duration_years" min="1" max="10" required>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="admin-btn admin-btn-secondary"
+                        onclick="closeEditModal()">Cancel</button>
+                    <button type="submit" class="admin-btn admin-btn-primary">Update Program</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <nav class="admin-bottom-nav">
+        <a href="{{ url_for('admin_dashboard') }}" class="nav-item">
+            <i class="material-icons">dashboard</i>
+            <span>Dashboard</span>
+        </a>
+        <a href="{{ url_for('admin_students') }}" class="nav-item">
+            <i class="material-icons">people</i>
+            <span>Students</span>
+        </a>
+        <a href="{{ url_for('admin_subjects') }}" class="nav-item">
+            <i class="material-icons">menu_book</i>
+            <span>Subjects</span>
+        </a>
+        <a href="{{ url_for('admin_programs') }}" class="nav-item active">
+            <i class="material-icons">school</i>
+            <span>Programs</span>
+        </a>
+    </nav>
+
+    <script>
+        function openAddModal() {
+            document.getElementById('addModal').style.display = 'flex';
+        }
+
+        function closeAddModal() {
+            document.getElementById('addModal').style.display = 'none';
+            document.getElementById('addForm').reset();
+        }
+
+        function openEditModal(programId, programCode, programName, durationYears) {
+            document.getElementById('editProgramId').value = programId;
+            document.getElementById('editProgramCode').value = programCode;
+            document.getElementById('editProgramName').value = programName;
+            document.getElementById('editDurationYears').value = durationYears;
+            document.getElementById('editModal').style.display = 'flex';
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').style.display = 'none';
+        }
+
+        async function addProgram(event) {
+            event.preventDefault();
+            const formData = new FormData(event.target);
+            const data = Object.fromEntries(formData);
+
+            try {
+                const response = await fetch('/api/admin/programs', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    alert('Program created successfully!');
+                    location.reload();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Failed to create program');
+                console.error(error);
+            }
+        }
+
+        async function editProgram(event) {
+            event.preventDefault();
+            const programId = document.getElementById('editProgramId').value;
+            const formData = new FormData(event.target);
+            const data = Object.fromEntries(formData);
+
+            try {
+                const response = await fetch(`/api/admin/programs/${programId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    alert('Program updated successfully!');
+                    location.reload();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Failed to update program');
+                console.error(error);
+            }
+        }
+
+        async function deleteProgram(programId, programName) {
+            if (!confirm(`Delete program "${programName}"?\n\nNote: Programs with active sections cannot be deleted.`)) return;
+
+            try {
+                const response = await fetch(`/api/admin/programs/${programId}`, {
+                    method: 'DELETE'
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    alert('Program deleted successfully');
+                    location.reload();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Failed to delete program');
+                console.error(error);
+            }
+        }
+    </script>
+</body>
+
+</html>

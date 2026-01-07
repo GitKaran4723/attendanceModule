@@ -125,6 +125,7 @@ class Faculty(db.Model, TimestampMixin, SoftDeleteMixin):
     first_name = db.Column(db.String(100), nullable=False)
     last_name = db.Column(db.String(100), nullable=False)
     department = db.Column(db.String(100))
+    program_id = db.Column(db.String(36), db.ForeignKey("programs.program_id"), nullable=True, index=True)
     qualification = db.Column(db.String(200))
     
     # Legacy field for backward compatibility
@@ -140,6 +141,7 @@ class Faculty(db.Model, TimestampMixin, SoftDeleteMixin):
 
     # Relationships
     user = db.relationship("User", back_populates="faculty")
+    program = db.relationship("Program")
     allocations = db.relationship("SubjectAllocation", back_populates="faculty", lazy="dynamic")
     schedules = db.relationship("ClassSchedule", back_populates="faculty", lazy="dynamic")
     tests = db.relationship("Test", back_populates="faculty", lazy="dynamic")
@@ -155,6 +157,8 @@ class Faculty(db.Model, TimestampMixin, SoftDeleteMixin):
             'email': self.email,
             'phone': self.phone,
             'department': self.department,
+            'program_id': self.program_id,
+            'program': self.program.program_name if self.program else None,
             'qualification': self.qualification,
             'designation': self.designation,
             'employment_type': self.employment_type,
@@ -375,6 +379,7 @@ class Subject(db.Model, TimestampMixin, SoftDeleteMixin):
     description = db.Column(db.Text)
     total_hours = db.Column(db.Integer)  # Total teaching hours
     is_specialization = db.Column(db.Boolean, default=False)  # True for elective/specialization subjects
+    carries_section = db.Column(db.Boolean, default=True)  # Does this subject have section-based attendance?
 
     # Legacy field for backward compatibility
     code = db.Column(db.String(64), nullable=True)  # Old field kept for compatibility
@@ -404,7 +409,8 @@ class Subject(db.Model, TimestampMixin, SoftDeleteMixin):
             'semester_id': self.semester_id,
             'program_id': self.program_id,
             'description': self.description,
-            'total_hours': self.total_hours
+            'total_hours': self.total_hours,
+            'carries_section': self.carries_section
         }
 
     def __repr__(self):
@@ -1130,3 +1136,54 @@ class FacultyAttendance(db.Model, TimestampMixin):
     
     def __repr__(self):
         return f"<FacultyAttendance {self.faculty_id} {self.date}>"
+
+
+# =====================================================
+# Student Enrollment Model
+# =====================================================
+
+class StudentEnrollment(db.Model, TimestampMixin, SoftDeleteMixin):
+    """
+    Track which students are enrolled in which subjects
+    Handles both core (auto) and elective (manual) enrollments
+    """
+    __tablename__ = "student_enrollments"
+    
+    enrollment_id = db.Column(db.String(36), primary_key=True, default=gen_uuid)
+    student_id = db.Column(db.String(36), db.ForeignKey("students.student_id"), nullable=False, index=True)
+    subject_id = db.Column(db.String(36), db.ForeignKey("subjects.subject_id"), nullable=False, index=True)
+    section_id = db.Column(db.String(36), db.ForeignKey("sections.section_id"), nullable=True, index=True)
+    
+    enrollment_type = db.Column(db.Enum("core", "elective", "specialization", name="enrollment_type_enum"), default="core")
+    enrollment_status = db.Column(db.Enum("active", "dropped", "completed", name="enrollment_status_enum"), default="active")
+    
+    # Academic tracking
+    semester_enrolled = db.Column(db.Integer)  # Which semester they enrolled
+    academic_year = db.Column(db.String(20))  # e.g., "2023-24"
+    
+    # Relationships
+    student = db.relationship("Student", backref=db.backref("enrollments", lazy="dynamic"))
+    subject = db.relationship("Subject", backref=db.backref("enrollments", lazy="dynamic"))
+    section = db.relationship("Section")
+    
+    __table_args__ = (
+        UniqueConstraint("student_id", "subject_id", "is_deleted", name="uix_student_subject_enrollment"),
+    )
+    
+    def to_dict(self):
+        """Convert enrollment to dictionary"""
+        return {
+            'enrollment_id': self.enrollment_id,
+            'student_id': self.student_id,
+            'subject_id': self.subject_id,
+            'section_id': self.section_id,
+            'enrollment_type': self.enrollment_type,
+            'enrollment_status': self.enrollment_status,
+            'semester_enrolled': self.semester_enrolled,
+            'academic_year': self.academic_year,
+            'student_name': self.student.name if self.student else None,
+            'subject_name': self.subject.subject_name if self.subject else None
+        }
+    
+    def __repr__(self):
+        return f"<StudentEnrollment {self.student_id} -> {self.subject_id}>"

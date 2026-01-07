@@ -372,6 +372,42 @@
             </div>
         </header>
 
+        <!-- Program Selector -->
+        <div
+            style="background: linear-gradient(135deg, #1a237e 0%, #283593 100%); padding: 24px; border-radius: 12px; margin-bottom: 24px; color: white;">
+            <div
+                style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
+                <div>
+                    <h2 style="margin: 0 0 8px; font-size: 20px; font-weight: 600;">Select Program / Department</h2>
+                    <p style="margin: 0; opacity: 0.9; font-size: 14px;">Choose a program to view and assign students to
+                        sections</p>
+                </div>
+                <div style="min-width: 300px;">
+                    <select id="programSelector" onchange="loadProgramData()"
+                        style="width: 100%; padding: 14px 16px; border: 2px solid rgba(255,255,255,0.3); border-radius: 8px; font-size: 15px; background: rgba(255,255,255,0.15); color: white; cursor: pointer; backdrop-filter: blur(10px);">
+                        <option value="">-- Select a Program --</option>
+                        {% for program in programs %}
+                        <option value="{{ program.program_id }}" {% if selected_program and
+                            selected_program.program_id==program.program_id %}selected{% endif %}>
+                            {{ program.program_code or program.program_name }} - {{ program.program_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        {% if not selected_program %}
+        <!-- Empty State - No Program Selected -->
+        <div
+            style="text-align: center; padding: 80px 20px; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+            <div style="font-size: 72px; opacity: 0.2; margin-bottom: 16px;">🎓</div>
+            <h3 style="color: #1a237e; margin: 0 0 12px; font-size: 24px;">Select a Program to Begin</h3>
+            <p style="color: #666; margin: 0; font-size: 15px;">Choose a program from the dropdown above to view
+                students and sections for assignment.</p>
+        </div>
+        {% else %}
+        <!-- Toolbar and  Content -->
         <div class="toolbar">
             <div class="search-wrapper">
                 <i class="material-icons">search</i>
@@ -391,6 +427,16 @@
                     onclick="setActiveFilter(this)">Unassigned Only</label>
             </div>
         </div>
+
+        {% if students|length == 0 %}
+        <!-- Empty State - No Students in Program -->
+        <div style="text-align: center; padding: 60px 20px; background: white; border-radius: 12px;">
+            <i class="material-icons" style="font-size: 64px; opacity: 0.3; color: #ff9800;">people_outline</i>
+            <h3 style="color: #333; margin: 16px 0 8px;">No Students Found</h3>
+            <p style="color: #666; margin: 0;">There are no students enrolled in the <strong>{{
+                    selected_program.program_name }}</strong> program.</p>
+        </div>
+        {% else %}
 
         <!-- Matrix Container -->
         <div class="matrix-container">
@@ -417,20 +463,26 @@
                     <tbody>
                         {% for student in students %}
                         <tr class="student-row" data-student-id="{{ student.student_id }}"
+                            data-student-program="{{ student.program_id or '' }}"
                             data-original-section="{{ 'left_college' if not student.is_active else (student.section_id or 'none') }}">
                             <td class="col-sticky">{{ loop.index }}</td>
                             <td class="col-sticky-2">{{ student.roll_number }}</td>
                             <td class="col-sticky-3">
                                 <div style="font-weight: 500; color: #334155;">{{ student.first_name }} {{
                                     student.last_name }}</div>
+                                {% if student.program %}
+                                <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">{{
+                                    student.program.program_code or student.program.name }}</div>
+                                {% endif %}
                             </td>
 
                             {% for section in sections %}
-                            <td class="section-cell">
+                            <td class="section-cell" data-section-program="{{ section.program_id or '' }}">
                                 <label class="custom-radio-container">
                                     <input type="radio" name="section_{{ student.student_id }}"
                                         value="{{ section.section_id }}" class="custom-radio section-radio" {{ 'checked'
                                         if student.section_id==section.section_id else '' }}
+                                        data-section-program="{{ section.program_id or '' }}"
                                         onchange="markModified(this)">
                                 </label>
                             </td>
@@ -462,10 +514,12 @@
 
             <div
                 style="padding: 12px 20px; background: #fafafa; border-top: 1px solid var(--matrix-border); color: #666; font-size: 13px; display: flex; justify-content: space-between;">
-                <span>Showing {{ students|length }} students</span>
+                <span>Showing {{ students|length }} students in {{ selected_program.program_name }}</span>
                 <span>Assignments are auto-saved only when you click Update</span>
             </div>
         </div>
+        {% endif %}
+        {% endif %}
     </div>
 
     <!-- Sticky Action Bar -->
@@ -520,6 +574,18 @@
     </div>
 
     <script>
+        // Program selector function
+        function loadProgramData() {
+            const programId = document.getElementById('programSelector').value;
+            if (programId) {
+                // Reload page with program_id parameter
+                window.location.href = `/admin/assign-students?program_id=${programId}`;
+            } else {
+                // Reload without parameter
+                window.location.href = '/admin/assign-students';
+            }
+        }
+
         // Filters UI
         function setActiveFilter(element) {
             document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
@@ -641,6 +707,51 @@
                 console.error(error);
             }
         }
+
+        // Program-based filtering - disable sections that don't match student's program
+        function applyProgramFiltering() {
+            const rows = document.querySelectorAll('.student-row');
+
+            rows.forEach(row => {
+                const studentProgram = row.dataset.studentProgram;
+
+                // Get all section radios in this row
+                const sectionRadios = row.querySelectorAll('input.section-radio');
+
+                sectionRadios.forEach(radio => {
+                    const sectionProgram = radio.dataset.sectionProgram;
+
+                    // If student has no program, or section has no program, allow it
+                    // Otherwise, only allow if programs match
+                    if (studentProgram && sectionProgram && studentProgram !== sectionProgram) {
+                        radio.disabled = true;
+                        radio.closest('.custom-radio-container').style.opacity = '0.3';
+                        radio.closest('.custom-radio-container').style.cursor = 'not-allowed';
+                        radio.closest('.custom-radio-container').title = 'Different program - cannot assign';
+
+                        // If this disabled radio is currently checked, uncheck it
+                        if (radio.checked) {
+                            radio.checked = false;
+                            // Select the "None" option instead
+                            const noneRadio = row.querySelector('input[value="none"]');
+                            if (noneRadio) {
+                                noneRadio.checked = true;
+                            }
+                        }
+                    } else {
+                        radio.disabled = false;
+                        radio.closest('.custom-radio-container').style.opacity = '1';
+                        radio.closest('.custom-radio-container').style.cursor = 'pointer';
+                        radio.closest('.custom-radio-container').title = '';
+                    }
+                });
+            });
+        }
+
+        // Apply filtering on page load
+        document.addEventListener('DOMContentLoaded', function () {
+            applyProgramFiltering();
+        });
     </script>
 </body>
 

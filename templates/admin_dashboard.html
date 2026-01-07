@@ -65,6 +65,12 @@
                 </a>
             </li>
             <li class="admin-nav-item">
+                <a href="{{ url_for('admin_programs') }}">
+                    <i class="material-icons">school</i>
+                    <span>Programs</span>
+                </a>
+            </li>
+            <li class="admin-nav-item">
                 <a href="{{ url_for('admin_import') }}">
                     <i class="material-icons">upload_file</i>
                     <span>Bulk Import</span>
@@ -165,6 +171,14 @@
                     </div>
                     <h3>Sections & Classes</h3>
                     <p>Manage academic sections</p>
+                </a>
+
+                <a href="{{ url_for('admin_programs') }}" class="admin-module-card">
+                    <div class="module-icon">
+                        <i class="material-icons">school</i>
+                    </div>
+                    <h3>Programs / Departments</h3>
+                    <p>Manage academic programs and departments</p>
                 </a>
 
                 <a href="{{ url_for('admin_import') }}" class="admin-module-card">

@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1a237e">
+    <title>Enroll Students - {{ subject.subject_name }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <style>
+        .enroll-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .subject-header {
+            background: var(--admin-gradient);
+            padding: 24px;
+            border-radius: var(--admin-radius-xl);
+            color: white;
+            margin-bottom: 24px;
+        }
+
+        .two-column-layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 100px;
+        }
+
+        .column-card {
+            background: var(--admin-card-bg);
+            border-radius: var(--admin-radius-lg);
+            padding: 24px;
+            box-shadow: var(--admin-shadow-md);
+        }
+
+        .column-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid var(--admin-accent);
+        }
+
+        .column-header h3 {
+            margin: 0;
+            color: var(--admin-primary);
+            font-size: 18px;
+        }
+
+        .student-counter {
+            background: var(--admin-accent);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .student-list {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .student-item {
+            padding: 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: var(--admin-radius-md);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: all 0.2s;
+        }
+
+        .student-item:hover {
+            background: #f5f5f5;
+            border-color: var(--admin-primary);
+        }
+
+        .student-item input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        .student-info {
+            flex: 1;
+        }
+
+        .student-name {
+            font-weight: 600;
+            color: var(--admin-text-primary);
+        }
+
+        .student-details {
+            font-size: 13px;
+            color: var(--admin-text-secondary);
+            margin-top: 4px;
+        }
+
+        .btn-remove {
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+            border: none;
+            padding: 6px 12px;
+            border-radius: var(--admin-radius-sm);
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .btn-remove:hover {
+            background: #ef4444;
+            color: white;
+        }
+
+        .action-bar {
+            position: fixed;
+            bottom: 72px;
+            left: 0;
+            right: 0;
+            background: white;
+            padding: 16px 24px;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            z-index: 99;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 24px;
+            color: var(--admin-text-secondary);
+        }
+
+        .empty-state i {
+            font-size: 48px;
+            opacity: 0.3;
+        }
+    </style>
+</head>
+
+<body class="admin-page">
+    <header class="admin-app-bar">
+        <button class="menu-btn" onclick="window.history.back()">
+            <i class="material-icons">arrow_back</i>
+        </button>
+        <h1 class="app-title">Enroll Students</h1>
+        <button class="icon-btn" onclick="location.href='{{ url_for('logout') }}'">
+            <i class="material-icons">logout</i>
+        </button>
+    </header>
+
+    <main class="admin-main">
+        <div class="enroll-container">
+            <div class="subject-header">
+                <h2>{{ subject.subject_name }}</h2>
+                <p>{{ subject.subject_code }} • {{ subject.program.program_name if subject.program else 'No Program' }}
+                    • Semester {{ subject.semester_id }}</p>
+            </div>
+
+            <div class="two-column-layout">
+                <!-- Available Students -->
+                <div class="column-card">
+                    <div class="column-header">
+                        <h3>Available Students</h3>
+                        <span class="student-counter" id="availableCount">{{ available_students|length }}</span>
+                    </div>
+                    <div class="student-list">
+                        {% if available_students %}
+                        {% for student in available_students %}
+                        <div class="student-item">
+                            <input type="checkbox" class="student-checkbox" value="{{ student.student_id }}">
+                            <div class="student-info">
+                                <div class="student-name">{{ student.name }}</div>
+                                <div class="student-details">
+                                    {{ student.usn }} • Section: {{ student.section.section_name if student.section else
+                                    'N/A' }}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                        {% else %}
+                        <div class="empty-state">
+                            <i class="material-icons">check_circle</i>
+                            <p>All eligible students are enrolled</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Enrolled Students -->
+                <div class="column-card">
+                    <div class="column-header">
+                        <h3>Enrolled Students</h3>
+                        <span class="student-counter" id="enrolledCount">{{ enrolled_students|length }}</span>
+                    </div>
+                    <div class="student-list">
+                        {% if enrolled_students %}
+                        {% for item in enrolled_students %}
+                        <div class="student-item">
+                            <div class="student-info">
+                                <div class="student-name">{{ item.student.name }}</div>
+                                <div class="student-details">
+                                    {{ item.student.usn }} • Enrolled: {{ item.enrollment.enrollment_type|title }}
+                                </div>
+                            </div>
+                            <button class="btn-remove"
+                                onclick="unenrollStudent('{{ item.enrollment.enrollment_id }}', '{{ item.student.name }}')">
+                                <i class="material-icons" style="font-size: 16px;">delete</i> Remove
+                            </button>
+                        </div>
+                        {% endfor %}
+                        {% else %}
+                        <div class="empty-state">
+                            <i class="material-icons">person_add</i>
+                            <p>No students enrolled yet</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="action-bar">
+                <button class="admin-btn admin-btn-secondary" onclick="selectAll()">
+                    <i class="material-icons">done_all</i> Select All
+                </button>
+                <button class="admin-btn admin-btn-primary" onclick="enrollSelected()" id="enrollBtn">
+                    <i class="material-icons">person_add</i> Enroll Selected (<span id="selectedCount">0</span>)
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const subjectId = '{{ subject.subject_id }}';
+
+        // Update selected count
+        document.querySelectorAll('.student-checkbox').forEach(cb => {
+            cb.addEventListener('change', updateSelectedCount);
+        });
+
+        function updateSelectedCount() {
+            const selected = document.querySelectorAll('.student-checkbox:checked').length;
+            document.getElementById('selectedCount').textContent = selected;
+            document.getElementById('enrollBtn').disabled = selected === 0;
+        }
+
+        function selectAll() {
+            const checkboxes = document.querySelectorAll('.student-checkbox');
+            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+            checkboxes.forEach(cb => cb.checked = !allChecked);
+            updateSelectedCount();
+        }
+
+        async function enrollSelected() {
+            const selected = Array.from(document.querySelectorAll('.student-checkbox:checked'))
+                .map(cb => cb.value);
+
+            if (selected.length === 0) {
+                alert('Please select at least one student');
+                return;
+            }
+
+            if (!confirm(`Enroll ${selected.length} student(s) in this subject?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/admin/enrollments/add', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        subject_id: subjectId,
+                        student_ids: selected
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert(`Successfully enrolled ${result.enrolled_count} student(s)`);
+                    location.reload();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Failed to enroll students');
+                console.error(error);
+            }
+        }
+
+        async function unenrollStudent(enrollmentId, studentName) {
+            if (!confirm(`Remove ${studentName} from this subject?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/admin/enrollments/${enrollmentId}`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert('Student removed successfully');
+                    location.reload();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Failed to remove student');
+                console.error(error);
+            }
+        }
+    </script>
+</body>
+
+</html>

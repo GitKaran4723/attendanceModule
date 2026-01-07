@@ -382,6 +382,13 @@
                     <option value="6">Semester 6</option>
                 </select>
 
+                <select class="filter-select" id="programFilter" onchange="filterSubjects()">
+                    <option value="">All Programs</option>
+                    {% for program in programs %}
+                    <option value="{{ program.program_id }}">{{ program.program_code or program.program_name }}</option>
+                    {% endfor %}
+                </select>
+
                 <select class="filter-select" id="typeFilter" onchange="filterSubjects()">
                     <option value="">All Types</option>
                     <option value="theory">Theory</option>
@@ -407,7 +414,8 @@
                 {% if subjects %}
                 {% for subject in subjects %}
                 <div class="subject-card" data-name="{{ subject.subject_name }}" data-code="{{ subject.subject_code }}"
-                    data-semester="{{ subject.semester_id or '' }}" data-type="{{ subject.subject_type or 'theory' }}">
+                    data-semester="{{ subject.semester_id or '' }}" data-type="{{ subject.subject_type or 'theory' }}"
+                    data-program="{{ subject.program_id or '' }}">
                     <div class="card-content">
                         <div class="subject-avatar">
                             <i class="material-icons">{{ 'build' if subject.subject_type == 'practical' else 'menu_book'
@@ -439,6 +447,12 @@
                         <button class="btn-action btn-units" onclick="manageUnits('{{ subject.subject_id }}')">
                             <i class="material-icons">folder_open</i>
                             Units
+                        </button>
+                        <button class="btn-action btn-primary"
+                            style="background: linear-gradient(135deg, #10b981, #059669); color: white;"
+                            onclick="location.href='/admin/subjects/{{ subject.subject_id }}/enroll-students'">
+                            <i class="material-icons">person_add</i>
+                            Enroll
                         </button>
                         <button class="btn-action btn-delete"
                             onclick="deleteSubject('{{ subject.subject_id }}', '{{ subject.subject_name }}')">
@@ -488,6 +502,7 @@
         function filterSubjects() {
             const searchTerm = document.getElementById('searchInput').value.toLowerCase();
             const semesterFilter = document.getElementById('semesterFilter').value;
+            const programFilter = document.getElementById('programFilter').value;
             const typeFilter = document.getElementById('typeFilter').value;
             const cards = document.querySelectorAll('.subject-card');
 
@@ -495,13 +510,15 @@
                 const name = card.getAttribute('data-name').toLowerCase();
                 const code = card.getAttribute('data-code').toLowerCase();
                 const semester = card.getAttribute('data-semester');
+                const program = card.getAttribute('data-program');
                 const type = card.getAttribute('data-type');
 
                 const matchesSearch = name.includes(searchTerm) || code.includes(searchTerm);
                 const matchesSemester = !semesterFilter || semester === semesterFilter;
+                const matchesProgram = !programFilter || program === programFilter;
                 const matchesType = !typeFilter || type === typeFilter;
 
-                card.style.display = (matchesSearch && matchesSemester && matchesType) ? 'block' : 'none';
+                card.style.display = (matchesSearch && matchesSemester && matchesProgram && matchesType) ? 'block' : 'none';
             });
         }
 
