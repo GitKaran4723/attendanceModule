@@ -323,6 +323,90 @@
                 width: 100%;
             }
         }
+
+        /* Custom Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 24px;
+            border-radius: var(--admin-radius-lg);
+            width: 90%;
+            max-width: 400px;
+            transform: scale(0.9);
+            transition: all 0.3s ease;
+            box-shadow: var(--admin-shadow-lg);
+        }
+
+        .modal-overlay.active .modal-content {
+            transform: scale(1);
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #d32f2f;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .modal-body {
+            color: var(--admin-text-dark);
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+
+        .btn-modal {
+            padding: 10px 20px;
+            border-radius: var(--admin-radius-md);
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+        }
+
+        .btn-cancel {
+            background: #e0e0e0;
+            color: #424242;
+        }
+
+        .btn-confirm-delete {
+            background: #d32f2f;
+            color: white;
+        }
+
+        .btn-modal:hover {
+            filter: brightness(0.9);
+            transform: translateY(-1px);
+        }
     </style>
 </head>
 
@@ -345,6 +429,23 @@
             <div class="page-header">
                 <h2>👩‍🎓 Students</h2>
                 <p>Manage student records, assign to sections, and track enrollment</p>
+
+                <!-- Flash Messages -->
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                <div class="flash-messages" style="margin-top: 16px;">
+                    {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}"
+                        style="padding: 12px 16px; border-radius: 8px; margin-bottom: 8px; 
+                               background: {{ 'rgba(34, 197, 94, 0.1)' if category == 'success' else 'rgba(239, 68, 68, 0.1)' }};
+                               color: {{ '#16a34a' if category == 'success' else '#dc2626' }};
+                               border: 1px solid {{ 'rgba(34, 197, 94, 0.2)' if category == 'success' else 'rgba(239, 68, 68, 0.2)' }};">
+                        {{ message }}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                {% endwith %}
                 <div class="stats-row">
                     <div class="stat-pill">
                         <i class="material-icons" style="font-size: 16px;">people</i>
@@ -369,7 +470,7 @@
                         placeholder="Search by name or roll number..." onkeyup="filterStudents()">
                 </div>
 
-                <select class="filter-select" id="programFilter" onchange="filterStudents()">
+                <select class="filter-select" id="programFilter" onchange="filterByProgram()">
                     <option value="">All Programs</option>
                     {% for program in programs %}
                     <option value="{{ program.program_id }}">{{ program.program_name }}</option>
@@ -379,7 +480,8 @@
                 <select class="filter-select" id="sectionFilter" onchange="filterStudents()">
                     <option value="">All Sections</option>
                     {% for section in sections %}
-                    <option value="{{ section.section_id }}">{{ section.section_name }}</option>
+                    <option value="{{ section.section_id }}" data-program-id="{{ section.program_id }}">{{
+                        section.section_name }}</option>
                     {% endfor %}
                 </select>
 
@@ -401,16 +503,15 @@
             <div class="student-grid" id="studentGrid">
                 {% if students %}
                 {% for student in students %}
-                <div class="student-card" data-name="{{ student.first_name }} {{ student.last_name }}"
-                    data-roll="{{ student.roll_number }}" data-program="{{ student.program_id }}"
-                    data-section="{{ student.section_id or '' }}">
+                <div class="student-card" data-name="{{ student.name }}" data-roll="{{ student.roll_number }}"
+                    data-program="{{ student.program_id }}" data-section="{{ student.section_id or '' }}">
 
                     <div class="card-content">
                         <div class="student-avatar">
-                            {{ student.first_name[0] }}{{ student.last_name[0] if student.last_name else '' }}
+                            {{ student.name[0] if student.name else '?' }}
                         </div>
                         <div class="student-info">
-                            <h3 class="student-name">{{ student.first_name }} {{ student.last_name }}</h3>
+                            <h3 class="student-name">{{ student.name }}</h3>
                             <div class="student-roll">{{ student.roll_number }}</div>
                             <div class="student-meta">
                                 <span class="meta-item">
@@ -424,11 +525,11 @@
                                     style="background: rgba(0,0,0,0.05); color: #666; border-color: #eee;">Unassigned</span>
                                 {% endif %}
                                 <span
-                                    class="section-badge {{ 'status-active' if student.is_active else 'status-inactive' }}"
-                                    style="background: {{ 'rgba(76, 175, 80, 0.1)' if student.is_active else 'rgba(244, 67, 54, 0.1)' }}; 
-                                             color: {{ '#4caf50' if student.is_active else '#f44336' }}; 
-                                             border-color: {{ '#4caf50' if student.is_active else '#f44336' }};">
-                                    {{ 'Active' if student.is_active else 'Inactive/Left' }}
+                                    class="section-badge {{ 'status-active' if student.status == 'active' else 'status-inactive' }}"
+                                    style="background: {{ 'rgba(76, 175, 80, 0.1)' if student.status == 'active' else 'rgba(244, 67, 54, 0.1)' }}; 
+                                             color: {{ '#4caf50' if student.status == 'active' else '#f44336' }}; 
+                                             border-color: {{ '#4caf50' if student.status == 'active' else '#f44336' }};">
+                                    {{ 'Active' if student.status == 'active' else 'Inactive/Left' }}
                                 </span>
                             </div>
                             <div class="student-meta" style="margin-top: 8px;">
@@ -446,7 +547,7 @@
                             Edit
                         </button>
                         <button class="btn-action btn-delete"
-                            onclick="deleteStudent('{{ student.student_id }}', '{{ student.first_name }} {{ student.last_name }}')">
+                            onclick="deleteStudent('{{ student.student_id }}', '{{ student.name }}')">
                             <i class="material-icons" style="font-size: 18px;">delete</i>
                             Delete
                         </button>
@@ -463,6 +564,23 @@
             </div>
         </div>
     </main>
+
+    <!-- Custom Delete Modal -->
+    <div id="deleteModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-title">
+                <i class="material-icons">warning</i>
+                Permanent Delete?
+            </div>
+            <div class="modal-body" id="deleteModalBody">
+                Are you sure you want to PERMANENTLY delete this student? This action cannot be undone.
+            </div>
+            <div class="modal-footer">
+                <button class="btn-modal btn-cancel" onclick="closeDeleteModal()">Cancel</button>
+                <button class="btn-modal btn-confirm-delete" id="confirmDeleteBtn">Delete Permanently</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Floating Action Button -->
     <button class="fab" onclick="location.href='{{ url_for('admin_student_add') }}'" title="Add Student">
@@ -490,6 +608,31 @@
     </nav>
 
     <script>
+        function filterByProgram() {
+            const programId = document.getElementById('programFilter').value;
+            const sectionSelect = document.getElementById('sectionFilter');
+
+            // Filter section dropdown options
+            Array.from(sectionSelect.options).forEach(option => {
+                if (option.value === '') {
+                    // Always show "All Sections" option
+                    option.style.display = '';
+                } else if (!programId || option.dataset.programId === programId) {
+                    option.style.display = '';
+                } else {
+                    option.style.display = 'none';
+                }
+            });
+
+            // Reset section filter if current selection doesn't match program
+            if (sectionSelect.value && sectionSelect.selectedOptions[0].dataset.programId !== programId) {
+                sectionSelect.value = '';
+            }
+
+            // Apply student filtering
+            filterStudents();
+        }
+
         function filterStudents() {
             const searchTerm = document.getElementById('searchInput').value.toLowerCase();
             const programFilter = document.getElementById('programFilter').value;
@@ -523,13 +666,33 @@
             alert('Section assignment feature coming soon!');
         }
 
-        async function deleteStudent(studentId, studentName) {
-            if (!confirm(`Are you sure you want to delete ${studentName}? This will also delete their attendance records and test results.`)) {
-                return;
-            }
+        let studentToDelete = null;
+
+        function closeDeleteModal() {
+            document.getElementById('deleteModal').classList.remove('active');
+            studentToDelete = null;
+        }
+
+        function deleteStudent(student_id, studentName) {
+            console.log("Opening delete modal for:", student_id, studentName);
+            studentToDelete = student_id;
+            document.getElementById('deleteModalBody').innerHTML = `Are you sure you want to <strong>PERMANENTLY</strong> delete student <strong>${studentName}</strong>? <br><br>This will remove all their records from the database, including attendance and fees. This action cannot be undone.`;
+            document.getElementById('deleteModal').classList.add('active');
+
+            // Set up confirm button
+            const confirmBtn = document.getElementById('confirmDeleteBtn');
+            confirmBtn.onclick = async () => {
+                confirmBtn.disabled = true;
+                confirmBtn.innerHTML = 'Deleting...';
+                await confirmPermanentDelete();
+            };
+        }
+
+        async function confirmPermanentDelete() {
+            if (!studentToDelete) return;
 
             try {
-                const response = await fetch(`/api/admin/students/${studentId}`, {
+                const response = await fetch(`/api/admin/students/${studentToDelete}?permanent=true`, {
                     method: 'DELETE',
                     headers: { 'Content-Type': 'application/json' }
                 });
@@ -541,10 +704,12 @@
                     location.reload();
                 } else {
                     alert('Error: ' + result.error);
+                    closeDeleteModal();
                 }
             } catch (error) {
                 alert('Failed to delete student');
                 console.error(error);
+                closeDeleteModal();
             }
         }
     </script>

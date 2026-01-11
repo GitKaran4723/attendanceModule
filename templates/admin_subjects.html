@@ -216,6 +216,8 @@
             display: flex;
             gap: 8px;
             border-top: 1px solid #f0f0f0;
+            flex-wrap: wrap;
+            /* Allow wrapping for small screens or many buttons */
         }
 
         .btn-action {
@@ -448,12 +450,14 @@
                             <i class="material-icons">folder_open</i>
                             Units
                         </button>
+                        {% if subject.subject_category in ['language', 'specialization', 'elective'] %}
                         <button class="btn-action btn-primary"
                             style="background: linear-gradient(135deg, #10b981, #059669); color: white;"
                             onclick="location.href='/admin/subjects/{{ subject.subject_id }}/enroll-students'">
                             <i class="material-icons">person_add</i>
                             Enroll
                         </button>
+                        {% endif %}
                         <button class="btn-action btn-delete"
                             onclick="deleteSubject('{{ subject.subject_id }}', '{{ subject.subject_name }}')">
                             <i class="material-icons">delete</i>

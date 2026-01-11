@@ -351,6 +351,17 @@
             text-align: center;
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
         }
+
+        /* Fix dropdown options - dark text on white background */
+        select option {
+            background: white;
+            color: #1a237e;
+            padding: 10px;
+        }
+
+        select option:hover {
+            background: #f0f0f0;
+        }
     </style>
 </head>
 
@@ -375,14 +386,16 @@
         <!-- Program Selector -->
         <div
             style="background: linear-gradient(135deg, #1a237e 0%, #283593 100%); padding: 24px; border-radius: 12px; margin-bottom: 24px; color: white;">
-            <div
-                style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
+            <div style="margin-bottom: 20px;">
+                <h2 style="margin: 0 0 8px; font-size: 20px; font-weight: 600;">Select Program / Department</h2>
+                <p style="margin: 0; opacity: 0.9; font-size: 14px;">Choose filters to view and assign students to
+                    sections</p>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px;">
+                <!-- Program Selector -->
                 <div>
-                    <h2 style="margin: 0 0 8px; font-size: 20px; font-weight: 600;">Select Program / Department</h2>
-                    <p style="margin: 0; opacity: 0.9; font-size: 14px;">Choose a program to view and assign students to
-                        sections</p>
-                </div>
-                <div style="min-width: 300px;">
+                    <label style="display: block; margin-bottom: 8px; font-size: 13px; opacity: 0.9;">Program</label>
                     <select id="programSelector" onchange="loadProgramData()"
                         style="width: 100%; padding: 14px 16px; border: 2px solid rgba(255,255,255,0.3); border-radius: 8px; font-size: 15px; background: rgba(255,255,255,0.15); color: white; cursor: pointer; backdrop-filter: blur(10px);">
                         <option value="">-- Select a Program --</option>
@@ -390,6 +403,32 @@
                         <option value="{{ program.program_id }}" {% if selected_program and
                             selected_program.program_id==program.program_id %}selected{% endif %}>
                             {{ program.program_code or program.program_name }} - {{ program.program_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Semester Filter -->
+                <div>
+                    <label style="display: block; margin-bottom: 8px; font-size: 13px; opacity: 0.9;">Semester</label>
+                    <select id="semesterFilter" onchange="filterBySemester()"
+                        style="width: 100%; padding: 14px 16px; border: 2px solid rgba(255,255,255,0.3); border-radius: 8px; font-size: 15px; background: rgba(255,255,255,0.15); color: white; cursor: pointer; backdrop-filter: blur(10px);">
+                        <option value="">All Semesters</option>
+                        {% for semester in available_semesters %}
+                        <option value="{{ semester }}">Semester {{ semester }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Section Filter (shows sections from selected semester) -->
+                <div>
+                    <label style="display: block; margin-bottom: 8px; font-size: 13px; opacity: 0.9;">Section</label>
+                    <select id="sectionFilter" onchange="filterBySection()"
+                        style="width: 100%; padding: 14px 16px; border: 2px solid rgba(255,255,255,0.3); border-radius: 8px; font-size: 15px; background: rgba(255,255,255,0.15); color: white; cursor: pointer; backdrop-filter: blur(10px);">
+                        <option value="">All Sections</option>
+                        {% for section in sections %}
+                        <option value="{{ section.section_id }}" data-semester="{{ section.current_semester }}">
+                            {{ section.section_name }} (Sem {{ section.current_semester }})
                         </option>
                         {% endfor %}
                     </select>
@@ -448,7 +487,7 @@
                             <th class="col-sticky-2">USN</th>
                             <th class="col-sticky-3">Name</th>
                             {% for section in sections %}
-                            <th class="section-header"
+                            <th class="section-header section-column" data-semester="{{ section.current_semester }}"
                                 title="{{ section.program.program_code }} - {{ section.section_name }}">
                                 <div style="font-size: 14px; margin-bottom: 2px;">{{ section.section_name }}</div>
                                 <div style="font-weight: 400; color: #666; font-size: 11px;">{{ section.current_semester
@@ -464,12 +503,12 @@
                         {% for student in students %}
                         <tr class="student-row" data-student-id="{{ student.student_id }}"
                             data-student-program="{{ student.program_id or '' }}"
-                            data-original-section="{{ 'left_college' if not student.is_active else (student.section_id or 'none') }}">
+                            data-student-semester="{{ student.current_semester or '' }}"
+                            data-original-section="{{ 'left_college' if student.status != 'active' else (student.section_id or 'none') }}">
                             <td class="col-sticky">{{ loop.index }}</td>
                             <td class="col-sticky-2">{{ student.roll_number }}</td>
                             <td class="col-sticky-3">
-                                <div style="font-weight: 500; color: #334155;">{{ student.first_name }} {{
-                                    student.last_name }}</div>
+                                <div style="font-weight: 500; color: #334155;">{{ student.name }}</div>
                                 {% if student.program %}
                                 <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">{{
                                     student.program.program_code or student.program.name }}</div>
@@ -477,7 +516,8 @@
                             </td>
 
                             {% for section in sections %}
-                            <td class="section-cell" data-section-program="{{ section.program_id or '' }}">
+                            <td class="section-cell section-column" data-semester="{{ section.current_semester }}"
+                                data-section-program="{{ section.program_id or '' }}">
                                 <label class="custom-radio-container">
                                     <input type="radio" name="section_{{ student.student_id }}"
                                         value="{{ section.section_id }}" class="custom-radio section-radio" {{ 'checked'
@@ -493,7 +533,7 @@
                                 <label class="custom-radio-container none-option" title="Unassign (Keep Active)">
                                     <input type="radio" name="section_{{ student.student_id }}" value="none"
                                         class="custom-radio section-radio" {{ 'checked' if not student.section_id and
-                                        student.is_active else '' }} onchange="markModified(this)">
+                                        student.status=='active' else '' }} onchange="markModified(this)">
                                 </label>
                             </td>
 
@@ -502,8 +542,8 @@
                                 style="background: rgba(255,0,0,0.05); border-left: 2px solid #fee;">
                                 <label class="custom-radio-container left-option" title="Left College (Inactive)">
                                     <input type="radio" name="section_{{ student.student_id }}" value="left_college"
-                                        class="custom-radio section-radio warning-radio" {{ 'checked' if not
-                                        student.is_active else '' }} onchange="markModified(this)">
+                                        class="custom-radio section-radio warning-radio" {{ 'checked' if student.status
+                                        !='active' else '' }} onchange="markModified(this)">
                                 </label>
                             </td>
                         </tr>
@@ -598,6 +638,8 @@
         function filterTable() {
             const searchText = document.getElementById('searchInput').value.toLowerCase();
             const viewFilter = document.querySelector('input[name="viewFilter"]:checked').value;
+            const semesterFilter = document.getElementById('semesterFilter').value;
+            const sectionFilter = document.getElementById('sectionFilter').value;
             const rows = document.querySelectorAll('.student-row');
 
             rows.forEach(row => {
@@ -605,15 +647,68 @@
                 const usn = row.querySelector('.col-sticky-2').textContent.toLowerCase();
                 const isUnassigned = row.dataset.originalSection === 'none';
 
+                // Get student's current semester (from data attribute if available)
+                const studentSemester = row.dataset.studentSemester || '';
+
+                // Get student's current section
+                const studentSection = row.dataset.originalSection;
+
                 const matchesSearch = name.includes(searchText) || usn.includes(searchText);
                 const matchesFilter = viewFilter === 'all' || (viewFilter === 'unassigned' && isUnassigned);
+                const matchesSemester = !semesterFilter || studentSemester === semesterFilter;
+                const matchesSection = !sectionFilter || studentSection === sectionFilter;
 
-                if (matchesSearch && matchesFilter) {
+                if (matchesSearch && matchesFilter && matchesSemester && matchesSection) {
                     row.style.display = '';
                 } else {
                     row.style.display = 'none';
                 }
             });
+        }
+
+        // Semester filter function
+        function filterBySemester() {
+            const semester = document.getElementById('semesterFilter').value;
+            const sectionSelect = document.getElementById('sectionFilter');
+
+            // Hide/show section columns in the table
+            const sectionColumns = document.querySelectorAll('.section-column');
+            sectionColumns.forEach(column => {
+                if (!semester || column.dataset.semester === semester) {
+                    column.style.display = '';
+                } else {
+                    column.style.display = 'none';
+                }
+            });
+
+            // Update section dropdown to show only sections from selected semester
+            if (semester) {
+                Array.from(sectionSelect.options).forEach(option => {
+                    if (option.value === '') {
+                        option.style.display = '';
+                    } else if (option.dataset.semester === semester) {
+                        option.style.display = '';
+                    } else {
+                        option.style.display = 'none';
+                    }
+                });
+                // Reset section filter if current selection doesn't match semester
+                if (sectionSelect.value && sectionSelect.selectedOptions[0].dataset.semester !== semester) {
+                    sectionSelect.value = '';
+                }
+            } else {
+                // Show all sections
+                Array.from(sectionSelect.options).forEach(option => {
+                    option.style.display = '';
+                });
+            }
+
+            filterTable();
+        }
+
+        // Section filter function
+        function filterBySection() {
+            filterTable();
         }
 
         // Change Detection

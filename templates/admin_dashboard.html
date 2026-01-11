@@ -41,6 +41,24 @@
                 </a>
             </li>
             <li class="admin-nav-item">
+                <a href="{{ url_for('admin_programs') }}">
+                    <i class="material-icons">school</i>
+                    <span>Programs</span>
+                </a>
+            </li>
+            <li class="admin-nav-item">
+                <a href="{{ url_for('admin_sections') }}">
+                    <i class="material-icons">class</i>
+                    <span>Sections</span>
+                </a>
+            </li>
+            <li class="admin-nav-item">
+                <a href="{{ url_for('admin_subjects') }}">
+                    <i class="material-icons">book</i>
+                    <span>Subjects</span>
+                </a>
+            </li>
+            <li class="admin-nav-item">
                 <a href="{{ url_for('admin_faculty') }}">
                     <i class="material-icons">school</i>
                     <span>Faculty</span>
@@ -53,33 +71,33 @@
                 </a>
             </li>
             <li class="admin-nav-item">
-                <a href="{{ url_for('admin_subjects') }}">
-                    <i class="material-icons">book</i>
-                    <span>Subjects</span>
+                <a href="{{ url_for('enrollment.admin_enrollment_page') }}">
+                    <i class="material-icons">how_to_reg</i>
+                    <span>Enrollment</span>
                 </a>
             </li>
             <li class="admin-nav-item">
-                <a href="{{ url_for('admin_sections') }}">
-                    <i class="material-icons">class</i>
-                    <span>Sections</span>
-                </a>
-            </li>
-            <li class="admin-nav-item">
-                <a href="{{ url_for('admin_programs') }}">
-                    <i class="material-icons">school</i>
-                    <span>Programs</span>
-                </a>
-            </li>
-            <li class="admin-nav-item">
-                <a href="{{ url_for('admin_import') }}">
-                    <i class="material-icons">upload_file</i>
-                    <span>Bulk Import</span>
+                <a href="{{ url_for('admin_fees_page') }}">
+                    <i class="material-icons">payments</i>
+                    <span>Fee Management</span>
                 </a>
             </li>
             <li class="admin-nav-item">
                 <a href="{{ url_for('admin_work_diary') }}">
                     <i class="material-icons">assignment</i>
                     <span>Work Diaries</span>
+                </a>
+            </li>
+            <li class="admin-nav-item">
+                <a href="{{ url_for('admin_holidays') }}">
+                    <i class="material-icons">event</i>
+                    <span>Manage Holidays</span>
+                </a>
+            </li>
+            <li class="admin-nav-item">
+                <a href="{{ url_for('admin_import') }}">
+                    <i class="material-icons">upload_file</i>
+                    <span>Bulk Import</span>
                 </a>
             </li>
             <li class="admin-nav-item">
@@ -132,85 +150,100 @@
             <!-- Quick Actions -->
             <h2 class="admin-section-title">Quick Actions</h2>
             <div class="admin-modules-grid">
-                <a href="{{ url_for('admin_assign_students') }}" class="admin-module-card">
-                    <div class="module-icon">
-                        <i class="material-icons">assignment_ind</i>
-                    </div>
-                    <h3>Assign Students</h3>
-                    <p>Assign students to sections & enroll in subjects</p>
-                </a>
-
-                <a href="{{ url_for('admin_faculty') }}" class="admin-module-card">
+                <a href="{{ url_for('admin_programs') }}" class="admin-module-card">
                     <div class="module-icon">
                         <i class="material-icons">school</i>
                     </div>
-                    <div class="module-title">Manage Faculty</div>
-                    <div class="module-desc">Add, edit, and manage faculty members, assign subjects, and handle HOD
-                        designations</div>
-                </a>
-
-                <a href="{{ url_for('admin_students') }}" class="admin-module-card">
-                    <div class="module-icon">
-                        <i class="material-icons">people</i>
-                    </div>
-                    <div class="module-title">Manage Students</div>
-                    <div class="module-desc">Add students, assign to batches and sections, manage enrollment</div>
-                </a>
-
-                <a href="{{ url_for('admin_subjects') }}" class="admin-module-card">
-                    <div class="module-icon">
-                        <i class="material-icons">book</i>
-                    </div>
-                    <div class="module-title">Manage Subjects</div>
-                    <div class="module-desc">Add subjects, units, chapters, and concepts for curriculum</div>
+                    <h3>Programs</h3>
+                    <p>Manage academic programs and departments</p>
                 </a>
 
                 <a href="{{ url_for('admin_sections') }}" class="admin-module-card">
                     <div class="module-icon">
                         <i class="material-icons">class</i>
                     </div>
-                    <h3>Sections & Classes</h3>
-                    <p>Manage academic sections</p>
+                    <h3>Sections</h3>
+                    <p>Manage class sections and class teachers</p>
                 </a>
 
-                <a href="{{ url_for('admin_programs') }}" class="admin-module-card">
+                <a href="{{ url_for('admin_subjects') }}" class="admin-module-card">
+                    <div class="module-icon">
+                        <i class="material-icons">book</i>
+                    </div>
+                    <h3>Subjects</h3>
+                    <p>Manage curriculum, units, and subjects</p>
+                </a>
+
+                <a href="{{ url_for('admin_faculty') }}" class="admin-module-card">
                     <div class="module-icon">
                         <i class="material-icons">school</i>
                     </div>
-                    <h3>Programs / Departments</h3>
-                    <p>Manage academic programs and departments</p>
+                    <h3>Faculty</h3>
+                    <p>Manage faculty profiles and subject allocations</p>
                 </a>
 
-                <a href="{{ url_for('admin_import') }}" class="admin-module-card">
+                <a href="{{ url_for('admin_students') }}" class="admin-module-card">
                     <div class="module-icon">
-                        <i class="material-icons">upload_file</i>
+                        <i class="material-icons">people</i>
                     </div>
-                    <div class="module-title">Bulk Import</div>
-                    <div class="module-desc">Import students and faculty from Excel/CSV files</div>
+                    <h3>Students</h3>
+                    <p>Manage student records and admissions</p>
+                </a>
+
+                <a href="{{ url_for('admin_assign_students') }}" class="admin-module-card">
+                    <div class="module-icon">
+                        <i class="material-icons">assignment_ind</i>
+                    </div>
+                    <h3>Assign Students</h3>
+                    <p>Assign students to sections and enroll in subjects</p>
+                </a>
+
+                <a href="{{ url_for('enrollment.admin_enrollment_page') }}" class="admin-module-card">
+                    <div class="module-icon">
+                        <i class="material-icons">how_to_reg</i>
+                    </div>
+                    <h3>Enrollment</h3>
+                    <p>Manage elective enrollments and virtual sections</p>
+                </a>
+
+                <a href="{{ url_for('admin_fees_page') }}" class="admin-module-card">
+                    <div class="module-icon">
+                        <i class="material-icons">payments</i>
+                    </div>
+                    <h3>Fee Management</h3>
+                    <p>Track payments, manage templates and defaulters</p>
                 </a>
 
                 <a href="{{ url_for('admin_work_diary') }}" class="admin-module-card">
                     <div class="module-icon">
                         <i class="material-icons">assignment</i>
                     </div>
-                    <div class="module-title">Work Diaries</div>
-                    <div class="module-desc">Review and approve faculty work diary entries</div>
+                    <h3>Work Diaries</h3>
+                    <p>Review and approve faculty work diary entries</p>
                 </a>
-                <!-- 
-                <a href="{{ url_for('admin_work_diary') }}" class="admin-module-card">
+
+                <a href="{{ url_for('admin_holidays') }}" class="admin-module-card">
                     <div class="module-icon">
-                        <i class="material-icons">fact_check</i>
+                        <i class="material-icons">event</i>
                     </div>
-                    <div class="module-title">Attendance Records</div>
-                    <div class="module-desc">View faculty work diaries and attendance records</div>
-                </a> -->
+                    <h3>Holidays</h3>
+                    <p>Set academic calendar and public holidays</p>
+                </a>
+
+                <a href="{{ url_for('admin_import') }}" class="admin-module-card">
+                    <div class="module-icon">
+                        <i class="material-icons">upload_file</i>
+                    </div>
+                    <h3>Bulk Import</h3>
+                    <p>Batch import students and faculty from Excel</p>
+                </a>
 
                 <a href="{{ url_for('public_home') }}" class="admin-module-card">
                     <div class="module-icon">
                         <i class="material-icons">public</i>
                     </div>
-                    <div class="module-title">Public Website</div>
-                    <div class="module-desc">View the department's public-facing website</div>
+                    <h3>Public Website</h3>
+                    <p>View the department's public landing page</p>
                 </a>
             </div>
         </div>

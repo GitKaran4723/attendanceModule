@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ 'Edit' if template else 'Add' }} Fee Template - BCA BUB Admin</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <meta name="theme-color" content="#1a237e">
+    <style>
+        .page-header {
+            background: var(--admin-gradient);
+            padding: 24px;
+            margin: -24px -24px 24px -24px;
+            border-radius: 0 0 var(--admin-radius-xl) var(--admin-radius-xl);
+            color: white;
+            text-align: center;
+        }
+
+        .form-container {
+            background: var(--admin-card-bg);
+            border-radius: var(--admin-radius-lg);
+            padding: 32px;
+            box-shadow: var(--admin-shadow-md);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--admin-text-primary);
+            margin-bottom: 8px;
+        }
+
+        .required {
+            color: #ef4444;
+        }
+
+        .form-input,
+        .form-select {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: var(--admin-radius-md);
+            font-size: 16px;
+            box-sizing: border-box;
+            transition: all 0.3s;
+        }
+
+        .form-input:focus,
+        .form-select:focus {
+            outline: none;
+            border-color: var(--admin-primary);
+            box-shadow: 0 0 0 3px rgba(26, 35, 126, 0.1);
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 16px;
+            margin-top: 32px;
+            padding-top: 24px;
+            border-top: 1px solid #f0f0f0;
+        }
+
+        .btn-form-primary {
+            flex: 1;
+            padding: 16px 24px;
+            background: var(--admin-accent-gradient);
+            color: white;
+            border: none;
+            border-radius: var(--admin-radius-md);
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.3s;
+            box-shadow: 0 4px 12px rgba(255, 111, 0, 0.3);
+        }
+
+        .btn-form-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 111, 0, 0.4);
+        }
+
+        .btn-form-secondary {
+            flex: 1;
+            padding: 16px 24px;
+            background: white;
+            color: var(--admin-primary);
+            border: 2px solid var(--admin-primary);
+            border-radius: var(--admin-radius-md);
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.3s;
+        }
+
+        .btn-form-secondary:hover {
+            background: var(--admin-primary);
+            color: white;
+        }
+
+        .help-text {
+            font-size: 12px;
+            color: #666;
+            margin-top: 4px;
+        }
+    </style>
+</head>
+
+<body class="admin-page">
+    <header class="admin-app-bar">
+        <button class="menu-btn" onclick="location.href='{{ url_for('admin_fee_templates') }}'">
+            <i class="material-icons">arrow_back</i>
+        </button>
+        <h1 class="app-title">{{ 'Edit' if template else 'Add' }} Fee Template</h1>
+        <button class="icon-btn" onclick="location.href='{{ url_for('logout') }}'">
+            <i class="material-icons">logout</i>
+        </button>
+    </header>
+
+    <main class="admin-main">
+        <div class="admin-container">
+            <div class="page-header">
+                <h2>{{ '✏️ Edit' if template else '➕ Add' }} Fee Template</h2>
+                <p>{{ 'Update base fees for this template' if template else 'Set base fees for a seat type and quota' }}
+                </p>
+            </div>
+
+            <div class="form-container">
+                <form method="POST">
+                    <div class="form-group">
+                        <label class="form-label">Academic Year <span class="required">*</span></label>
+                        <input type="text" name="academic_year" class="form-input"
+                            value="{{ template.academic_year if template else '' }}" placeholder="2025-2026"
+                            pattern="\d{4}-\d{4}" required {{ 'readonly style="background: #f5f5f5;"' if template
+                            else '' }}>
+                        <div class="help-text">Current year when fees will be paid (e.g., 2025-2026)</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Batch Year <span class="required">*</span></label>
+                        <input type="text" name="batch_year" class="form-input"
+                            value="{{ template.batch_year if template else '' }}" placeholder="2024-2025"
+                            pattern="\d{4}-\d{4}" required {{ 'readonly style="background: #f5f5f5;"' if template
+                            else '' }}>
+                        <div class="help-text">Year when batch joined (e.g., 2024-2025 for 2024 batch)</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Seat Type <span class="required">*</span></label>
+                        <select name="seat_type" class="form-select" required id="seatTypeSelect"
+                            {{ 'disabled style="background: #f5f5f5;"' if template else '' }}
+                            onchange="toggleQuotaType()">
+                            <option value="">Select Seat Type</option>
+                            <option value="GOVERNMENT" {{ 'selected' if template and template.seat_type=='GOVERNMENT'
+                                else '' }}>Government Seat</option>
+                            <option value="MANAGEMENT" {{ 'selected' if template and template.seat_type=='MANAGEMENT'
+                                else '' }}>Management Seat</option>
+                        </select>
+                        {% if template %}
+                        <input type="hidden" name="seat_type" value="{{ template.seat_type }}">
+                        {% endif %}
+                    </div>
+
+                    <div class="form-group" id="quotaTypeGroup">
+                        <label class="form-label">Quota Type <span class="required" id="quotaRequired">*</span></label>
+                        <select name="quota_type" class="form-select" id="quotaTypeSelect"
+                            {{ 'disabled style="background: #f5f5f5;"' if template else '' }}>
+                            <option value="">Select Quota Type</option>
+                            <option value="MERIT" {{ 'selected' if template and template.quota_type=='MERIT' else '' }}>
+                                Merit (General category meritorious)</option>
+                            <option value="CATEGORY" {{ 'selected' if template and template.quota_type=='CATEGORY'
+                                else '' }}>Category (Reserved categories)</option>
+                        </select>
+                        <div class="help-text">Only for Government seats. Leave blank for Management.</div>
+                        {% if template and template.quota_type %}
+                        <input type="hidden" name="quota_type" value="{{ template.quota_type }}">
+                        {% endif %}
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Base Fees (₹) <span class="required">*</span></label>
+                        <input type="number" name="base_fees" class="form-input"
+                            value="{{ template.base_fees if template else '' }}" placeholder="25000" min="0" step="1"
+                            required>
+                        <div class="help-text">Enter the base fee amount in rupees</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Description</label>
+                        <textarea name="description" class="form-input" rows="3"
+                            placeholder="Optional description for this template">{{ template.description if template else '' }}</textarea>
+                    </div>
+
+                    <div class="btn-group">
+                        <button type="button" class="btn-form-secondary"
+                            onclick="location.href='{{ url_for('admin_fee_templates') }}'">
+                            <i class="material-icons">close</i>
+                            Cancel
+                        </button>
+                        <button type="submit" class="btn-form-primary">
+                            <i class="material-icons">{{ 'save' if template else 'add' }}</i>
+                            {{ 'Update Template' if template else 'Create Template' }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </main>
+
+    <nav class="admin-bottom-nav">
+        <a href="{{ url_for('admin_dashboard') }}">
+            <i class="material-icons">dashboard</i>
+            <span>Dashboard</span>
+        </a>
+        <a href="{{ url_for('admin_faculty') }}">
+            <i class="material-icons">school</i>
+            <span>Faculty</span>
+        </a>
+        <a href="{{ url_for('admin_students') }}">
+            <i class="material-icons">people</i>
+            <span>Students</span>
+        </a>
+        <a href="{{ url_for('admin_subjects') }}">
+            <i class="material-icons">menu_book</i>
+            <span>Subjects</span>
+        </a>
+    </nav>
+
+    <script>
+        function toggleQuotaType() {
+            const seatType = document.getElementById('seatTypeSelect').value;
+            const quotaGroup = document.getElementById('quotaTypeGroup');
+            const quotaSelect = document.getElementById('quotaTypeSelect');
+            const quotaRequired = document.getElementById('quotaRequired');
+
+            if (seatType === 'MANAGEMENT') {
+                quotaGroup.style.display = 'none';
+                quotaSelect.required = false;
+                quotaSelect.value = '';
+            } else if (seatType === 'GOVERNMENT') {
+                quotaGroup.style.display = 'block';
+                quotaSelect.required = true;
+            }
+        }
+
+        // Initialize on page load
+        toggleQuotaType();
+    </script>
+</body>
+
+</html>

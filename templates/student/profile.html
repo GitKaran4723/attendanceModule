@@ -174,7 +174,7 @@
         <div class="profile-avatar">
             <i class="fas fa-user"></i>
         </div>
-        <h2 style="margin: 0;">{{ student.first_name }} {{ student.last_name }}</h2>
+        <h2 style="margin: 0;">{{ student.name }}</h2>
         <p style="margin: 5px 0 0; opacity: 0.8;">{{ student.roll_number }}</p>
     </div>
 
@@ -240,13 +240,13 @@
             <span class="nav-icon"><i class="fas fa-home"></i></span>
             Home
         </a>
-        <a href="{{ url_for('student_dashboard') }}" class="nav-item">
-            <span class="nav-icon"><i class="fas fa-chart-pie"></i></span>
-            Analytics
+        <a href="{{ url_for('student_internal_marks') }}" class="nav-item">
+            <span class="nav-icon"><i class="fas fa-clipboard-list"></i></span>
+            Internal Marks
         </a>
-        <a href="#" class="nav-item">
-            <span class="nav-icon"><i class="fas fa-bell"></i></span>
-            Notice
+        <a href="{{ url_for('student_fees_page') }}" class="nav-item">
+            <span class="nav-icon"><i class="fas fa-wallet"></i></span>
+            Fees
         </a>
         <a href="{{ url_for('student_profile') }}" class="nav-item active">
             <span class="nav-icon"><i class="fas fa-user"></i></span>

@@ -240,6 +240,23 @@
             </div>
 
             <div class="form-container">
+                <!-- Flash Messages -->
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                <div class="flash-messages" style="margin-bottom: 24px;">
+                    {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}"
+                        style="padding: 12px 16px; border-radius: 8px; margin-bottom: 8px; 
+                               background: {{ 'rgba(34, 197, 94, 0.1)' if category == 'success' else 'rgba(239, 68, 68, 0.1)' }};
+                               color: {{ '#16a34a' if category == 'success' else '#dc2626' }};
+                               border: 1px solid {{ 'rgba(34, 197, 94, 0.2)' if category == 'success' else 'rgba(239, 68, 68, 0.2)' }};">
+                        {{ message }}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                {% endwith %}
+
                 {% if error %}
                 <div class="error-message">
                     <i class="material-icons">error</i>
@@ -276,16 +293,11 @@
 
                         <div class="form-row">
                             <div class="form-group">
-                                <label class="form-label">First Name <span class="required">*</span></label>
-                                <input type="text" name="first_name" class="form-input"
-                                    value="{{ student.first_name if student else '' }}" required
-                                    placeholder="First Name">
-                            </div>
-
-                            <div class="form-group">
-                                <label class="form-label">Last Name <span class="required">*</span></label>
-                                <input type="text" name="last_name" class="form-input"
-                                    value="{{ student.last_name if student else '' }}" required placeholder="Last Name">
+                                <label class="form-label">Full Name <small>(As in 10th Marks Card)</small> <span
+                                        class="required">*</span></label>
+                                <input type="text" name="name" class="form-input"
+                                    value="{{ student.name if student else '' }}" required
+                                    placeholder="Enter full name as in 10th marksheet">
                             </div>
                         </div>
 
@@ -311,6 +323,18 @@
                             Academic Information
                         </div>
 
+                        {% if student and student.status != 'active' %}
+                        <!-- Student has left - show message instead of academic form -->
+                        <div
+                            style="background: linear-gradient(135deg, rgba(156, 163, 175, 0.1) 0%, rgba(107, 114, 128, 0.1) 100%); border: 2px solid rgba(156, 163, 175, 0.3); border-radius: 12px; padding: 24px; text-align: center;">
+                            <i class="material-icons"
+                                style="font-size: 48px; color: #6b7280; margin-bottom: 12px;">school_off</i>
+                            <h3 style="margin: 0 0 8px 0; color: #374151; font-size: 18px;">Student Has Left</h3>
+                            <p style="margin: 0; color: #6b7280; font-size: 14px;">Academic details are not required for
+                                students who have left the institution.</p>
+                        </div>
+                        {% else %}
+                        <!-- Active student - show academic form -->
                         <div class="form-row">
                             <div class="form-group">
                                 <label class="form-label">Program <span class="required">*</span></label>
@@ -344,9 +368,23 @@
                                 <label class="form-label">Admission Year</label>
                                 <input type="number" name="admission_year" class="form-input"
                                     value="{{ student.admission_year if student else '' }}" placeholder="2024"
-                                    min="2000" max="2100">
+                                    min="2000" max="2100" id="admissionYearInput">
                             </div>
 
+                            <div class="form-group">
+                                <label class="form-label">Joining Academic Year <small style="color: #666;">(for
+                                        fees)</small></label>
+                                <input type="text" name="joining_academic_year" class="form-input"
+                                    value="{{ student.joining_academic_year if student else '' }}"
+                                    placeholder="2024-2025" pattern="\d{4}-\d{4}"
+                                    title="Format: YYYY-YYYY (e.g., 2024-2025)" id="joiningYearInput">
+                                <small style="color: #666; font-size: 12px; display: block; margin-top: 4px;">
+                                    Auto-filled from Admission Year. Format: YYYY-YYYY
+                                </small>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
                             <div class="form-group">
                                 <label class="form-label">Current Semester</label>
                                 <select name="current_semester" class="form-select">
@@ -359,10 +397,207 @@
                                     {% endfor %}
                                 </select>
                             </div>
+
+                            <div class="form-group">
+                                <label class="form-label">Current Academic Year <small style="color: #666;">(for
+                                        reports)</small></label>
+                                <input type="text" name="current_academic_year" class="form-input"
+                                    value="{{ student.current_academic_year if student else '' }}"
+                                    placeholder="2024-2025" pattern="\d{4}-\d{4}"
+                                    title="Format: YYYY-YYYY (e.g., 2024-2025)" id="currentYearInput">
+                                <small style="color: #666; font-size: 12px; display: block; margin-top: 4px;">
+                                    The year the student is currently studying in.
+                                </small>
+                            </div>
                         </div>
+                        {% endif %}
                     </div>
 
+                    <!-- Fee Information -->
+                    <div class="form-section">
+                        <div class="section-title">
+                            <i class="material-icons">account_balance_wallet</i>
+                            Fee Information
+                        </div>
+
+                        {% if student and student.status != 'active' %}
+                        <!-- Student has left - show message instead of fee form -->
+                        <div
+                            style="background: linear-gradient(135deg, rgba(156, 163, 175, 0.1) 0%, rgba(107, 114, 128, 0.1) 100%); border: 2px solid rgba(156, 163, 175, 0.3); border-radius: 12px; padding: 24px; text-align: center;">
+                            <i class="material-icons"
+                                style="font-size: 48px; color: #6b7280; margin-bottom: 12px;">person_off</i>
+                            <h3 style="margin: 0 0 8px 0; color: #374151; font-size: 18px;">Student Has Left</h3>
+                            <p style="margin: 0; color: #6b7280; font-size: 14px;">Fee details are not required for
+                                students who have left the institution.</p>
+                        </div>
+                        {% else %}
+                        <!-- Active student - show fee form -->
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">Category <span class="required">*</span></label>
+                                <select name="category" class="form-select" id="categorySelect" required
+                                    onchange="autoSuggestSeatType()">
+                                    <option value="">Select Category</option>
+                                    <option value="GENERAL" {{ 'selected' if student and student.category=='GENERAL'
+                                        else '' }}>General</option>
+                                    <option value="SC" {{ 'selected' if student and student.category=='SC' else '' }}>SC
+                                    </option>
+                                    <option value="ST" {{ 'selected' if student and student.category=='ST' else '' }}>ST
+                                    </option>
+                                    <option value="CAT1" {{ 'selected' if student and student.category=='CAT1' else ''
+                                        }}>CAT1</option>
+                                    <option value="2A" {{ 'selected' if student and student.category=='2A' else '' }}>2A
+                                    </option>
+                                    <option value="2B" {{ 'selected' if student and student.category=='2B' else '' }}>2B
+                                    </option>
+                                    <option value="3A" {{ 'selected' if student and student.category=='3A' else '' }}>3A
+                                    </option>
+                                    <option value="3B" {{ 'selected' if student and student.category=='3B' else '' }}>3B
+                                    </option>
+                                    <option value="OTHER" {{ 'selected' if student and student.category=='OTHER' else ''
+                                        }}>Other</option>
+                                </select>
+                                <small style="color: #666; font-size: 12px; display: block; margin-top: 4px;">
+                                    Student's caste category
+                                </small>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label">Seat Type <span class="required">*</span></label>
+                                <select name="seat_type" class="form-select" id="seatTypeSelect" required
+                                    onchange="toggleQuotaType()">
+                                    <option value="">Select Seat Type</option>
+                                    <option value="GOVERNMENT" {{ 'selected' if student and
+                                        student.seat_type=='GOVERNMENT' else '' }}>Government Seat</option>
+                                    <option value="MANAGEMENT" {{ 'selected' if student and
+                                        student.seat_type=='MANAGEMENT' else '' }}>Management Seat</option>
+                                </select>
+                                <small style="color: #666; font-size: 12px; display: block; margin-top: 4px;">
+                                    Auto-suggested based on category
+                                </small>
+                            </div>
+                        </div>
+
+                        <div class="form-row" id="quotaTypeRow">
+                            <div class="form-group">
+                                <label class="form-label">Quota Type <span class="required"
+                                        id="quotaRequired">*</span></label>
+                                <select name="quota_type" class="form-select" id="quotaTypeSelect">
+                                    <option value="">Select Quota Type</option>
+                                    <option value="MERIT" {{ 'selected' if student and student.quota_type=='MERIT'
+                                        else '' }}>Merit (General category meritorious)</option>
+                                    <option value="CATEGORY" {{ 'selected' if student and student.quota_type=='CATEGORY'
+                                        else '' }}>Category (Reserved categories)</option>
+                                </select>
+                                <small style="color: #666; font-size: 12px; display: block; margin-top: 4px;">
+                                    Only for Government seats
+                                </small>
+                            </div>
+
+                            <div class="form-group">
+                                <!-- Empty for spacing -->
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Additional Fees</label>
+                            <div id="additionalFeesContainer">
+                                <!-- Additional fees will be added here dynamically -->
+                            </div>
+                            <button type="button" class="admin-btn admin-btn-secondary" onclick="addAdditionalFee()"
+                                style="margin-top: 8px;">
+                                <i class="material-icons">add</i> Add Additional Fee
+                            </button>
+                            <small style="color: #666; font-size: 12px; display: block; margin-top: 8px;">
+                                Add fees like "Other State", "Hostel", etc. Base fees are auto-assigned from templates.
+                            </small>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Current Fee Structure (from Database) -->
+                    {% if student %}
+                    {% set current_fee = student.fee_structures.filter_by(academic_year=student.current_academic_year,
+                    is_deleted=False).first() %}
+                    {% if current_fee %}
+                    <div class="form-section"
+                        style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(168, 85, 247, 0.05) 100%); border: 2px solid rgba(99, 102, 241, 0.2); border-radius: 12px; padding: 24px;">
+                        <div class="section-title" style="border-bottom-color: rgba(99, 102, 241, 0.3);">
+                            <i class="material-icons" style="color: #6366f1;">receipt</i>
+                            Current Fee Structure in Database
+                        </div>
+
+                        <div style="background: white; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
+                            <div
+                                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 16px;">
+                                <div>
+                                    <div style="font-size: 12px; color: #666; margin-bottom: 4px;">Academic Year</div>
+                                    <div style="font-size: 16px; font-weight: 600; color: #1a237e;">{{
+                                        current_fee.academic_year }}</div>
+                                </div>
+                                <div>
+                                    <div style="font-size: 12px; color: #666; margin-bottom: 4px;">Seat Type</div>
+                                    <div style="font-size: 16px; font-weight: 600; color: #1a237e;">{{
+                                        current_fee.student.seat_type }}</div>
+                                </div>
+                                <div>
+                                    <div style="font-size: 12px; color: #666; margin-bottom: 4px;">Quota</div>
+                                    <div style="font-size: 16px; font-weight: 600; color: #1a237e;">{{
+                                        current_fee.student.quota_type or 'N/A' }}</div>
+                                </div>
+                            </div>
+
+                            <div style="border-top: 1px solid #e0e0e0; padding-top: 16px;">
+                                <div
+                                    style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px;">
+                                    <div>
+                                        <div style="font-size: 12px; color: #666;">Base Fees</div>
+                                        <div style="font-size: 18px; font-weight: 700; color: #16a34a;">₹{{
+                                            "{:,.0f}".format(current_fee.base_fees) }}</div>
+                                    </div>
+                                    {% if current_fee.carry_forward and current_fee.carry_forward > 0 %}
+                                    <div>
+                                        <div style="font-size: 12px; color: #666;">Carry Forward</div>
+                                        <div style="font-size: 18px; font-weight: 700; color: #f59e0b;">₹{{
+                                            "{:,.0f}".format(current_fee.carry_forward) }}</div>
+                                    </div>
+                                    {% endif %}
+                                    <div>
+                                        <div style="font-size: 12px; color: #666;">Total Fees</div>
+                                        <div style="font-size: 20px; font-weight: 700; color: #6366f1;">₹{{
+                                            "{:,.0f}".format(current_fee.total_fees) }}</div>
+                                    </div>
+                                    <div>
+                                        <div style="font-size: 12px; color: #666;">Balance</div>
+                                        <div style="font-size: 18px; font-weight: 700; color: #ef4444;">₹{{
+                                            "{:,.0f}".format(current_fee.calculate_outstanding()) }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div
+                            style="display: flex; gap: 12px; align-items: center; background: rgba(239, 68, 68, 0.05); padding: 16px; border-radius: 8px; border: 1px solid rgba(239, 68, 68, 0.2);">
+                            <i class="material-icons" style="color: #ef4444;">warning</i>
+                            <div style="flex: 1;">
+                                <div style="font-weight: 600; color: #ef4444; margin-bottom: 4px;">Delete Fee Structure?
+                                </div>
+                                <div style="font-size: 13px; color: #666;">If the fee information above is incorrect,
+                                    you can delete it. The system will recreate it from the template when you save the
+                                    form.</div>
+                            </div>
+                            <button type="button" onclick="deleteFeeStructure('{{ current_fee.fee_structure_id }}')"
+                                style="padding: 10px 20px; background: #ef4444; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 6px;">
+                                <i class="material-icons" style="font-size: 18px;">delete</i>
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% endif %}
+
                     <!-- Contact Information -->
+
                     <div class="form-section">
                         <div class="section-title">
                             <i class="material-icons">home</i>
@@ -423,6 +658,13 @@
                             <i class="material-icons">close</i>
                             Cancel
                         </button>
+                        {% if student %}
+                        <button type="button" class="btn-form-secondary" onclick="openPasswordResetModal()"
+                            style="background: rgba(239, 68, 68, 0.1); color: #ef4444; border-color: #ef4444;">
+                            <i class="material-icons">lock_reset</i>
+                            Reset Password
+                        </button>
+                        {% endif %}
                         <button type="submit" class="btn-form-primary">
                             <i class="material-icons">{{ 'save' if student else 'add' }}</i>
                             {{ 'Update Student' if student else 'Add Student' }}
@@ -453,6 +695,38 @@
         </a>
     </nav>
 
+    <!-- Password Reset Modal -->
+    {% if student %}
+    <div id="passwordResetModal"
+        style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center;">
+        <div
+            style="background: white; border-radius: 16px; padding: 32px; max-width: 400px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+            <h3 style="margin: 0 0 8px 0; color: #1a237e; font-size: 20px;">Reset Student Password</h3>
+            <p style="margin: 0 0 24px 0; color: #666; font-size: 14px;">Enter a new password for {{ student.name }}</p>
+
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #333; font-size: 14px;">New
+                    Password</label>
+                <input type="password" id="newPasswordInput" placeholder="Enter new password (min 6 characters)"
+                    style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; box-sizing: border-box;">
+                <small style="color: #666; font-size: 12px; display: block; margin-top: 4px;">Minimum 6 characters
+                    required</small>
+            </div>
+
+            <div style="display: flex; gap: 12px;">
+                <button onclick="closePasswordResetModal()"
+                    style="flex: 1; padding: 12px; background: #f5f5f5; color: #333; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">
+                    Cancel
+                </button>
+                <button onclick="resetPassword()"
+                    style="flex: 1; padding: 12px; background: linear-gradient(135deg, #ff6f00 0%, #ff8f00 100%); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">
+                    Reset Password
+                </button>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <script>
         // Filter sections based on selected program
         document.getElementById('programSelect').addEventListener('change', function () {
@@ -478,6 +752,241 @@
 
         // Trigger on load to filter sections
         document.getElementById('programSelect').dispatchEvent(new Event('change'));
+
+        // Auto-fill joining and current academic year from admission year
+        document.getElementById('admissionYearInput').addEventListener('input', function () {
+            const admissionYear = parseInt(this.value);
+            if (admissionYear && admissionYear >= 2000 && admissionYear <= 2100) {
+                const yearRange = `${admissionYear}-${admissionYear + 1}`;
+                document.getElementById('joiningYearInput').value = yearRange;
+                document.getElementById('currentYearInput').value = yearRange;
+            }
+        });
+
+        // Filter sections by selected program
+        function filterSectionsByProgram() {
+            const programSelect = document.getElementById('programSelect');
+            const sectionSelect = document.getElementById('sectionSelect');
+            const selectedProgram = programSelect.value;
+
+            // Get all section options
+            const allOptions = sectionSelect.querySelectorAll('option');
+
+            // Show/hide sections based on program
+            allOptions.forEach(option => {
+                if (option.value === '') {
+                    // Always show the "Select Section" option
+                    option.style.display = 'block';
+                } else {
+                    const sectionProgram = option.getAttribute('data-program');
+                    if (!selectedProgram || sectionProgram === selectedProgram) {
+                        option.style.display = 'block';
+                    } else {
+                        option.style.display = 'none';
+                    }
+                }
+            });
+
+            // Reset section selection if current selection is not visible
+            const currentSection = sectionSelect.value;
+            if (currentSection) {
+                const currentOption = sectionSelect.querySelector(`option[value="${currentSection}"]`);
+                if (currentOption && currentOption.style.display === 'none') {
+                    sectionSelect.value = '';
+                }
+            }
+        }
+
+        // Add event listener to program select
+        document.getElementById('programSelect').addEventListener('change', filterSectionsByProgram);
+
+        // Initialize on page load
+        filterSectionsByProgram();
+
+        // Fee Management Functions
+        let additionalFeeCounter = 0;
+
+        function autoSuggestSeatType() {
+            const category = document.getElementById('categorySelect').value;
+            const seatTypeSelect = document.getElementById('seatTypeSelect');
+            const quotaTypeSelect = document.getElementById('quotaTypeSelect');
+
+            // Auto-suggest based on category
+            if (category === 'GENERAL') {
+                seatTypeSelect.value = 'GOVERNMENT';
+                quotaTypeSelect.value = 'MERIT';
+            } else if (['SC', 'ST', '2A', '2B', '3A', '3B', 'CAT1'].includes(category)) {
+                seatTypeSelect.value = 'GOVERNMENT';
+                quotaTypeSelect.value = 'CATEGORY';
+            } else if (category === 'OTHER') {
+                seatTypeSelect.value = 'MANAGEMENT';
+                quotaTypeSelect.value = '';
+            }
+
+            toggleQuotaType();
+        }
+
+        function toggleQuotaType() {
+            const seatType = document.getElementById('seatTypeSelect').value;
+            const quotaRow = document.getElementById('quotaTypeRow');
+            const quotaSelect = document.getElementById('quotaTypeSelect');
+            const quotaRequired = document.getElementById('quotaRequired');
+
+            if (seatType === 'MANAGEMENT') {
+                quotaRow.style.display = 'none';
+                quotaSelect.required = false;
+                quotaSelect.value = '';
+            } else if (seatType === 'GOVERNMENT') {
+                quotaRow.style.display = 'flex';
+                quotaSelect.required = true;
+            }
+        }
+
+        function addAdditionalFee(description = '', amount = '') {
+            additionalFeeCounter++;
+            const container = document.getElementById('additionalFeesContainer');
+
+            const feeRow = document.createElement('div');
+            feeRow.className = 'form-row';
+            feeRow.id = `additionalFee_${additionalFeeCounter}`;
+            feeRow.style.marginBottom = '12px';
+            feeRow.style.alignItems = 'center';
+
+            feeRow.innerHTML = `
+                <div class="form-group" style="flex: 2; margin-bottom: 0;">
+                    <input type="text" name="additional_fee_desc[]" class="form-input" 
+                        placeholder="Description (e.g., Other State)" value="${description}" required>
+                </div>
+                <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                    <input type="number" name="additional_fee_amount[]" class="form-input" 
+                        placeholder="Amount" value="${amount}" min="0" step="100" required>
+                </div>
+                <button type="button" class="btn-action btn-delete" 
+                    onclick="removeAdditionalFee(${additionalFeeCounter})"
+                    style="padding: 10px; border-radius: 8px; border: none; background: rgba(239, 68, 68, 0.08); color: #ef4444; cursor: pointer;">
+                    <i class="material-icons" style="font-size: 20px;">delete</i>
+                </button>
+            `;
+
+            container.appendChild(feeRow);
+        }
+
+        function removeAdditionalFee(id) {
+            const feeRow = document.getElementById(`additionalFee_${id}`);
+            if (feeRow) {
+                feeRow.remove();
+            }
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function () {
+            toggleQuotaType();
+
+            // Load existing additional fees if editing
+            {% if student %}
+            {% set current_fee = student.fee_structures.filter_by(academic_year = student.current_academic_year, is_deleted = False).first() %}
+            {% if current_fee and current_fee.additional_fees %}
+            (function () {
+                try {
+                    const additionalFeesRaw = {{ current_fee.additional_fees | tojson
+                }};
+            const feeList = typeof additionalFeesRaw === 'string' ? JSON.parse(additionalFeesRaw) : additionalFeesRaw;
+
+            if (Array.isArray(feeList)) {
+                feeList.forEach(fee => {
+                    addAdditionalFee(fee.name || fee.description || '', fee.amount || 0);
+                });
+            }
+        } catch (e) {
+            console.error('Error loading additional fees:', e);
+        }
+                    }) ();
+        {% endif %}
+        {% endif %}
+        });
+
+        // Password Reset Functions
+        {% if student %}
+        function openPasswordResetModal() {
+            document.getElementById('passwordResetModal').style.display = 'flex';
+            document.getElementById('newPasswordInput').value = '';
+            document.getElementById('newPasswordInput').focus();
+        }
+
+        function closePasswordResetModal() {
+            document.getElementById('passwordResetModal').style.display = 'none';
+        }
+
+        async function resetPassword() {
+            const newPassword = document.getElementById('newPasswordInput').value;
+
+            if (!newPassword || newPassword.length < 6) {
+                alert('Password must be at least 6 characters long');
+                return;
+            }
+
+            if (!confirm('Are you sure you want to reset the password for {{ student.name }}?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/admin/students/{{ student.student_id }}/reset-password', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: 'new_password=' + encodeURIComponent(newPassword)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert('Password reset successfully!');
+                    closePasswordResetModal();
+                } else {
+                    alert('Error: ' + result.message);
+                }
+            } catch (error) {
+                alert('Failed to reset password. Please try again.');
+                console.error(error);
+            }
+        }
+
+        // Close modal on Escape key
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') {
+                closePasswordResetModal();
+            }
+        });
+        {% endif %}
+
+        // Delete Fee Structure
+        async function deleteFeeStructure(feeStructureId) {
+            if (!confirm('Are you sure you want to delete this fee structure?\\n\\nThis will remove all fee data for this student. The system will recreate it from the template when you save the form.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/admin/fee-structure/${feeStructureId}/delete`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert('Fee structure deleted successfully!\\n\\nPlease save the form to recreate it from the template.');
+                    location.reload(); // Reload to show updated state
+                } else {
+                    alert('Error: ' + (result.message || 'Failed to delete fee structure'));
+                }
+            } catch (error) {
+                alert('Failed to delete fee structure. Please try again.');
+                console.error(error);
+            }
+        }
     </script>
 </body>
 

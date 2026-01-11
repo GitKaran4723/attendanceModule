@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Assessment</title>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary-color: #6200ea;
+            --primary-light: #b388ff;
+            --bg-color: #f5f5f7;
+            --surface-color: #ffffff;
+            --text-primary: #1d1d1f;
+            --text-secondary: #86868b;
+            --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            --border-radius: 16px;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding-bottom: 40px;
+            color: var(--text-primary);
+        }
+
+        .app-bar {
+            background: var(--surface-color);
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+        }
+
+        .page-title {
+            font-size: 20px;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .form-container {
+            padding: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        input,
+        select,
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 12px;
+            font-size: 15px;
+            font-family: 'Roboto', sans-serif;
+            box-sizing: border-box;
+        }
+
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .submit-btn {
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
+            color: white;
+            border: none;
+            padding: 16px;
+            border-radius: var(--border-radius);
+            font-weight: 700;
+            font-size: 16px;
+            width: 100%;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(98, 0, 234, 0.3);
+        }
+
+        .submit-btn:active {
+            transform: scale(0.98);
+        }
+
+        .hint {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+    </style>
+</head>
+
+<body>
+    <header class="app-bar">
+        <h1 class="page-title">Create Assessment</h1>
+        <i class="material-icons-round" onclick="history.back()"
+            style="color: var(--text-secondary); cursor: pointer;">close</i>
+    </header>
+
+    <div class="form-container">
+        <form method="POST" action="{{ url_for('faculty_create_assessment') }}">
+            <div class="form-group">
+                <label for="subject_id">Subject *</label>
+                <select name="subject_id" id="subject_id" required onchange="updateSections()">
+                    <option value="">Select Subject</option>
+                    {% set unique_subjects = [] %}
+                    {% for allocation in allocations %}
+                    {% if allocation.subject_id not in unique_subjects %}
+                    <option value="{{ allocation.subject_id }}">
+                        {{ allocation.subject.subject_name }} ({{ allocation.subject.subject_code }})
+                    </option>
+                    {% set _ = unique_subjects.append(allocation.subject_id) %}
+                    {% endif %}
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="section_id">Section *</label>
+                <select name="section_id" id="section_id" required>
+                    <option value="">Select Subject First</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="test_name">Assessment Name *</label>
+                <input type="text" name="test_name" id="test_name" placeholder="e.g., Mid-Term Test 1" required>
+            </div>
+
+            <div class="form-group">
+                <label for="component_type">Component Type *</label>
+                <select name="component_type" id="component_type" required>
+                    <option value="test">Test</option>
+                    <option value="assignment">Assignment</option>
+                    <option value="project">Project</option>
+                    <option value="quiz">Quiz</option>
+                    <option value="presentation">Presentation</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="max_marks">Maximum Marks *</label>
+                <input type="number" name="max_marks" id="max_marks" placeholder="e.g., 20" required min="1" step="0.5">
+            </div>
+
+            <div class="form-group">
+                <label for="weightage">Weightage (%)</label>
+                <input type="number" name="weightage" id="weightage" placeholder="e.g., 10" min="0" max="100"
+                    step="0.5">
+                <div class="hint">Percentage contribution to final marks (optional)</div>
+            </div>
+
+            <div class="form-group">
+                <label for="test_date">Date</label>
+                <input type="date" name="test_date" id="test_date">
+            </div>
+
+            <div class="form-group">
+                <label for="description">Description</label>
+                <textarea name="description" id="description"
+                    placeholder="Additional details about this assessment..."></textarea>
+            </div>
+
+            <button type="submit" class="submit-btn">
+                <i class="material-icons-round" style="vertical-align: middle;">save</i>
+                Create Assessment
+            </button>
+        </form>
+    </div>
+
+    <script>
+        // Sections mapping by subject ID
+        const subjectSections = {{ subject_sections | tojson }};
+
+        function updateSections() {
+            const subjectSelect = document.getElementById('subject_id');
+            const sectionSelect = document.getElementById('section_id');
+            const selectedSubject = subjectSelect.value;
+
+            console.log('Selected Subject ID:', selectedSubject);
+
+            // Clear existing options
+            sectionSelect.innerHTML = '<option value="">Select Section</option>';
+
+            if (!selectedSubject) {
+                sectionSelect.innerHTML = '<option value="">Select Subject First</option>';
+                return;
+            }
+
+            // Get sections from the mapping
+            const sections = subjectSections[selectedSubject] || [];
+            console.log('Available Sections for Subject:', sections);
+
+            if (sections.length === 0) {
+                const option = document.createElement('option');
+                option.value = "";
+                option.textContent = "No sections assigned to you";
+                sectionSelect.appendChild(option);
+            } else {
+                sections.forEach(section => {
+                    const option = document.createElement('option');
+                    option.value = section.section_id;
+                    option.textContent = section.section_name || "General / No Section";
+                    sectionSelect.appendChild(option);
+                });
+            }
+
+            // Auto-select if only one valid section
+            if (sections.length === 1 && sections[0].section_id) {
+                sectionSelect.value = sections[0].section_id;
+            }
+        }
+
+        // Set default date to today
+        document.getElementById('test_date').valueAsDate = new Date();
+    </script>
+</body>
+
+</html>

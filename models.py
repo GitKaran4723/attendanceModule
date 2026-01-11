@@ -136,8 +136,11 @@ class Faculty(db.Model, TimestampMixin, SoftDeleteMixin):
     employment_type = db.Column(db.Enum("full_time", "part_time", name="employment_type_enum"), nullable=True)
     join_date = db.Column(db.Date)
     designation = db.Column(db.String(128))
-    is_hod = db.Column(db.Boolean, nullable=False, default=False)
+    workload_hours_per_week = db.Column(db.Integer, default=0)  # Teaching hours per week
+    is_hod = db.Column(db.Boolean, nullable=False, default=False)  # Legacy field for backward compatibility
+    is_coordinator = db.Column(db.Boolean, nullable=False, default=False)  # Program coordinator status
     status = db.Column(db.String(32), default="active")
+    current_academic_year = db.Column(db.String(20))  # e.g., "2024-2025" - current year for reports
 
     # Relationships
     user = db.relationship("User", back_populates="faculty")
@@ -163,12 +166,54 @@ class Faculty(db.Model, TimestampMixin, SoftDeleteMixin):
             'designation': self.designation,
             'employment_type': self.employment_type,
             'is_hod': self.is_hod,
+            'is_coordinator': self.is_coordinator,
             'status': self.status,
             'join_date': self.join_date.isoformat() if self.join_date else None
         }
 
     def __repr__(self):
         return f"<Faculty {self.first_name} {self.last_name}>"
+
+
+# ---------------------------------------------------------------------
+# Program Coordinator Association Table
+# ---------------------------------------------------------------------
+class ProgramCoordinator(db.Model, TimestampMixin, SoftDeleteMixin):
+    """
+    Association table for many-to-many relationship between Faculty and Program.
+    A faculty can be coordinator of multiple programs, and a program can have multiple coordinators.
+    """
+    __tablename__ = "program_coordinators"
+    
+    assignment_id = db.Column(db.String(36), primary_key=True, default=gen_uuid)
+    faculty_id = db.Column(db.String(36), db.ForeignKey("faculties.faculty_id"), nullable=False, index=True)
+    program_id = db.Column(db.String(36), db.ForeignKey("programs.program_id"), nullable=False, index=True)
+    assigned_by = db.Column(db.String(36), db.ForeignKey("users.user_id"), nullable=True)  # Admin who assigned
+    assigned_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    faculty = db.relationship("Faculty", backref=db.backref("coordinator_assignments", lazy="dynamic", cascade="all, delete-orphan"))
+    program = db.relationship("Program", backref=db.backref("coordinator_assignments", lazy="dynamic", cascade="all, delete-orphan"))
+    assigned_by_user = db.relationship("User", foreign_keys=[assigned_by])
+    
+    __table_args__ = (
+        UniqueConstraint("faculty_id", "program_id", "is_deleted", name="uix_faculty_program_coordinator"),
+    )
+    
+    def to_dict(self):
+        """Convert to dictionary for JSON responses"""
+        return {
+            'assignment_id': self.assignment_id,
+            'faculty_id': self.faculty_id,
+            'faculty_name': f"{self.faculty.first_name} {self.faculty.last_name}" if self.faculty else None,
+            'program_id': self.program_id,
+            'program_name': self.program.program_name if self.program else None,
+            'assigned_at': self.assigned_at.isoformat() if self.assigned_at else None,
+            'assigned_by': self.assigned_by_user.username if self.assigned_by_user else None
+        }
+    
+    def __repr__(self):
+        return f"<ProgramCoordinator {self.faculty_id} -> {self.program_id}>"
 
 
 class Program(db.Model, TimestampMixin, SoftDeleteMixin):
@@ -186,6 +231,9 @@ class Program(db.Model, TimestampMixin, SoftDeleteMixin):
     
     duration = db.Column(db.Integer)  # duration in years/semesters
     duration_years = db.Column(db.Integer)  # For templates
+    
+    # Academic year tracking (per program)
+    current_academic_year = db.Column(db.String(20))  # e.g., "2024-2025"
 
     # Relationships
     sections = db.relationship("Section", back_populates="program", lazy="dynamic")
@@ -215,13 +263,14 @@ class Section(db.Model, TimestampMixin, SoftDeleteMixin):
     section_id = db.Column(db.String(36), primary_key=True, default=gen_uuid)
     section_name = db.Column(db.String(64), nullable=False)
     
-    # Legacy field for backward compatibility
-    name = db.Column(db.String(64), nullable=True)
-    
     program_id = db.Column(db.String(36), db.ForeignKey("programs.program_id"), nullable=False, index=True)
     year_of_study = db.Column(db.Integer)
     academic_year = db.Column(db.String(20))  # e.g., "2024-2025"
     current_semester = db.Column(db.Integer)  # Which semester they're in
+    
+    # Elective Support (Virtual Sections)
+    is_elective = db.Column(db.Boolean, default=False)
+    linked_subject_id = db.Column(db.String(36), db.ForeignKey("subjects.subject_id"), nullable=True)
     
     # Class Teacher - Faculty assigned as class teacher for this section
     class_teacher_id = db.Column(db.String(36), db.ForeignKey("faculties.faculty_id"), nullable=True, index=True)
@@ -229,6 +278,7 @@ class Section(db.Model, TimestampMixin, SoftDeleteMixin):
     # Relationships
     program = db.relationship("Program", back_populates="sections")
     class_teacher = db.relationship("Faculty", foreign_keys=[class_teacher_id], backref="class_teacher_sections")
+    linked_subject = db.relationship("Subject", foreign_keys=[linked_subject_id])
     students = db.relationship("Student", back_populates="section", lazy="dynamic")
     allocations = db.relationship("SubjectAllocation", back_populates="section", lazy="dynamic")
     schedules = db.relationship("ClassSchedule", back_populates="section", lazy="dynamic")
@@ -238,11 +288,30 @@ class Section(db.Model, TimestampMixin, SoftDeleteMixin):
         UniqueConstraint("section_name", "program_id", "current_semester", "academic_year", name="uix_section_program_semester"),
     )
 
+    def get_students(self):
+        """
+        Get all students for this section.
+        For virtual sections (linked to a subject), fetch students from StudentSubjectEnrollment.
+        For regular sections, fetch students directly by section_id.
+        """
+        from models import StudentSubjectEnrollment
+        
+        if self.is_elective and self.linked_subject_id:
+            # Virtual section - get students enrolled in the linked subject
+            enrollments = StudentSubjectEnrollment.query.filter_by(
+                subject_id=self.linked_subject_id,
+                is_deleted=False
+            ).all()
+            return [enrollment.student for enrollment in enrollments if enrollment.student and not enrollment.student.is_deleted]
+        else:
+            # Regular section - get students directly
+            return self.students.filter_by(is_deleted=False).all()
+
     def to_dict(self):
         """Convert section object to dictionary for JSON responses"""
         return {
             'section_id': self.section_id,
-            'name': self.name,
+            'name': self.section_name,  # For backward compatibility
             'section_name': self.section_name,
             'program_id': self.program_id,
             'program_name': self.program.name if self.program else None,
@@ -255,7 +324,7 @@ class Section(db.Model, TimestampMixin, SoftDeleteMixin):
         }
 
     def __repr__(self):
-        return f"<Section {self.name}>"
+        return f"<Section {self.section_name}>"
 
 
 class Student(db.Model, TimestampMixin, SoftDeleteMixin):
@@ -268,38 +337,38 @@ class Student(db.Model, TimestampMixin, SoftDeleteMixin):
     student_id = db.Column(db.String(36), primary_key=True, default=gen_uuid)
     user_id = db.Column(db.String(36), db.ForeignKey("users.user_id"), nullable=False, unique=True, index=True)
     
-    # New detailed fields
+    # Student details
     roll_number = db.Column(db.String(64), unique=True, index=True)
-    first_name = db.Column(db.String(100), nullable=False)
-    last_name = db.Column(db.String(100), nullable=False)
+    name = db.Column(db.String(205), nullable=False) # Full name as in 10th marksheet
     date_of_birth = db.Column(db.Date)
     address = db.Column(db.Text)
     guardian_name = db.Column(db.String(200))
     guardian_phone = db.Column(db.String(20))
-    
-    # Legacy fields for backward compatibility
     usn = db.Column(db.String(64), nullable=True, index=True)  # University Seat Number
-    name = db.Column(db.String(200), nullable=True)
-    dob = db.Column(db.Date)
     
     email = db.Column(db.String(255))
     phone = db.Column(db.String(20))
     program_id = db.Column(db.String(36), db.ForeignKey("programs.program_id"), nullable=True)
     section_id = db.Column(db.String(36), db.ForeignKey("sections.section_id"), nullable=True)
     admission_year = db.Column(db.Integer)
+    joining_academic_year = db.Column(db.String(20))  # e.g., "2023-2024" - for fee tracking
+    current_academic_year = db.Column(db.String(20))  # e.g., "2024-2025" - current year for reports
+    
+    # Fee-related fields
+    category = db.Column(db.String(20), nullable=True)  # 'CAT1', 'SC', 'ST', '2A', '2B', '3A', '3B', 'GENERAL', 'OTHER'
+    seat_type = db.Column(db.String(20), nullable=True)  # 'GOVERNMENT', 'MANAGEMENT'
+    quota_type = db.Column(db.String(20), nullable=True)  # 'MERIT', 'CATEGORY', NULL (for Management)
+    
     current_semester = db.Column(db.Integer)  # Which semester (1-8)
-    semester_id = db.Column(db.String(36), db.ForeignKey("semesters.semester_id"), nullable=True)
     status = db.Column(db.String(32), default="active")
-    is_active = db.Column(db.Boolean, default=True, nullable=False)
     gender = db.Column(db.String(10))  # M, F, or Other
 
     # Relationships
     user = db.relationship("User", back_populates="student")
     program = db.relationship("Program")
     section = db.relationship("Section", back_populates="students")
-    semester = db.relationship("Semester")
-    attendance_records = db.relationship("AttendanceRecord", back_populates="student", lazy="dynamic")
-    test_results = db.relationship("TestResult", back_populates="student", lazy="dynamic")
+    attendance_records = db.relationship("AttendanceRecord", back_populates="student", lazy="dynamic", cascade="all, delete-orphan")
+    test_results = db.relationship("TestResult", back_populates="student", lazy="dynamic", cascade="all, delete-orphan")
 
     def to_dict(self):
         """Convert student object to dictionary for JSON responses"""
@@ -307,13 +376,11 @@ class Student(db.Model, TimestampMixin, SoftDeleteMixin):
             'student_id': self.student_id,
             'roll_number': self.roll_number,
             'usn': self.roll_number or self.usn,  # Backward compatibility
-            'first_name': self.first_name,
-            'last_name': self.last_name,
-            'name': self.name or f"{self.first_name} {self.last_name}",  # Backward compatibility
+            'name': self.name,
             'email': self.email,
             'phone': self.phone,
             'date_of_birth': self.date_of_birth.isoformat() if self.date_of_birth else None,
-            'dob': (self.date_of_birth or self.dob).isoformat() if (self.date_of_birth or self.dob) else None,
+            'dob': self.date_of_birth.isoformat() if self.date_of_birth else None,  # Backward compatibility
             'address': self.address,
             'guardian_name': self.guardian_name,
             'guardian_phone': self.guardian_phone,
@@ -325,7 +392,7 @@ class Student(db.Model, TimestampMixin, SoftDeleteMixin):
         }
 
     def __repr__(self):
-        return f"<Student {self.roll_number or self.usn} - {self.first_name} {self.last_name}>"
+        return f"<Student {self.roll_number or self.usn} - {self.name}>"
 
 
 # ---------------------------------------------------------------------
@@ -372,6 +439,10 @@ class Subject(db.Model, TimestampMixin, SoftDeleteMixin):
     subject_name = db.Column(db.String(255), nullable=False)
     credits = db.Column(db.Float, default=0)  # Changed to Float for decimal credits
     subject_type = db.Column(db.String(64))  # Theory, Practical, Project, etc
+    
+    # Elective Support
+    subject_category = db.Column(db.Enum('compulsory', 'language', 'specialization', 'elective', name='subject_category_enum'), default='compulsory')
+    elective_group = db.Column(db.String(100)) # e.g., "Language II", "Specialization I" - for grouping options
     
     # Academic details
     program_id = db.Column(db.String(36), db.ForeignKey("programs.program_id"), nullable=True, index=True)
@@ -699,6 +770,13 @@ class Test(db.Model, TimestampMixin, SoftDeleteMixin):
     semester_id = db.Column(db.String(36), db.ForeignKey("semesters.semester_id"), nullable=True)
     test_date = db.Column(db.Date)
     max_marks = db.Column(db.Float)
+    
+    # Internal Marks System fields
+    component_type = db.Column(db.Enum('test', 'assignment', 'project', 'quiz', 'presentation', 'other', 
+                                       name='component_type_enum'), nullable=False, default='test')
+    weightage = db.Column(db.Float, nullable=True)  # Percentage contribution to final marks
+    description = db.Column(db.Text, nullable=True)  # Detailed description
+    is_published = db.Column(db.Boolean, nullable=False, default=False)  # Visibility to students
 
     # Relationships
     subject = db.relationship("Subject", back_populates="tests")
@@ -715,10 +793,18 @@ class Test(db.Model, TimestampMixin, SoftDeleteMixin):
             'test_name': self.test_name,
             'subject': self.subject.subject_name if self.subject else None,
             'subject_code': self.subject.code if self.subject else None,
+            'subject_id': self.subject_id,
             'faculty': self.faculty.name if self.faculty else None,
-            'section': self.section.name if self.section else None,
+            'section': self.section.section_name if self.section else None,
+            'section_id': self.section_id,
             'test_date': self.test_date.isoformat() if self.test_date else None,
-            'max_marks': self.max_marks
+            'max_marks': self.max_marks,
+            'component_type': self.component_type,
+            'weightage': self.weightage,
+            'description': self.description,
+            'is_published': self.is_published,
+            'total_students': self.results.count(),
+            'marked_students': self.results.filter(TestResult.marks_obtained.isnot(None)).count()
         }
 
     def __repr__(self):
@@ -846,26 +932,26 @@ class WorkDiary(db.Model, TimestampMixin, SoftDeleteMixin):
     @staticmethod
     def generate_diary_number(year=None):
         """
-        Generate unique diary number in format: WD-YYYY-NNNN
-        Example: WD-2025-0001, WD-2025-0002, etc.
+        Generate unique diary number as simple sequential number: 1, 2, 3, etc.
         """
-        if year is None:
-            year = datetime.now().year
+        # Get the last diary number overall
+        last_diary = WorkDiary.query.order_by(
+            WorkDiary.created_at.desc()
+        ).first()
         
-        # Get the last diary number for this year
-        prefix = f"WD-{year}-"
-        last_diary = WorkDiary.query.filter(
-            WorkDiary.diary_number.like(f"{prefix}%")
-        ).order_by(WorkDiary.diary_number.desc()).first()
-        
-        if last_diary:
-            # Extract number and increment
-            last_num = int(last_diary.diary_number.split('-')[-1])
-            new_num = last_num + 1
+        if last_diary and last_diary.diary_number:
+            try:
+                # Try to extract number from diary_number
+                last_num = int(last_diary.diary_number.split('-')[-1]) if '-' in last_diary.diary_number else int(last_diary.diary_number)
+                new_num = last_num + 1
+            except (ValueError, IndexError):
+                # If parsing fails, count all diaries and add 1
+                new_num = WorkDiary.query.count() + 1
         else:
             new_num = 1
         
-        return f"{prefix}{new_num:04d}"
+        return str(new_num)
+
 
     def to_dict(self):
         """Convert work diary object to dictionary for JSON responses"""
@@ -960,12 +1046,14 @@ class StudentSubjectEnrollment(db.Model, TimestampMixin, SoftDeleteMixin):
     enrollment_id = db.Column(db.String(36), primary_key=True, default=gen_uuid)
     student_id = db.Column(db.String(36), db.ForeignKey("students.student_id"), nullable=False, index=True)
     subject_id = db.Column(db.String(36), db.ForeignKey("subjects.subject_id"), nullable=False, index=True)
+    section_id = db.Column(db.String(36), db.ForeignKey("sections.section_id"), nullable=True, index=True) # Link to Virtual Section
     academic_year = db.Column(db.String(20))  # e.g., "2024-2025"
     semester = db.Column(db.Integer)  # 1-8
 
     # Relationships
-    student = db.relationship("Student", backref=db.backref("subject_enrollments", lazy="dynamic"))
+    student = db.relationship("Student", backref=db.backref("subject_enrollments", lazy="dynamic", cascade="all, delete-orphan"))
     subject = db.relationship("Subject", backref=db.backref("student_enrollments", lazy="dynamic"))
+    section = db.relationship("Section")
 
     __table_args__ = (
         UniqueConstraint("student_id", "subject_id", "academic_year", name="uix_student_subject_year"),
@@ -976,7 +1064,7 @@ class StudentSubjectEnrollment(db.Model, TimestampMixin, SoftDeleteMixin):
         return {
             'enrollment_id': self.enrollment_id,
             'student_id': self.student_id,
-            'student_name': f"{self.student.first_name} {self.student.last_name}" if self.student else None,
+            'student_name': f"{self.student.name}" if self.student else None,
             'student_usn': self.student.roll_number if self.student else None,
             'subject_id': self.subject_id,
             'subject_name': self.subject.subject_name if self.subject else None,
@@ -1015,7 +1103,7 @@ class CampusCheckIn(db.Model, TimestampMixin, SoftDeleteMixin):
     device_info = db.Column(db.String(255))  # Optional: browser/device info
 
     # Relationships
-    student = db.relationship("Student", backref=db.backref("campus_checkins", lazy="dynamic"))
+    student = db.relationship("Student", backref=db.backref("campus_checkins", lazy="dynamic", cascade="all, delete-orphan"))
 
     __table_args__ = (
         UniqueConstraint("student_id", "checkin_date", name="uix_student_daily_checkin"),
@@ -1027,7 +1115,7 @@ class CampusCheckIn(db.Model, TimestampMixin, SoftDeleteMixin):
         return {
             'checkin_id': self.checkin_id,
             'student_id': self.student_id,
-            'student_name': f"{self.student.first_name} {self.student.last_name}" if self.student else None,
+            'student_name': f"{self.student.name}" if self.student else None,
             'student_roll': self.student.roll_number if self.student else None,
             'checkin_date': self.checkin_date.isoformat() if self.checkin_date else None,
             'checkin_time': self.checkin_time.isoformat() if self.checkin_time else None,
@@ -1101,11 +1189,13 @@ class FacultyAttendance(db.Model, TimestampMixin):
     check_in_time = db.Column(db.DateTime)
     check_in_latitude = db.Column(db.Float)
     check_in_longitude = db.Column(db.Float)
+    check_in_accuracy = db.Column(db.Float)  # GPS accuracy in meters
     
     # Check-out details
     check_out_time = db.Column(db.DateTime)
     check_out_latitude = db.Column(db.Float)
     check_out_longitude = db.Column(db.Float)
+    check_out_accuracy = db.Column(db.Float)  # GPS accuracy in meters
     check_out_valid = db.Column(db.Boolean, default=False)  # True if checkout was within campus radius
     
     # Relationships
@@ -1122,7 +1212,13 @@ class FacultyAttendance(db.Model, TimestampMixin):
             'faculty_id': self.faculty_id,
             'date': self.date.isoformat() if self.date else None,
             'check_in_time': self.check_in_time.isoformat() if self.check_in_time else None,
+            'check_in_latitude': self.check_in_latitude,
+            'check_in_longitude': self.check_in_longitude,
+            'check_in_accuracy': self.check_in_accuracy,
             'check_out_time': self.check_out_time.isoformat() if self.check_out_time else None,
+            'check_out_latitude': self.check_out_latitude,
+            'check_out_longitude': self.check_out_longitude,
+            'check_out_accuracy': self.check_out_accuracy,
             'check_out_valid': self.check_out_valid,
             'hours_worked': self.get_hours_worked()
         }
@@ -1162,7 +1258,7 @@ class StudentEnrollment(db.Model, TimestampMixin, SoftDeleteMixin):
     academic_year = db.Column(db.String(20))  # e.g., "2023-24"
     
     # Relationships
-    student = db.relationship("Student", backref=db.backref("enrollments", lazy="dynamic"))
+    student = db.relationship("Student", backref=db.backref("enrollments", lazy="dynamic", cascade="all, delete-orphan"))
     subject = db.relationship("Subject", backref=db.backref("enrollments", lazy="dynamic"))
     section = db.relationship("Section")
     
@@ -1187,3 +1283,332 @@ class StudentEnrollment(db.Model, TimestampMixin, SoftDeleteMixin):
     
     def __repr__(self):
         return f"<StudentEnrollment {self.student_id} -> {self.subject_id}>"
+
+
+# ---------------------------------------------------------------------
+# Fee Management Models
+# ---------------------------------------------------------------------
+class FeeTemplate(db.Model, TimestampMixin, SoftDeleteMixin):
+    """
+    Fee template defining base fees for different seat types and quotas per academic year.
+    Admin creates these templates, which are then used to auto-assign fees to students.
+    """
+    __tablename__ = "fee_templates"
+    
+    # Primary key
+    fee_template_id = db.Column(db.String(36), primary_key=True, default=gen_uuid)
+    
+    # Academic year
+    academic_year = db.Column(db.String(20), nullable=False, index=True)  # e.g., "2025-2026" (current year)
+    batch_year = db.Column(db.String(20), nullable=False, index=True)  # e.g., "2024-2025" (joining year)
+    
+    # Seat type and quota
+    seat_type = db.Column(db.String(20), nullable=False)  # 'GOVERNMENT', 'MANAGEMENT'
+    quota_type = db.Column(db.String(20), nullable=True)  # 'MERIT', 'CATEGORY', NULL (for Management)
+    
+    # Fee amount
+    base_fees = db.Column(db.Float, nullable=False)
+    
+    # Created by admin
+    created_by_user_id = db.Column(db.String(36), db.ForeignKey("users.user_id"), nullable=False)
+    
+    # Metadata
+    description = db.Column(db.Text, nullable=True)
+    
+    # Relationships
+    created_by = db.relationship("User", foreign_keys=[created_by_user_id])
+    
+    __table_args__ = (
+        UniqueConstraint("academic_year", "batch_year", "seat_type", "quota_type", "is_deleted", 
+                        name="uix_fee_template_year_batch_seat_quota"),
+        Index("ix_fee_template_year_batch_seat", "academic_year", "batch_year", "seat_type", "quota_type"),
+    )
+    
+    def to_dict(self):
+        """Convert to dictionary for API responses"""
+        return {
+            'fee_template_id': self.fee_template_id,
+            'academic_year': self.academic_year,
+            'batch_year': self.batch_year,
+            'seat_type': self.seat_type,
+            'quota_type': self.quota_type,
+            'base_fees': self.base_fees,
+            'description': self.description,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+    
+    def __repr__(self):
+        quota_str = f"-{self.quota_type}" if self.quota_type else ""
+        return f"<FeeTemplate Batch:{self.batch_year} Year:{self.academic_year} {self.seat_type}{quota_str}: ₹{self.base_fees:,.0f}>"
+
+
+
+class FeeStructure(db.Model, TimestampMixin, SoftDeleteMixin):
+    """
+    Total fees assigned to a student for a specific academic year.
+    Set by class teacher. Can include carry forward from previous year.
+    """
+    __tablename__ = "fee_structures"
+    
+    # Primary key
+    fee_structure_id = db.Column(db.String(36), primary_key=True, default=gen_uuid)
+    
+    # Foreign keys
+    student_id = db.Column(db.String(36), db.ForeignKey("students.student_id"), nullable=False, index=True)
+    section_id = db.Column(db.String(36), db.ForeignKey("sections.section_id"), nullable=False, index=True)
+    template_id = db.Column(db.String(36), db.ForeignKey("fee_templates.fee_template_id"), nullable=True)  # Link to template used
+    
+    # Academic year tracking
+    academic_year = db.Column(db.String(20), nullable=False, index=True)  # e.g., "2023-2024"
+    
+    # Fee breakdown
+    base_fees = db.Column(db.Float, nullable=False, default=0)  # Current year fees (from template)
+    carry_forward = db.Column(db.Float, nullable=False, default=0)  # From previous year
+    additional_charges = db.Column(db.Float, nullable=False, default=0)  # Late fees, etc. (deprecated - use additional_fees)
+    total_fees = db.Column(db.Float, nullable=False)  # Total to be paid
+    
+    # Additional fees (new system)
+    additional_fees = db.Column(db.JSON, nullable=True)  # Array of {description, amount}
+    
+    # Auto-generation tracking
+    is_auto_generated = db.Column(db.Boolean, default=False)  # True if created automatically from template
+    
+    # Set by class teacher or auto-assigned
+    set_by_user_id = db.Column(db.String(36), db.ForeignKey("users.user_id"), nullable=False)
+    
+    # Retention tracking
+    is_retained = db.Column(db.Boolean, default=False)  # True if student retained in same year
+    previous_year = db.Column(db.String(20), nullable=True)  # Previous academic year if retained
+    
+    # Metadata
+    remarks = db.Column(db.Text, nullable=True)
+    status = db.Column(db.String(20), default='active')  # active, completed, cancelled
+    
+    # Relationships
+    student = db.relationship("Student", backref=db.backref("fee_structures", lazy="dynamic", cascade="all, delete-orphan"))
+    section = db.relationship("Section")
+    template = db.relationship("FeeTemplate", foreign_keys=[template_id])
+    set_by = db.relationship("User", foreign_keys=[set_by_user_id])
+    fee_receipts = db.relationship("FeeReceipt", back_populates="fee_structure", lazy="dynamic")
+    
+    __table_args__ = (
+        UniqueConstraint("student_id", "academic_year", "is_deleted", name="uix_student_year_fee"),
+        Index("ix_fee_structure_student_year", "student_id", "academic_year"),
+    )
+    
+    @property
+    def amount_paid(self):
+        """Calculate total amount paid (sum of approved receipts)"""
+        approved_receipts = self.fee_receipts.filter_by(approved=True, is_deleted=False).all()
+        return sum(receipt.amount_paid for receipt in approved_receipts)
+    
+    @property
+    def balance(self):
+        """Calculate outstanding fees (total - total_paid)"""
+        return self.total_fees - self.amount_paid
+
+    def calculate_outstanding(self):
+        """Calculate outstanding fees (total - sum of approved receipts)"""
+        approved_receipts = self.fee_receipts.filter_by(approved=True, is_deleted=False).all()
+        total_paid = sum(receipt.amount_paid for receipt in approved_receipts)
+        return self.total_fees - total_paid
+    
+    def calculate_total_paid(self):
+        """Calculate total amount paid (sum of approved receipts)"""
+        approved_receipts = self.fee_receipts.filter_by(approved=True, is_deleted=False).all()
+        return sum(receipt.amount_paid for receipt in approved_receipts)
+    
+    def to_dict(self):
+        """Convert fee structure object to dictionary for JSON responses"""
+        return {
+            'fee_structure_id': self.fee_structure_id,
+            'student_id': self.student_id,
+            'student_name': f"{self.student.name}" if self.student else None,
+            'roll_number': self.student.roll_number if self.student else None,
+            'section_id': self.section_id,
+            'section_name': self.section.section_name if self.section else None,
+            'academic_year': self.academic_year,
+            'base_fees': self.base_fees,
+            'carry_forward': self.carry_forward,
+            'additional_charges': self.additional_charges,
+            'total_fees': self.total_fees,
+            'total_paid': self.calculate_total_paid(),
+            'outstanding': self.calculate_outstanding(),
+            'is_retained': self.is_retained,
+            'previous_year': self.previous_year,
+            'status': self.status,
+            'remarks': self.remarks,
+            'set_by': self.set_by.username if self.set_by else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+    
+    def __repr__(self):
+        return f"<FeeStructure {self.student_id} {self.academic_year} - ?{self.total_fees}>"
+
+
+class FeeReceipt(db.Model, TimestampMixin, SoftDeleteMixin):
+    """
+    Individual fee payment receipts (installments).
+    Students can make multiple payments per academic year.
+    Requires class teacher approval to be counted towards total paid.
+    """
+    __tablename__ = "fee_receipts"
+    
+    # Primary key
+    fee_receipt_id = db.Column(db.String(36), primary_key=True, default=gen_uuid)
+    
+    # Foreign keys
+    fee_structure_id = db.Column(db.String(36), db.ForeignKey("fee_structures.fee_structure_id"), 
+                                 nullable=False, index=True)
+    student_id = db.Column(db.String(36), db.ForeignKey("students.student_id"), nullable=False, index=True)
+    
+    # Receipt details (entered by student or class teacher)
+    receipt_number = db.Column(db.String(100), nullable=False, unique=True, index=True)
+    receipt_phone = db.Column(db.String(20), nullable=False)  # Phone on receipt
+    amount_paid = db.Column(db.Float, nullable=False)
+    payment_date = db.Column(db.Date, nullable=False, index=True)
+    payment_mode = db.Column(db.String(50), nullable=True)  # cash, online, cheque, DD, etc.
+    
+    # Entry tracking
+    entered_by_user_id = db.Column(db.String(36), db.ForeignKey("users.user_id"), nullable=False)
+    entered_by_role = db.Column(db.String(20), nullable=False)  # 'student' or 'faculty'
+    
+    # Approval workflow
+    approved = db.Column(db.Boolean, default=False, nullable=False)
+    approved_by_user_id = db.Column(db.String(36), db.ForeignKey("users.user_id"), nullable=True)
+    approved_at = db.Column(db.DateTime, nullable=True)
+    
+    # Additional metadata
+    remarks = db.Column(db.Text, nullable=True)
+    
+    # Relationships
+    fee_structure = db.relationship("FeeStructure", back_populates="fee_receipts")
+    student = db.relationship("Student", backref=db.backref("fee_receipts", lazy="dynamic", cascade="all, delete-orphan"))
+    entered_by = db.relationship("User", foreign_keys=[entered_by_user_id])
+    approved_by = db.relationship("User", foreign_keys=[approved_by_user_id])
+    
+    __table_args__ = (
+        Index("ix_fee_receipt_student_structure", "student_id", "fee_structure_id"),
+        Index("ix_fee_receipt_approved", "approved"),
+    )
+    
+    def can_edit_by_student(self):
+        """Students cannot edit receipts after submission"""
+        return False
+    
+    def can_edit_by_teacher(self, faculty_id):
+        """Teachers can edit receipts for their section students (even if approved)"""
+        if self.student and self.student.section:
+            return self.student.section.class_teacher_id == faculty_id
+        return False
+    
+    def to_dict(self):
+        """Convert fee receipt object to dictionary for JSON responses"""
+        return {
+            'fee_receipt_id': self.fee_receipt_id,
+            'fee_structure_id': self.fee_structure_id,
+            'student_id': self.student_id,
+            'student_name': f"{self.student.name}" if self.student else None,
+            'roll_number': self.student.roll_number if self.student else None,
+            'receipt_number': self.receipt_number,
+            'receipt_phone': self.receipt_phone,
+            'amount_paid': self.amount_paid,
+            'payment_date': self.payment_date.strftime('%d %b %Y') if self.payment_date else None,
+            'payment_mode': self.payment_mode,
+            'entered_by_role': self.entered_by_role,
+            'entered_by': self.entered_by.username if self.entered_by else None,
+            'approved': self.approved,
+            'approved_by': self.approved_by.username if self.approved_by else None,
+            'approved_at': self.approved_at.isoformat() if self.approved_at else None,
+            'remarks': self.remarks,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+    
+    def __repr__(self):
+        return f"<FeeReceipt {self.receipt_number} - ?{self.amount_paid} {'' if self.approved else ''}>"
+
+
+class Holiday(db.Model, TimestampMixin):
+    """
+    Academic holidays including Sundays, 2nd/4th Saturdays, public holidays, and special holidays.
+    """
+    __tablename__ = "holidays"
+    
+    holiday_id = db.Column(db.String(36), primary_key=True, default=gen_uuid)
+    holiday_date = db.Column(db.Date, unique=True, nullable=False, index=True)
+    holiday_name = db.Column(db.String(100), nullable=False)
+    holiday_type = db.Column(db.String(20), nullable=False) # sunday, saturday, public, special
+    academic_year = db.Column(db.String(20), nullable=False, index=True) # e.g., "2024-2025"
+    
+    def to_dict(self):
+        return {
+            'holiday_id': self.holiday_id,
+            'holiday_date': self.holiday_date.strftime('%d %b %Y'),
+            'raw_date': self.holiday_date.isoformat(),
+            'holiday_name': self.holiday_name,
+            'holiday_type': self.holiday_type,
+            'academic_year': self.academic_year,
+            'day_name': self.holiday_date.strftime('%A')
+        }
+
+    def __repr__(self):
+        return f"<Holiday {self.holiday_name} on {self.holiday_date}>"
+
+
+# =====================================================
+# SYSTEM SETTINGS
+# =====================================================
+
+class SystemSettings(db.Model):
+    """
+    Global system configuration settings
+    Stores key-value pairs for system-wide settings like current academic year
+    """
+    __tablename__ = "system_settings"
+    
+    setting_key = db.Column(db.String(50), primary_key=True)
+    setting_value = db.Column(db.Text)
+    description = db.Column(db.Text)
+    updated_at = db.Column(db.DateTime)
+    updated_by = db.Column(db.String(36), db.ForeignKey("users.user_id"))
+    
+    # Relationships
+    updated_by_user = db.relationship("User", foreign_keys=[updated_by])
+    
+    def __repr__(self):
+        return f"<SystemSettings {self.setting_key}={self.setting_value}>"
+    
+    @staticmethod
+    def get_current_academic_year():
+        """Get the current academic year from settings"""
+        setting = SystemSettings.query.get('current_academic_year')
+        if setting:
+            return setting.setting_value
+        # Default to current year if not set
+        from datetime import datetime
+        current_year = datetime.now().year
+        return f"{current_year}-{current_year + 1}"
+    
+    @staticmethod
+    def set_current_academic_year(year, user_id=None):
+        """Set the current academic year"""
+        from datetime import datetime
+        setting = SystemSettings.query.get('current_academic_year')
+        if setting:
+            setting.setting_value = year
+            setting.updated_at = datetime.now()
+            setting.updated_by = user_id
+        else:
+            setting = SystemSettings(
+                setting_key='current_academic_year',
+                setting_value=year,
+                description='Current academic year for the entire system',
+                updated_at=datetime.now(),
+                updated_by=user_id
+            )
+            db.session.add(setting)
+        db.session.commit()
+        return setting

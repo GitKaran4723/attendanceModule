@@ -327,9 +327,269 @@
         </div>
     </div>
 
+    <!-- Campus Attendance Card -->
+    <div class="section-header">
+        <span class="section-title">Campus Attendance</span>
+    </div>
+
+    {% if is_holiday %}
+    <div style="padding: 0 20px; margin-bottom: 20px;">
+        <div
+            style="background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); color: white; padding: 20px; border-radius: 16px; text-align: center;">
+            <h2 style="margin: 0 0 5px 0; font-size: 1.3rem;">🎉 Today is a Holiday</h2>
+            <p style="margin: 0; opacity: 0.9;">{{ holiday.holiday_name }}</p>
+        </div>
+    </div>
+    {% else %}
+    <div style="padding: 0 20px; margin-bottom: 20px;">
+        <div class="stat-card"
+            style="width: 100%; box-sizing: border-box; display: flex; flex-direction: row; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <div class="stat-icon"
+                    style="margin-bottom: 0; {% if has_checked_in and not has_checked_out %}color: var(--secondary-color); background: rgba(0, 191, 165, 0.1);{% endif %}">
+                    <i class="material-icons-round">{% if has_checked_in and not has_checked_out %}where_to_vote{% else
+                        %}location_on{% endif %}</i>
+                </div>
+                <div>
+                    <div style="font-weight: 700; font-size: 15px;">
+                        {% if not has_checked_in %}
+                        Not Checked In
+                        {% elif not has_checked_out %}
+                        Checked In
+                        {% else %}
+                        Attendance Completed
+                        {% endif %}
+                    </div>
+                    <div style="font-size: 11px; color: var(--text-secondary);">
+                        {% if has_checked_in %}
+                        In: {{ current_checkin.check_in_time.split('T')[1][:5] if current_checkin.check_in_time else
+                        '--:--' }}
+                        {% if has_checked_out %}
+                        | Out: {{ current_checkin.check_out_time.split('T')[1][:5] if current_checkin.check_out_time
+                        else '--:--' }}
+                        {% endif %}
+                        {% else %}
+                        Location recording active
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            {% if not has_checked_in %}
+            <button onclick="openCheckInModal()"
+                style="background: var(--primary-color); color: white; border: none; padding: 8px 16px; border-radius: 8px; font-weight: 600; font-size: 13px;">Check
+                In</button>
+            {% elif not has_checked_out %}
+            <button onclick="openCheckInModal()"
+                style="background: var(--secondary-color); color: white; border: none; padding: 8px 16px; border-radius: 8px; font-weight: 600; font-size: 13px;">Check
+                Out</button>
+            {% else %}
+            <div style="color: var(--secondary-color);"><i class="material-icons-round">check_circle</i></div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+    <!-- Attendance Modal -->
+    <div id="checkInModal"
+        style="display:none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:2000; align-items: flex-end;">
+        <div
+            style="background: white; width:100%; border-radius: 20px 20px 0 0; padding: 24px; box-sizing: border-box; animation: slideUp 0.3s ease;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
+                <h3 style="margin:0; font-size: 20px;">📍 Campus Verification</h3>
+                <i class="material-icons-round" onclick="closeCheckInModal()"
+                    style="color: var(--text-secondary); cursor: pointer;">close</i>
+            </div>
+
+            <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 20px;">
+                {% if not has_checked_in %}
+                Mark your arrival at the campus. <strong>Your location will be recorded</strong> for attendance
+                verification.
+                {% else %}
+                Mark your departure. You must be <strong>within the department premises</strong> to check out
+                successfully.
+                {% endif %}
+            </p>
+
+            <div id="locationStatus"
+                style="display:none; padding: 12px; border-radius: 12px; font-size: 13px; margin-bottom: 16px;"></div>
+
+            {% if not has_checked_in %}
+            <button id="btnAction" onclick="performAction('check-in')"
+                style="width:100%; background: var(--primary-color); color:white; border:none; padding: 14px; border-radius: 12px; font-weight: 700; font-size: 16px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                <i class="material-icons-round">fingerprint</i> Verify & Check In
+            </button>
+            {% else %}
+            <button id="btnAction" onclick="performAction('check-out')"
+                style="width:100%; background: var(--secondary-color); color:white; border:none; padding: 14px; border-radius: 12px; font-weight: 700; font-size: 16px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                <i class="material-icons-round">logout</i> Confirm Check Out
+            </button>
+            {% endif %}
+
+            <div style="text-align: center; margin-top: 16px;">
+                <span style="font-size: 11px; color: var(--text-secondary);">Bangalore University Attendance
+                    System</span>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        @keyframes slideUp {
+            from {
+                transform: translateY(100%);
+            }
+
+            to {
+                transform: translateY(0);
+            }
+        }
+
+        .success-toast {
+            background: #e0f2f1;
+            color: #00695c;
+            border: 1px solid #b2dfdb;
+        }
+
+        .error-toast {
+            background: #ffebee;
+            color: #c62828;
+            border: 1px solid #ffcdd2;
+        }
+    </style>
+
+    <script>
+        function openCheckInModal() { document.getElementById('checkInModal').style.display = 'flex'; }
+        function closeCheckInModal() { document.getElementById('checkInModal').style.display = 'none'; }
+
+        function performAction(type) {
+            const btn = document.getElementById('btnAction');
+            const status = document.getElementById('locationStatus');
+            const originalText = btn.innerHTML;
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="material-icons-round spin" style="animation: spin 1s linear infinite;">sync</i> Verifying...';
+
+            if (!navigator.geolocation) {
+                showStatus("Geolocation not supported", "error");
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    const url = type === 'check-in' ? '/api/faculty/check-in' : '/api/faculty/check-out';
+                    fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            latitude: pos.coords.latitude,
+                            longitude: pos.coords.longitude
+                        })
+                    })
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data.success) {
+                                showStatus(data.message, "success");
+                                setTimeout(() => location.reload(), 1500);
+                            } else {
+                                showStatus(data.error, "error");
+                                btn.disabled = false;
+                                btn.innerHTML = originalText;
+                            }
+                        })
+                        .catch(err => {
+                            showStatus("Connection error", "error");
+                            btn.disabled = false;
+                            btn.innerHTML = originalText;
+                        });
+                },
+                (err) => {
+                    showStatus("Location access denied", "error");
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                },
+                { enableHighAccuracy: true }
+            );
+        }
+
+        function showStatus(msg, type) {
+            const status = document.getElementById('locationStatus');
+            status.style.display = 'block';
+            status.className = type === 'success' ? 'success-toast' : 'error-toast';
+            status.innerHTML = msg;
+        }
+    </script>
+
+    <style>
+        @keyframes spin {
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
 
 
-    <!-- Recent Attendance -->
+
+    <div style="padding: 0 20px; margin-bottom: 30px;">
+        <button onclick="toggleReportForm()" class="stat-card"
+            style="width: 100%; border: 1px dashed var(--primary-light); background: rgba(98, 0, 234, 0.02); display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 10px; cursor: pointer;">
+            <i class="material-icons-round" style="color: var(--primary-color);">assessment</i>
+            <span style="font-weight: 600; color: var(--primary-color);">Generate Attendance Report</span>
+        </button>
+
+        <div id="reportForm"
+            style="display:none; margin-top: 12px; background: white; padding: 16px; border-radius: 12px; box-shadow: var(--card-shadow);">
+            <form action="{{ url_for('faculty_attendance_report') }}" method="GET">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                    <div>
+                        <label
+                            style="font-size: 11px; color: var(--text-secondary); display: block; margin-bottom: 4px;">Start
+                            Date</label>
+                        <input type="date" name="start_date" required
+                            style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px;">
+                    </div>
+                    <div>
+                        <label
+                            style="font-size: 11px; color: var(--text-secondary); display: block; margin-bottom: 4px;">End
+                            Date</label>
+                        <input type="date" name="end_date" required
+                            style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px;">
+                    </div>
+                </div>
+                <button type="submit"
+                    style="width: 100%; background: var(--primary-color); color: white; border: none; padding: 10px; border-radius: 8px; font-weight: 600;">Download
+                    / View Report</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Internal Marks Button -->
+    <div style="padding: 0 20px; margin-bottom: 30px;">
+        <button onclick="location.href='{{ url_for('faculty_internal_marks') }}'" class="stat-card"
+            style="width: 100%; border: 1px dashed var(--secondary-color); background: rgba(0, 191, 165, 0.02); display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 10px; cursor: pointer;">
+            <i class="material-icons-round" style="color: var(--secondary-color);">assignment</i>
+            <span style="font-weight: 600; color: var(--secondary-color);">Manage Internal Marks</span>
+        </button>
+    </div>
+
+    <script>
+        function toggleReportForm() {
+            const form = document.getElementById('reportForm');
+            form.style.display = form.style.display === 'none' ? 'block' : 'none';
+            if (form.style.display === 'block') {
+                // Set default dates to current month
+                const now = new Date();
+                const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+                const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+                document.querySelector('input[name="start_date"]').value = firstDay;
+                document.querySelector('input[name="end_date"]').value = lastDay;
+            }
+        }
+    </script>
     <div class="section-header">
         <span class="section-title">Recent Attendance</span>
     </div>
@@ -354,7 +614,15 @@
             </div>
             <div class="work-details">
                 <i class="material-icons-round" style="font-size: 14px;">groups</i>
-                {{ session.section_name }}
+                <div class="session-section">
+                    {% if session.schedule and session.schedule.section %}
+                    {{ session.schedule.section|section_display(session.schedule.subject) }}
+                    {% elif session.section_name %}
+                    {{ session.section_name }}
+                    {% else %}
+                    N/A
+                    {% endif %}
+                </div>
             </div>
         </div>
         {% endfor %}
@@ -381,6 +649,12 @@
         <a href="{{ url_for('faculty_my_class_view') }}" class="nav-item">
             <i class="material-icons-round">school</i>
             <span>My Class</span>
+        </a>
+        {% endif %}
+        {% if faculty.is_coordinator %}
+        <a href="{{ url_for('faculty_department') }}" class="nav-item">
+            <i class="material-icons-round">supervisor_account</i>
+            <span>My Department</span>
         </a>
         {% endif %}
         <a href="{{ url_for('faculty_work_diary') }}" class="nav-item">

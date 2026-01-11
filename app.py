@@ -1,4 +1,4 @@
-"""
+﻿"""
 Flask PWA Application - Main Entry Point
 This is a Progressive Web App (PWA) built with Flask that can be installed on mobile devices.
 The app uses SQLite database and is designed with a mobile-first approach.
@@ -10,12 +10,22 @@ Project Structure:
 - routes/: Modular route blueprints (for students to work on)
 """
 
-from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session
+from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session, send_file
 from datetime import datetime, date, time, timedelta
 import os
 import math
 import json
 import uuid
+from io import BytesIO
+from fee_helpers import (
+    assign_fee_to_student,
+    add_additional_fee,
+    remove_additional_fee,
+    get_student_fee_breakdown
+)
+from docx import Document
+from docx.shared import Pt, RGBColor
+from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 
 # Import configuration
 from config import Config
@@ -53,15 +63,109 @@ from models import (
     Semester, Subject, SubjectAllocation, ClassSchedule,
     AttendanceSession, AttendanceRecord, Test, TestResult,
     WorkDiary, ImportLog, Unit, Chapter, Concept,
-    CampusCheckIn, CollegeConfig, StudentSubjectEnrollment
+    CampusCheckIn, CollegeConfig, StudentSubjectEnrollment,
+    FacultyAttendance, FeeStructure, FeeReceipt, Holiday, SystemSettings,
+    ProgramCoordinator
 )
 
 # Import authentication utilities
 from auth import (
     login_required, admin_required, faculty_required, student_required, role_required,
     login_user, logout_user, get_current_user, hash_password, verify_password,
-    can_edit_work_diary, can_approve_work_diary, can_view_all_diaries
+    can_edit_work_diary, can_approve_work_diary, can_view_all_diaries,
+    coordinator_required, is_coordinator
 )
+
+# Import fee management blueprint
+from fee_routes import fee_bp
+
+# Register blueprints
+app.register_blueprint(fee_bp)
+
+# Import and register enrollment blueprint
+from routes.enrollment_routes import enrollment_bp
+app.register_blueprint(enrollment_bp)
+
+# Import and register coordinator routes
+from coordinator_routes import register_coordinator_routes
+register_coordinator_routes(app)
+
+# Import and register coordinator admin routes
+from coordinator_admin_routes import register_coordinator_admin_routes
+# Import and register department routes
+from department_routes import register_department_routes
+register_department_routes(app)
+
+register_coordinator_admin_routes(app)
+
+
+
+
+# ============================================
+# Custom Jinja2 Filters
+# ============================================
+
+@app.template_filter('section_display')
+def section_display_filter(section, subject=None):
+    """
+    Display section name with fallback for subjects without sections.
+    Returns section name if exists, otherwise returns 'Program-Subject' format.
+    """
+    if section and hasattr(section, 'section_name'):
+        return section.section_name
+    
+    # Fallback: Use subject's program or default to 'BCA'
+    if subject:
+        if hasattr(subject, 'program') and subject.program:
+            return f"{subject.program.program_code or subject.program.program_name}-Subject"
+        elif hasattr(subject, 'subject_code'):
+            return f"BCA-{subject.subject_code}"
+    
+    return "BCA-Subject"
+
+
+def get_or_create_virtual_section(subject):
+    """
+    Get or create a virtual section for a subject that doesn't carry sections.
+    Virtual sections are auto-created for subjects with carries_section=False.
+    
+    Args:
+        subject: Subject object
+        
+    Returns:
+        Section object (virtual section)
+    """
+    if subject.carries_section:
+        return None  # Subject uses real sections, no virtual section needed
+    
+    # Check if virtual section already exists
+    virtual_section = Section.query.filter_by(
+        linked_subject_id=subject.subject_id,
+        is_elective=True,  # Repurposing is_elective as is_virtual
+        is_deleted=False
+    ).first()
+    
+    if virtual_section:
+        return virtual_section
+    
+    # Create virtual section
+    program_code = subject.program.program_code if subject.program else "BCA"
+    section_name = f"{program_code}-{subject.subject_code}"
+    
+    virtual_section = Section(
+        section_name=section_name,
+        program_id=subject.program_id if subject.program_id else None,
+        current_semester=subject.semester_id,
+        is_elective=True,  # Marking as virtual
+        linked_subject_id=subject.subject_id
+    )
+    
+    db.session.add(virtual_section)
+    db.session.commit()
+    
+    return virtual_section
+
+
 
 
 # ============================================
@@ -375,6 +479,12 @@ def faculty_work_diary():
     """
     current_user = get_current_user()
     
+    # Always fetch faculty record for navigation purposes
+    faculty_record = Faculty.query.filter_by(user_id=current_user.user_id).first()
+    if not faculty_record:
+        diaries = []
+        return render_template('work_diary.html', diaries=diaries, faculty=None, is_class_teacher=False)
+    
     # Base query for AttendanceSession
     query = AttendanceSession.query.join(ClassSchedule).filter(
         AttendanceSession.is_deleted == False
@@ -382,11 +492,6 @@ def faculty_work_diary():
     
     if not can_view_all_diaries():
         # Faculty view: only their own sessions
-        faculty_record = Faculty.query.filter_by(user_id=current_user.user_id).first()
-        if not faculty_record:
-            diaries = []
-            return render_template('work_diary.html', diaries=diaries)
-        
         query = query.filter(AttendanceSession.taken_by_user_id == current_user.user_id)
     
     # Get recent sessions
@@ -442,10 +547,374 @@ def faculty_work_diary():
         })
         
     # Check if Class Teacher
-    managed_section = Section.query.filter_by(class_teacher_id=faculty_record.faculty_id).first() if not can_view_all_diaries() else None
+    managed_section = Section.query.filter_by(class_teacher_id=faculty_record.faculty_id).first()
     is_class_teacher = managed_section is not None
         
-    return render_template('work_diary.html', diaries=diaries, is_class_teacher=is_class_teacher)
+    return render_template('work_diary.html', 
+                         diaries=diaries, 
+                         is_class_teacher=is_class_teacher,
+                         faculty=faculty_record)
+
+
+@app.route('/faculty/work-diary/docx')
+@faculty_required
+def generate_work_diary_docx():
+    """
+    Generate DOCX report for work diary (?start_date=...&end_date=...&faculty=...).
+    Uses date range filtering instead of month-based filtering.
+    """
+    from work_diary_helpers import (
+        build_months_structure_from_sessions,
+        filter_and_assign_sl,
+        COMBINED_HEADER
+    )
+    
+    current_user = get_current_user()
+    start_date_str = request.args.get("start_date")
+    end_date_str = request.args.get("end_date")
+    faculty_param = request.args.get("faculty", "current")
+    
+    if not start_date_str or not end_date_str:
+        return "Missing start_date or end_date parameter (format: 'YYYY-MM-DD')", 400
+    
+    try:
+        start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+        end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+    except ValueError:
+        return "Invalid date format. Use YYYY-MM-DD", 400
+    
+    if start_date > end_date:
+        return "Start date must be before or equal to end date", 400
+    
+    # Get faculty record
+    faculty_record = Faculty.query.filter_by(user_id=current_user.user_id).first()
+    if not faculty_record:
+        return "Faculty record not found", 404
+    
+    # Determine which faculty's diary to generate
+    if faculty_param == "current" or not can_view_all_diaries():
+        # Current faculty only
+        selected_faculty = f"{faculty_record.first_name} {faculty_record.last_name}"
+        query = AttendanceSession.query.join(ClassSchedule).filter(
+            AttendanceSession.is_deleted == False,
+            AttendanceSession.taken_by_user_id == current_user.user_id,
+            ClassSchedule.date >= start_date,
+            ClassSchedule.date <= end_date
+        )
+    else:
+        # Admin/coordinator can view all or specific faculty
+        selected_faculty = faculty_param if faculty_param != "All" else "All"
+        query = AttendanceSession.query.join(ClassSchedule).filter(
+            AttendanceSession.is_deleted == False,
+            ClassSchedule.date >= start_date,
+            ClassSchedule.date <= end_date
+        )
+    
+    # Get sessions
+    sessions = query.order_by(AttendanceSession.taken_at.desc()).limit(500).all()
+    
+    # Build months structure (still using month grouping internally)
+    # If no sessions found, create empty structure for the date range
+    if not sessions:
+        # Create empty template with the date range
+        months = {}
+        faculty_list = [selected_faculty]
+        all_rendered_weeks = []
+        
+        # Generate week structure for the date range (Monday to Saturday)
+        # Start from the actual start_date, not the first Monday
+        current_date = start_date
+        week_number = 1
+        
+        while current_date <= end_date:
+            # Find the Monday of the current week
+            week_start_monday = current_date - timedelta(days=current_date.weekday())
+            
+            # For the first week, start from the actual start_date
+            if week_number == 1:
+                week_start = start_date
+            else:
+                week_start = week_start_monday
+            
+            # Week ends on Saturday (6 days from Monday)
+            week_end_saturday = week_start_monday + timedelta(days=5)
+            
+            # Clip week_end to the end_date
+            week_end = min(week_end_saturday, end_date)
+            
+            # Only add week if it's valid
+            if week_start <= end_date:
+                # Create empty week with blank rows for manual entry
+                all_rendered_weeks.append({
+                    "week_number": week_number,
+                    "week_start": week_start_monday,
+                    "week_end": week_end_saturday,
+                    "display_start": week_start,
+                    "display_end": week_end,
+                    "entries": [],  # Empty entries - will create blank rows in DOCX
+                    "week_total_actual": 0.0,
+                    "week_total_claiming": 0.0
+                })
+                week_number += 1
+            
+            # Move to next Monday (7 days forward from the Monday of current week)
+            current_date = week_start_monday + timedelta(days=7)
+            
+            # Safety: limit to 10 weeks max for any single request
+            if week_number > 10:
+                break
+    else:
+        months, faculty_list = build_months_structure_from_sessions(sessions)
+        
+        if not months:
+            # Fallback to empty template
+            all_rendered_weeks = []
+        else:
+            # Process all months in the date range
+            all_rendered_weeks = []
+            for month_label in sorted(months.keys(), key=lambda m: datetime.strptime(m, "%B %Y")):
+                rendered_weeks = filter_and_assign_sl(months, month_label, selected_faculty)
+                all_rendered_weeks.extend(rendered_weeks)
+    
+    # Create DOCX with A4 portrait orientation
+    doc = Document()
+    
+    # Set A4 portrait with narrow margins
+    sections = doc.sections
+    for section in sections:
+        section.page_height = Pt(842)       # A4 height (297mm) 
+        section.page_width = Pt(595)        # A4 width (210mm)
+        section.left_margin = Pt(36)        # 0.5 inch
+        section.right_margin = Pt(36)       # 0.5 inch
+        section.top_margin = Pt(36)         # 0.5 inch
+        section.bottom_margin = Pt(36)      # 0.5 inch
+    
+    # Configure default style - Times New Roman 11pt
+    style = doc.styles['Normal']
+    style.font.name = 'Times New Roman'
+    style.font.size = Pt(11)
+    
+    # Header section matching the bcaofficial format
+    h = doc.add_paragraph()
+    run = h.add_run("BANGALORE UNIVERSITY")
+    run.bold = True
+    run.font.size = Pt(14)
+    run.font.name = 'Times New Roman'
+    run.underline = True
+    h.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+    h.space_after = Pt(6)
+    
+    # Department and Annexure line
+    dept_line = doc.add_paragraph()
+    dept_run = dept_line.add_run("Department:     BCA")
+    dept_run.bold = True
+    dept_run.font.size = Pt(11)
+    dept_run.font.name = 'Times New Roman'
+    dept_run.underline = True
+    
+    # Add tabs/spaces for annexure
+    dept_line.add_run("                    ")
+    annex_run = dept_line.add_run("ANNEXURE (time table need to be attached)")
+    annex_run.bold = True
+    annex_run.font.size = Pt(11)
+    annex_run.font.name = 'Times New Roman'
+    annex_run.underline = True
+    dept_line.space_after = Pt(3)
+    
+    # Workload line
+    workload = doc.add_paragraph()
+    workload.add_run("                                                                         ")
+    workload_run = workload.add_run("Workload allotted per Week . . . . . .16 hours . . . . . .")
+    workload_run.bold = True
+    workload_run.font.size = Pt(11)
+    workload_run.font.name = 'Times New Roman'
+    workload.alignment = WD_PARAGRAPH_ALIGNMENT.RIGHT
+    workload.space_after = Pt(8)
+    
+    # Create tables for each week
+    cols = [
+        "Sl.\nNo", "Diary\nNo.", "Date", "Particulars / chapter / lectures (as per\nTime Table) I / II / III / IV / V / VI Sem",
+        "Actual\nhours", "Claiming hours\n(Lab period\nreduced by 3/4)", "Subject\ncode"
+    ]
+    
+    # Optimized column widths for A4 portrait (595pt width - 72pt margins = ~523pt usable)
+    col_widths_pt = [28, 35, 55, 250, 40, 70, 45]  # Total: ~523pt
+    
+    for w in all_rendered_weeks:
+        week_label = f"Week {w['week_number']}: {w['display_start'].strftime('%d %b %Y')} — {w['display_end'].strftime('%d %b %Y')}"
+        week_para = doc.add_paragraph(week_label)
+        week_para.space_before = Pt(8)
+        week_para.space_after = Pt(4)
+        for run in week_para.runs:
+            run.bold = True
+            run.font.size = Pt(11)
+            run.font.name = 'Times New Roman'
+        
+        rows = []
+        for e in w["entries"]:
+            rows.append([
+                str(e.get("SL No", "")),
+                str(e.get("Dairy No.", "")),
+                e.get("Date"),
+                e.get(COMBINED_HEADER, ""),
+                f"{e.get('Actual hours', 0):.1f}",
+                f"{e.get('Claiming hours', 0):.1f}",
+                e.get("Subject code", "")
+            ])
+        
+        # If no entries, add blank rows for manual entry (10 rows per week)
+        if not rows:
+            for i in range(10):
+                rows.append(["", "", "", "", "", "", ""])
+        
+        if not rows:
+            continue
+        
+        table = doc.add_table(rows=1 + len(rows) + 1, cols=len(cols))
+        table.style = 'Table Grid'
+        table.autofit = False
+        table.allow_autofit = False
+        
+        # Set column widths in points
+        for i, width in enumerate(col_widths_pt):
+            for row in table.rows:
+                row.cells[i].width = Pt(width)
+        
+        # Header row styling - Times New Roman 9pt (smaller for portrait fit)
+        hdr_cells = table.rows[0].cells
+        for i, c in enumerate(cols):
+            p = hdr_cells[i].paragraphs[0]
+            p.clear()
+            run = p.add_run(c)
+            run.bold = True
+            run.font.size = Pt(9)
+            run.font.name = 'Times New Roman'
+            p.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+            p.space_before = Pt(2)
+            p.space_after = Pt(2)
+        
+        # Data rows - Times New Roman 9pt with text wrapping (compact for portrait)
+        for r_idx, row_data in enumerate(rows, start=1):
+            row_cells = table.rows[r_idx].cells
+            for c_idx, val in enumerate(row_data):
+                p = row_cells[c_idx].paragraphs[0]
+                p.clear()
+                run = p.add_run(str(val))
+                run.font.size = Pt(9)
+                run.font.name = 'Times New Roman'
+                p.space_before = Pt(1)
+                p.space_after = Pt(1)
+                # Center align numeric columns
+                if c_idx in [0, 1, 4, 5]:
+                    p.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+                # Enable text wrapping for long content
+                row_cells[c_idx].width = Pt(col_widths_pt[c_idx])
+        
+        # Totals row - Times New Roman 9pt bold (compact for portrait)
+        total_row_cells = table.rows[1 + len(rows)].cells
+        for i in range(len(cols)):
+            p = total_row_cells[i].paragraphs[0]
+            p.clear()
+            p.space_before = Pt(2)
+            p.space_after = Pt(2)
+            
+            if i == 0:
+                run = p.add_run("Weekly Total")
+                run.bold = True
+                run.font.size = Pt(9)
+                run.font.name = 'Times New Roman'
+            elif i == 4:
+                run = p.add_run(f"{w['week_total_actual']:.1f}")
+                run.bold = True
+                run.font.size = Pt(9)
+                run.font.name = 'Times New Roman'
+                p.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+            elif i == 5:
+                run = p.add_run(f"{w['week_total_claiming']:.1f}")
+                run.bold = True
+                run.font.size = Pt(9)
+                run.font.name = 'Times New Roman'
+                p.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+    
+    # Calculate total claiming hours for all weeks
+    total_claiming = sum(w['week_total_claiming'] for w in all_rendered_weeks)
+    
+    # Add footer section
+    doc.add_paragraph("")
+    doc.add_paragraph("")
+    
+    # Total monthly working hours and remuneration
+    total_line = doc.add_paragraph()
+    total_hours_run = total_line.add_run(f"Total monthly working hours: {total_claiming:.1f}")
+    total_hours_run.bold = True
+    total_hours_run.font.size = Pt(11)
+    total_hours_run.font.name = 'Times New Roman'
+    
+    total_line.add_run("                    ")
+    
+    total_renum_run = total_line.add_run(f"Total remuneration claiming - {total_claiming * 1000:.0f}/-")
+    total_renum_run.bold = True
+    total_renum_run.font.size = Pt(11)
+    total_renum_run.font.name = 'Times New Roman'
+    total_line.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+    total_line.space_after = Pt(24)
+    
+    doc.add_paragraph("")
+    doc.add_paragraph("")
+    
+    # Date and Signature line
+    date_sig = doc.add_paragraph()
+    date_run = date_sig.add_run(f"Date: {datetime.now().strftime('%d / %m / %Y')}")
+    date_run.font.size = Pt(11)
+    date_run.font.name = 'Times New Roman'
+    
+    date_sig.add_run("                                                                              ")
+    sig_run = date_sig.add_run("Signature of the Guest Faculty")
+    sig_run.font.size = Pt(11)
+    sig_run.font.name = 'Times New Roman'
+    date_sig.space_after = Pt(36)
+    
+    doc.add_paragraph("")
+    doc.add_paragraph("")
+    
+    # Certification text
+    cert = doc.add_paragraph()
+    cert.add_run("       ")
+    cert_run = cert.add_run(
+        "Certified that, the above Guest Faculty has been handled the Classes allotted to him/her as per the Time "
+        "Table and as per the Attendance Record maintained in the department. The said dates and hours are is in order."
+    )
+    cert_run.font.size = Pt(11)
+    cert_run.font.name = 'Times New Roman'
+    cert.space_after = Pt(48)
+    
+    doc.add_paragraph("")
+    doc.add_paragraph("")
+    doc.add_paragraph("")
+    
+    # Chairman signature line
+    chairman = doc.add_paragraph()
+    chairman.add_run("                                                                                                                          ")
+    chairman_run = chairman.add_run("Chairman / Chairperson")
+    chairman_run.bold = True
+    chairman_run.font.size = Pt(11)
+    chairman_run.font.name = 'Times New Roman'
+    
+    # Save to BytesIO buffer
+    bio = BytesIO()
+    doc.save(bio)
+    bio.seek(0)
+    
+    # Generate filename with faculty name and month/year
+    # Format: FacultyName_MonthYear.docx (e.g., "John_Doe_January_2026.docx")
+    month_year = start_date.strftime("%B_%Y")
+    faculty_name_clean = selected_faculty.replace(" ", "_")
+    filename = f"{faculty_name_clean}_{month_year}.docx"
+    
+    return send_file(bio, as_attachment=True, download_name=filename,
+                     mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+
+
 
 
 @app.route('/work-diary/create', methods=['GET', 'POST'])
@@ -788,12 +1257,13 @@ def admin_faculty_add():
             db.session.add(new_faculty)
             db.session.flush()
             
-            # Assign subjects
+            # Assign subjects with specific sections
             for subject_id in subject_ids:
+                section_id = request.form.get(f'section_{subject_id}')
                 allocation = SubjectAllocation(
                     subject_id=subject_id,
                     faculty_id=new_faculty.faculty_id,
-                    section_id=None  # Can be assigned later
+                    section_id=section_id if section_id else None
                 )
                 db.session.add(allocation)
             
@@ -809,7 +1279,13 @@ def admin_faculty_add():
     # GET request
     subjects = Subject.query.filter_by(is_deleted=False).all()
     programs = Program.query.filter_by(is_deleted=False).all()
-    return render_template('admin_faculty_form.html', subjects=subjects, programs=programs)
+    sections = Section.query.filter_by(is_deleted=False).all()
+    
+    return render_template('admin_faculty_form.html', 
+                         subjects=subjects, 
+                         programs=programs,
+                         sections=[s.to_dict() for s in sections],
+                         faculty_allocations={})
 
 
 @app.route('/admin/faculty/<faculty_id>/edit', methods=['GET', 'POST'])
@@ -830,18 +1306,23 @@ def admin_faculty_edit(faculty_id):
             faculty.designation = request.form.get('designation')
             faculty.qualification = request.form.get('qualification')
             
+            # Update workload hours per week
+            workload = request.form.get('workload_hours_per_week', 0)
+            faculty.workload_hours_per_week = int(workload) if workload else 0
+            
             # Update subject allocations
             subject_ids = request.form.getlist('subjects')
             
             # Remove old allocations
             SubjectAllocation.query.filter_by(faculty_id=faculty_id).delete()
             
-            # Add new allocations
+            # Add new allocations with sections
             for subject_id in subject_ids:
+                section_id = request.form.get(f'section_{subject_id}')
                 allocation = SubjectAllocation(
                     subject_id=subject_id,
                     faculty_id=faculty_id,
-                    section_id=None
+                    section_id=section_id if section_id else None
                 )
                 db.session.add(allocation)
             
@@ -862,13 +1343,18 @@ def admin_faculty_edit(faculty_id):
     # GET request
     subjects = Subject.query.filter_by(is_deleted=False).all()
     programs = Program.query.filter_by(is_deleted=False).all()
-    allocations = SubjectAllocation.query.filter_by(faculty_id=faculty_id).all()
-    faculty_subject_ids = [a.subject_id for a in allocations]
+    sections = Section.query.filter_by(is_deleted=False).all()
+    
+    allocations = SubjectAllocation.query.filter_by(faculty_id=faculty_id, is_deleted=False).all()
+    faculty_allocations = {a.subject_id: a.section_id for a in allocations}
+    
     return render_template('admin_faculty_form.html', 
                          faculty=faculty,
                          subjects=subjects,
                          programs=programs,
-                         faculty_subject_ids=faculty_subject_ids)
+                         sections=[s.to_dict() for s in sections],
+                         faculty_subject_ids=list(faculty_allocations.keys()),
+                         faculty_allocations=faculty_allocations)
 
 
 @app.route('/api/admin/faculty/<faculty_id>', methods=['DELETE'])
@@ -884,6 +1370,43 @@ def api_delete_faculty(faculty_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 400
+
+
+@app.route('/api/admin/faculty/<faculty_id>/reset-password', methods=['POST'])
+@admin_required
+def api_reset_faculty_password(faculty_id):
+    """Reset faculty username and password using email prefix (before @)"""
+    try:
+        faculty = Faculty.query.get_or_404(faculty_id)
+        user = faculty.user
+        
+        if not user:
+            return jsonify({'success': False, 'error': 'User account not found'}), 404
+        
+        if not faculty.email or '@' not in faculty.email:
+            return jsonify({'success': False, 'error': 'Valid email required for reset'}), 400
+        
+        # Extract username from email (part before @)
+        email_prefix = faculty.email.split('@')[0]
+        
+        # Reset username to email prefix
+        user.username = email_prefix
+        
+        # Reset password to email prefix (hashed)
+        user.password_hash = hash_password(email_prefix)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Username and password reset to: {email_prefix}',
+            'username': email_prefix
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+
 
 
 # ---------------------------------------------
@@ -918,14 +1441,14 @@ def admin_student_add():
     if request.method == 'POST':
         try:
             roll_number = request.form.get('roll_number')
-            first_name = request.form.get('first_name')
-            last_name = request.form.get('last_name')
+            name = request.form.get('name') # Changed from first_name, last_name
             email = request.form.get('email')
             phone = request.form.get('phone')
             date_of_birth = request.form.get('date_of_birth')
             program_id = request.form.get('program_id')
             section_id = request.form.get('section_id')
             admission_year = request.form.get('admission_year')
+            joining_academic_year = request.form.get('joining_academic_year')
             current_semester = request.form.get('current_semester')
             address = request.form.get('address')
             guardian_name = request.form.get('guardian_name')
@@ -979,21 +1502,76 @@ def admin_student_add():
                 user_id=new_user.user_id,
                 roll_number=roll_number,
                 usn=roll_number,
-                first_name=first_name,
-                last_name=last_name,
-                name=f"{first_name} {last_name}",
+                name=name, # Changed from first_name, last_name, and name=f"{first_name} {last_name}"
                 email=email,
                 phone=phone,
                 date_of_birth=datetime.strptime(date_of_birth, '%Y-%m-%d').date() if date_of_birth else None,
                 program_id=program_id if program_id else None,
                 section_id=section_id if section_id else None,
                 admission_year=int(admission_year) if admission_year else None,
+                joining_academic_year=joining_academic_year if joining_academic_year else None,
                 current_semester=int(current_semester) if current_semester else None,
                 address=address,
                 guardian_name=guardian_name,
-                guardian_phone=guardian_phone
+                guardian_phone=guardian_phone,
+                category=request.form.get('category'),
+                seat_type=request.form.get('seat_type'),
+                quota_type=request.form.get('quota_type') if request.form.get('quota_type') else None,
+                current_academic_year=request.form.get('current_academic_year')
             )
             db.session.add(new_student)
+            db.session.flush()  # Get student ID before creating fee structure
+            
+            # Auto-create fee structure if minimum fee info provided
+            if new_student.seat_type and new_student.joining_academic_year and new_student.current_academic_year:
+                from fee_helpers import assign_fee_to_student
+                from models import FeeStructure
+                import json
+                
+                # Check if it already exists (unlikely in Add, but good for safety)
+                fee_structure = FeeStructure.query.filter_by(
+                    student_id=new_student.student_id,
+                    academic_year=new_student.current_academic_year,
+                    is_deleted=False
+                ).first()
+                
+                if not fee_structure:
+                    # Assign base fees
+                    assign_result = assign_fee_to_student(new_student.student_id, current_user.user_id)
+                    
+                    if assign_result['success']:
+                        # Get the created fee structure to add additional fees
+                        fee_structure = FeeStructure.query.filter_by(
+                            student_id=new_student.student_id,
+                            academic_year=new_student.current_academic_year,
+                            is_deleted=False
+                        ).first()
+                    else:
+                        flash(f"Fee assignment failed: {assign_result.get('error')}", "warning")
+                
+                if fee_structure:
+                        # Parse additional fees from form
+                        additional_fees = []
+                        fee_names = request.form.getlist('additional_fee_desc[]')
+                        fee_amounts = request.form.getlist('additional_fee_amount[]')
+                        
+                        for name, amount in zip(fee_names, fee_amounts):
+                            if name and amount:
+                                additional_fees.append({
+                                    'name': name,
+                                    'amount': float(amount),
+                                    'added_by': current_user.user_id,
+                                    'added_at': datetime.now().isoformat()
+                                })
+                        
+                        if additional_fees:
+                            fee_structure.additional_fees = json.dumps(additional_fees)
+                            # Recalculate total
+                            additional_total = sum(f['amount'] for f in additional_fees)
+                            fee_structure.total_fees = fee_structure.base_fees + additional_total
+                            # balance is a calculated property
+                            db.session.commit()
+            
             db.session.commit()
             
             return redirect(url_for('admin_students'))
@@ -1018,6 +1596,7 @@ def admin_student_edit(student_id):
     student = Student.query.get_or_404(student_id)
     
     if request.method == 'POST':
+        current_user = get_current_user()
         try:
             # Handle USN/Roll Number Update
             new_roll_number = request.form.get('roll_number')
@@ -1033,9 +1612,7 @@ def admin_student_edit(student_id):
                 student.roll_number = new_roll_number
                 student.usn = new_roll_number
             
-            student.first_name = request.form.get('first_name')
-            student.last_name = request.form.get('last_name')
-            student.name = f"{student.first_name} {student.last_name}"
+            student.name = request.form.get('name') # Changed from first_name, last_name, and name=f"{student.first_name} {student.last_name}"
             student.email = request.form.get('email')
             student.phone = request.form.get('phone')
             
@@ -1052,14 +1629,91 @@ def admin_student_edit(student_id):
             admission_year = request.form.get('admission_year')
             student.admission_year = int(admission_year) if admission_year else None
             
+            joining_academic_year = request.form.get('joining_academic_year')
+            student.joining_academic_year = joining_academic_year if joining_academic_year else None
+            
             current_semester = request.form.get('current_semester')
             student.current_semester = int(current_semester) if current_semester else None
+            
+            student.current_academic_year = request.form.get('current_academic_year')
             
             student.address = request.form.get('address')
             student.guardian_name = request.form.get('guardian_name')
             student.guardian_phone = request.form.get('guardian_phone')
             
+            # Update fee-related fields
+            old_category = student.category
+            old_seat_type = student.seat_type
+            old_quota_type = student.quota_type
+            
+            student.category = request.form.get('category')
+            student.seat_type = request.form.get('seat_type')
+            student.quota_type = request.form.get('quota_type') if request.form.get('quota_type') else None
+            
+            # Check if fee-related fields changed
+            fee_fields_changed = (old_category != student.category or 
+                                old_seat_type != student.seat_type or 
+                                old_quota_type != student.quota_type)
+            
+            # Update or create fee structure if minimum fee info provided
+            # Skip fee assignment if student has left (status != 'active')
+            if student.status == 'active' and student.seat_type and student.joining_academic_year and student.current_academic_year:
+                from fee_helpers import assign_fee_to_student
+                from models import FeeStructure
+                import json
+                
+                # IMPORTANT: Commit student changes first so assign_fee_to_student reads updated values
+                db.session.flush()
+                
+                # Check if it already exists for this year
+                fee_structure = FeeStructure.query.filter_by(
+                    student_id=student.student_id,
+                    academic_year=student.current_academic_year,
+                    is_deleted=False
+                ).first()
+                
+                # Create or update fee structure from template if:
+                # 1. Fee structure doesn't exist, OR
+                # 2. Fee-related fields (seat_type, category, quota_type) changed
+                if not fee_structure or fee_fields_changed:
+                    assign_result = assign_fee_to_student(student.student_id, current_user.user_id)
+                    if assign_result['success']:
+                        fee_structure = FeeStructure.query.filter_by(
+                            student_id=student.student_id,
+                            academic_year=student.current_academic_year,
+                            is_deleted=False
+                        ).first()
+                        if fee_fields_changed and fee_structure:
+                            flash(f"Base fees updated from template: ₹{fee_structure.base_fees}", "info")
+                    else:
+                        flash(f"Fee assignment failed: {assign_result.get('error')}", "warning")
+                
+                if fee_structure:
+                    # Parse additional fees from form
+                    additional_fees = []
+                    fee_names = request.form.getlist('additional_fee_desc[]')
+                    fee_amounts = request.form.getlist('additional_fee_amount[]')
+                    
+                    for name, amount in zip(fee_names, fee_amounts):
+                        if name and amount:
+                            additional_fees.append({
+                                'name': name,
+                                'amount': float(amount),
+                                'added_by': current_user.user_id,
+                                'added_at': datetime.now().isoformat()
+                            })
+                    
+                    # Sync additional fees
+                    fee_structure.additional_fees = json.dumps(additional_fees) if additional_fees else None
+                    
+                    # Recalculate total
+                    additional_total = sum(f['amount'] for f in additional_fees)
+                    fee_structure.total_fees = fee_structure.base_fees + additional_total
+                    # balance is a calculated property
+                    db.session.flush()
+            
             db.session.commit()
+            flash('Student updated successfully' + (' with fee structure' if fee_structure else ''), 'success')
             return redirect(url_for('admin_students'))
             
         except Exception as e:
@@ -1071,17 +1725,201 @@ def admin_student_edit(student_id):
                                  error=str(e))
     
     # GET request
+    current_user = get_current_user()
     programs = Program.query.filter_by(is_deleted=False).all()
     sections = Section.query.filter_by(is_deleted=False).all()
     return render_template('admin_student_form.html',
                          student=student,
                          programs=programs,
-                         sections=sections)
+                         sections=sections,
+                         current_user=current_user)
 
+
+@app.route('/admin/fee-structure/<fee_structure_id>/delete', methods=['POST'])
+@admin_required
+def admin_delete_fee_structure(fee_structure_id):
+    """Delete (hard delete) a fee structure"""
+    try:
+        from models import FeeStructure
+        
+        fee_structure = FeeStructure.query.get(fee_structure_id)
+        if not fee_structure:
+            return jsonify({'success': False, 'message': 'Fee structure not found'}), 404
+        
+        # Hard delete (not soft delete) to avoid unique constraint issues
+        # when recreating fee structure for same student/academic year
+        db.session.delete(fee_structure)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Fee structure deleted successfully'
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+# Fee Management API Endpoints - Add to app.py after student edit route
+
+# ---------------------------------------------
+# Fee Management Routes
+# ---------------------------------------------
+
+@app.route('/api/admin/students/<student_id>/assign-fee', methods=['POST'])
+@admin_required
+def api_assign_fee_to_student(student_id):
+    """Auto-assign fee to student based on joining year, academic year, and seat type"""
+    from fee_helpers import assign_fee_to_student
+    
+    current_user = get_current_user()
+    result = assign_fee_to_student(student_id, current_user.user_id)
+    
+    if result['success']:
+        return jsonify(result), 200
+    else:
+        return jsonify(result), 400
+
+
+@app.route('/api/admin/students/<student_id>/additional-fee', methods=['POST'])
+@admin_required
+def api_add_additional_fee(student_id):
+    """Add additional fee to student"""
+    from fee_helpers import add_additional_fee
+    
+    try:
+        data = request.get_json()
+        current_user = get_current_user()
+        
+        result = add_additional_fee(
+            student_id=student_id,
+            academic_year=data.get('academic_year'),
+            fee_name=data.get('fee_name'),
+            amount=data.get('amount'),
+            remarks=data.get('remarks'),
+            user_id=current_user.user_id
+        )
+        
+        if result['success']:
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 400
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+
+@app.route('/api/admin/students/<student_id>/additional-fee/<int:fee_index>', methods=['DELETE'])
+@admin_required
+def api_remove_additional_fee(student_id, fee_index):
+    """Remove additional fee from student"""
+    from fee_helpers import remove_additional_fee
+    
+    try:
+        data = request.get_json()
+        result = remove_additional_fee(
+            student_id=student_id,
+            academic_year=data.get('academic_year'),
+            fee_index=fee_index
+        )
+        
+        if result['success']:
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 400
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+
+@app.route('/api/students/<student_id>/fee-breakdown')
+@login_required
+def api_get_fee_breakdown(student_id):
+    """Get fee breakdown for student (accessible by student, faculty, admin)"""
+    from fee_helpers import get_student_fee_breakdown
+    
+    current_user = get_current_user()
+    
+    # Check permissions
+    if current_user.role == 'student':
+        # Students can only view their own fees
+        from models import Student
+        student = Student.query.filter_by(user_id=current_user.user_id).first()
+        if not student or student.student_id != student_id:
+            return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+    elif current_user.role == 'faculty':
+        # Faculty can view fees of students in their class
+        from models import Faculty, Student, Section
+        faculty = Faculty.query.filter_by(user_id=current_user.user_id).first()
+        if faculty:
+            # Check if student is in faculty's class
+            student = Student.query.get(student_id)
+            if not student or not student.section_id:
+                return jsonify({'success': False, 'error': 'Student not found'}), 404
+            
+            section = Section.query.get(student.section_id)
+            if not section or section.class_teacher_id != faculty.faculty_id:
+                return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+    
+    academic_year = request.args.get('academic_year')
+    result = get_student_fee_breakdown(student_id, academic_year)
+    
+    if result['success']:
+        return jsonify(result), 200
+    else:
+        return jsonify(result), 400
+
+@app.route('/api/admin/fees/bulk-sync', methods=['POST'])
+@admin_required
+def api_bulk_sync_fees():
+    """Bulk assign fees to all active students"""
+    try:
+        from fee_helpers import assign_fee_to_student
+        from models import Student
+        
+        students = Student.query.filter_by(is_deleted=False).all()
+        success_count = 0
+        current_user = get_current_user()
+        
+        for student in students:
+            if student.joining_academic_year and student.current_academic_year and student.seat_type:
+                result = assign_fee_to_student(student.student_id, current_user.user_id)
+                if result['success']:
+                    success_count += 1
+                    
+        return jsonify({
+            'success': True, 
+            'message': f'Successfully synced fees for {success_count} students.',
+            'total_students': len(students)
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
 
 # ---------------------------------------------
 # Semester Promotion Routes
 # ---------------------------------------------
+
+@app.route('/admin/students/<student_id>/reset-password', methods=['POST'])
+@admin_required
+def admin_reset_student_password(student_id):
+    """Reset a student's password"""
+    from werkzeug.security import generate_password_hash
+    
+    student = Student.query.get_or_404(student_id)
+    
+    try:
+        new_password = request.form.get('new_password')
+        if not new_password or len(new_password) < 6:
+            return jsonify({'success': False, 'message': 'Password must be at least 6 characters'}), 400
+        
+        # Update password
+        student.user.password_hash = generate_password_hash(new_password)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Password reset successfully'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
 
 @app.route('/admin/students/promote')
 @admin_required
@@ -1142,13 +1980,25 @@ def api_promote_students():
 @app.route('/api/admin/students/<student_id>', methods=['DELETE'])
 @admin_required
 def api_delete_student(student_id):
-    """Delete student (soft delete)"""
+    """Delete student (soft or permanent)"""
     try:
         student = Student.query.get_or_404(student_id)
-        student.is_deleted = True
-        student.user.is_deleted = True
+        permanent = request.args.get('permanent', 'false').lower() == 'true'
+        
+        if permanent:
+            # Delete associated user if it exists
+            if student.user:
+                db.session.delete(student.user)
+            # Delete student (cascades or manual depending on foreign keys)
+            db.session.delete(student)
+        else:
+            # Soft delete
+            student.is_deleted = True
+            if student.user:
+                student.user.is_deleted = True
+                
         db.session.commit()
-        return jsonify({'success': True})
+        return jsonify({'success': True, 'message': 'Student deleted ' + ('permanently' if permanent else 'softly')})
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 400
@@ -1324,7 +2174,10 @@ def admin_subject_add():
                 credits=float(credits) if credits else 0,
                 subject_type=subject_type,
                 total_hours=int(total_hours) if total_hours else None,
-                is_specialization=True if request.form.get('is_specialization') == 'true' else False
+                is_specialization=True if request.form.get('subject_category') in ['specialization', 'elective'] else False,
+                subject_category=request.form.get('subject_category', 'compulsory'),
+                elective_group=request.form.get('elective_group'),
+                carries_section=True if request.form.get('carries_section') == 'true' else False
             )
             db.session.add(new_subject)
             db.session.commit()
@@ -1366,6 +2219,16 @@ def admin_subject_edit(subject_id):
             
             total_hours = request.form.get('total_hours')
             subject.total_hours = int(total_hours) if total_hours else None
+
+            # Update Category and Group
+            subject.subject_category = request.form.get('subject_category', 'compulsory')
+            subject.elective_group = request.form.get('elective_group')
+            
+            # Update carries_section checkbox
+            subject.carries_section = True if request.form.get('carries_section') == 'true' else False
+            
+            # Update legacy is_specialization flag based on category
+            subject.is_specialization = subject.subject_category in ['specialization', 'elective']
             
             db.session.commit()
             return redirect(url_for('admin_subjects'))
@@ -1462,6 +2325,12 @@ def admin_enroll_students(subject_id):
     
     subject = Subject.query.get_or_404(subject_id)
     
+    # Debug output
+    print(f"DEBUG ENROLLMENT:")
+    print(f"  Subject: {subject.subject_name}")
+    print(f"  Program ID: {subject.program_id}")
+    print(f"  Semester ID: {subject.semester_id} (type: {type(subject.semester_id)})")
+    
     # Get active students matching program and semester
     eligible_students = Student.query.filter_by(
         program_id=subject.program_id,
@@ -1469,6 +2338,18 @@ def admin_enroll_students(subject_id):
         status='active',
         is_deleted=False
     ).all()
+    
+    print(f"  Found {len(eligible_students)} eligible students")
+    
+    # Also check all students in program
+    all_program_students = Student.query.filter_by(
+        program_id=subject.program_id,
+        status='active',
+        is_deleted=False
+    ).all()
+    print(f"  Total students in program: {len(all_program_students)}")
+    for s in all_program_students[:5]:  # Show first 5
+        print(f"    - {s.roll_number}: semester={s.current_semester} (type: {type(s.current_semester)})")
     
     # Get already enrolled student IDs
     enrolled_ids_query = db.session.query(StudentEnrollment.student_id).filter_by(
@@ -1779,6 +2660,28 @@ def api_update_program(program_id):
             program.duration_years = duration
             program.duration = duration
         
+        if 'current_academic_year' in data:
+            new_academic_year = data['current_academic_year']
+            program.current_academic_year = new_academic_year
+            
+            # Sync to all students in this program
+            students = Student.query.filter_by(program_id=program_id, is_deleted=False).all()
+            for student in students:
+                student.current_academic_year = new_academic_year
+                
+                # Trigger fee re-assignment for the new academic year
+                if student.seat_type and student.joining_academic_year:
+                    try:
+                        from fee_helpers import assign_fee_to_student
+                        assign_fee_to_student(student.student_id)
+                    except Exception as e:
+                        print(f"Fee assignment failed for {student.student_id}: {str(e)}")
+            
+            # Sync to all faculty in this program
+            faculties = Faculty.query.filter_by(program_id=program_id, is_deleted=False).all()
+            for faculty in faculties:
+                faculty.current_academic_year = new_academic_year
+        
         # Note: program_code is typically not editable after creation
         # to maintain referential integrity
         
@@ -1790,7 +2693,12 @@ def api_update_program(program_id):
                 'program_id': program.program_id,
                 'program_code': program.program_code,
                 'program_name': program.program_name,
-                'duration_years': program.duration_years
+                'duration_years': program.duration_years,
+                'current_academic_year': program.current_academic_year
+            },
+            'sync_stats': {
+                'students': len(students) if 'current_academic_year' in data else 0,
+                'faculty': len(faculties) if 'current_academic_year' in data else 0
             }
         })
         
@@ -1854,11 +2762,18 @@ def admin_assign_students():
             is_deleted=False
         ).all()
         selected_program = Program.query.get(program_id)
+        
+        # Get unique semesters from students
+        available_semesters = sorted(set(
+            s.current_semester for s in students 
+            if s.current_semester is not None
+        ))
     else:
         # If no program selected, show empty state
         students = []
         sections = []
         selected_program = None
+        available_semesters = []
     
     subjects = Subject.query.filter_by(is_deleted=False).all()
     
@@ -1867,7 +2782,8 @@ def admin_assign_students():
                          sections=sections,
                          subjects=subjects,
                          programs=programs,
-                         selected_program=selected_program)
+                         selected_program=selected_program,
+                         available_semesters=available_semesters)
 
 
 @app.route('/api/admin/students/assign-section', methods=['POST'])
@@ -1918,18 +2834,21 @@ def api_update_student_sections():
 
             # Check if status or section is changing
             current_section = student.section_id
-            current_active = student.is_active
+            current_active = (student.status == 'active')
             
             # Helper to determine new state
             target_section = new_section_id
             target_active = True
+            target_status = 'active'
             
             if new_section_id == 'left_college':
                 target_section = None
                 target_active = False
+                target_status = 'inactive'
             elif new_section_id == 'none' or new_section_id is None:
                 target_section = None
-                target_active = True # Unassigned but still active
+                target_active = True  # Unassigned but still active
+                target_status = 'active'
             
             # Detect change
             is_section_changed = (current_section != target_section)
@@ -1942,7 +2861,7 @@ def api_update_student_sections():
                      AttendanceRecord.query.filter_by(student_id=student_id, is_deleted=False).update({'is_deleted': True})
                 
                 student.section_id = target_section
-                student.is_active = target_active
+                student.status = target_status
                 updated_count += 1
         
         db.session.commit()
@@ -2142,11 +3061,11 @@ def init_db():
     """
     with app.app_context():
         db.create_all()
-        print("✓ Database tables created successfully!")
+        print("âœ“ Database tables created successfully!")
         
         # Create default roles if they don't exist
         create_default_roles()
-        print("✓ Default roles initialized!")
+        print("âœ“ Default roles initialized!")
 
 
 def create_default_roles():
@@ -2453,18 +3372,23 @@ def import_students(df):
     
     # Support single 'name' field - split into first_name and last_name
     if 'name' in df.columns:
-        if 'first_name' not in df.columns or 'last_name' not in df.columns:
-            # Split name into first and last
-            df['first_name'] = df['name'].apply(lambda x: str(x).strip().split()[0] if pd.notna(x) and str(x).strip() else '')
-            df['last_name'] = df['name'].apply(lambda x: ' '.join(str(x).strip().split()[1:]) if pd.notna(x) and len(str(x).strip().split()) > 1 else '')
+        # If 'name' column exists, use it directly for the 'name' field in Student model
+        # No need to split into first_name/last_name if the model only uses 'name'
+        pass
+    elif 'first_name' in df.columns or 'last_name' in df.columns:
+        # If separate first_name/last_name, combine them into a 'name' column for processing
+        df['name'] = df.apply(lambda row: f"{row.get('first_name', '')} {row.get('last_name', '')}".strip(), axis=1)
+    else:
+        # If neither 'name' nor 'first_name'/'last_name' are present, raise error or handle default
+        pass # Will be caught by required_columns check below if 'name' is required
     
-    # Required columns (minimum) - now supports both formats
-    required_columns = ['roll_number', 'email', 'date_of_birth']
+    # Required columns (minimum) - now requires 'name'
+    required_columns = ['roll_number', 'name', 'email', 'date_of_birth']
     
     # Validate columns
     missing_cols = set(required_columns) - set(df.columns)
     if missing_cols:
-        raise ValueError(f'Missing required columns: {", ".join(missing_cols)}. Use either (usn, name, email, date_of_birth) or (roll_number, first_name, last_name, email, date_of_birth)')
+        raise ValueError(f'Missing required columns: {", ".join(missing_cols)}. Ensure "name" column is present or "first_name" and "last_name" to be combined.')
     
     # Get student role
     student_role = Role.query.filter_by(role_name='student').first()
@@ -2561,20 +3485,19 @@ def import_students(df):
                 if program:
                     program_id = program.program_id
             
-            # Get first_name and last_name (may have been generated from 'name' field)
-            first_name = str(row.get('first_name', '')).strip() if pd.notna(row.get('first_name')) else ''
-            last_name = str(row.get('last_name', '')).strip() if pd.notna(row.get('last_name')) else ''
+            # Get the full name from the 'name' column
+            full_name = str(row.get('name', '')).strip() if pd.notna(row.get('name')) else ''
             
-            # Fallback: if no first_name, use roll_number
-            if not first_name:
-                first_name = roll_number
+            # Fallback: if no name, use roll_number
+            if not full_name:
+                full_name = roll_number
             
             # Create Student record
             student = Student(
                 user_id=user.user_id,
                 roll_number=roll_number,
-                first_name=first_name,
-                last_name=last_name,
+                usn=roll_number,
+                name=full_name, # Use the combined/provided name
                 email=str(row['email']).strip(),
                 phone=phone,
                 date_of_birth=dob,
@@ -3058,8 +3981,19 @@ def faculty_dashboard_view():
         AttendanceSession.taken_by_user_id == current_user.user_id,
         AttendanceSession.is_deleted == False
     ).order_by(AttendanceSession.taken_at.desc()).limit(5).all()
+    
+    # 4. Check-in/Out Status
+    from models import FacultyAttendance
+    attendance = FacultyAttendance.query.filter_by(
+        faculty_id=faculty_record.faculty_id,
+        date=today
+    ).first()
+    
+    current_checkin = attendance.to_dict() if attendance else None
+    has_checked_in = bool(attendance and attendance.check_in_time)
+    has_checked_out = bool(attendance and attendance.check_out_time)
 
-    # Calculate student count for each recent session
+    # 5. Calculate student count for each recent session
     recent_data = []
     for sess in recent_sessions:
         present_count = AttendanceRecord.query.filter_by(attendance_session_id=sess.attendance_session_id, status='present').count()
@@ -3074,9 +4008,13 @@ def faculty_dashboard_view():
             'total_count': total_count
         })
 
-    # 4. Check if Class Teacher
+    # 6. Check if Class Teacher
     managed_section = Section.query.filter_by(class_teacher_id=faculty_record.faculty_id).first()
     is_class_teacher = managed_section is not None
+    
+    # Check if today is a holiday
+    holiday = Holiday.query.filter_by(holiday_date=today).first()
+    is_holiday = holiday is not None
     
     return render_template('faculty/dashboard.html',
                          faculty=faculty_record,
@@ -3084,7 +4022,110 @@ def faculty_dashboard_view():
                          hours_month=round(hours_month, 1),
                          assigned_work=assigned_work,
                          recent_sessions=recent_data,
-                         is_class_teacher=is_class_teacher)
+                         is_class_teacher=is_class_teacher,
+                         current_checkin=current_checkin,
+                         has_checked_in=has_checked_in,
+                         has_checked_out=has_checked_out,
+                         is_holiday=is_holiday,
+                         holiday=holiday)
+
+
+@app.route('/faculty/attendance-report')
+@faculty_required
+def faculty_attendance_report():
+    """
+    Generate professional monthly/periodical attendance report for faculty.
+    Supports start_date and end_date query params.
+    """
+    current_user = get_current_user()
+    faculty_record = Faculty.query.filter_by(user_id=current_user.user_id).first()
+    
+    # Get range from query params
+    start_str = request.args.get('start_date')
+    end_str = request.args.get('end_date')
+    
+    today = date.today()
+    if not start_str or not end_str:
+        # Default to current month
+        start_date = today.replace(day=1)
+        # Last day of current month
+        if today.month == 12:
+            end_date = date(today.year, 12, 31)
+        else:
+            end_date = (today.replace(day=1, month=today.month+1) - timedelta(days=1))
+    else:
+        try:
+            start_date = datetime.strptime(start_str, '%Y-%m-%d').date()
+            end_date = datetime.strptime(end_str, '%Y-%m-%d').date()
+        except ValueError:
+            start_date = today.replace(day=1)
+            end_date = today
+            
+    # Fetch attendance records in range
+    attendance_records = {
+        r.date: r for r in FacultyAttendance.query.filter(
+            FacultyAttendance.faculty_id == faculty_record.faculty_id,
+            FacultyAttendance.date >= start_date,
+            FacultyAttendance.date <= end_date
+        ).all()
+    }
+    
+    # Fetch holidays in range
+    holidays = {
+        h.holiday_date: h for h in Holiday.query.filter(
+            Holiday.holiday_date >= start_date,
+            Holiday.holiday_date <= end_date
+        ).all()
+    }
+    
+    # Build daily report data
+    report_data = []
+    current_day = start_date
+    delta = timedelta(days=1)
+    
+    while current_day <= end_date:
+        status = "Absent"
+        remarks = ""
+        check_in = None
+        check_out = None
+        
+        # Check if holiday
+        if current_day in holidays:
+            status = "Holiday"
+            remarks = holidays[current_day].holiday_name
+        elif current_day.weekday() == 6: # Sunday fallback
+            status = "Holiday"
+            remarks = "Sunday"
+        
+        # Check if record exists
+        if current_day in attendance_records:
+            record = attendance_records[current_day]
+            if record.check_in_time:
+                status = "Present"
+                check_in = record.check_in_time.strftime('%H:%M')
+            if record.check_out_time:
+                check_out = record.check_out_time.strftime('%H:%M')
+                
+        # Future dates should be blank/upcoming
+        if current_day > today and status == "Absent":
+            status = "-"
+            
+        report_data.append({
+            'date': current_day.strftime('%d-%m-%Y'),
+            'day': current_day.strftime('%A'),
+            'status': status,
+            'check_in': check_in or '-',
+            'check_out': check_out or '-',
+            'remarks': remarks
+        })
+        current_day += delta
+        
+    return render_template('faculty/attendance_report.html',
+                         faculty=faculty_record,
+                         start_date=start_date.strftime('%d %b %Y'),
+                         end_date=end_date.strftime('%d %b %Y'),
+                         report_data=report_data,
+                         generated_at=datetime.now().strftime('%d-%m-%Y %H:%M'))
 
 
 @app.route('/faculty/session/<session_id>')
@@ -3177,7 +4218,7 @@ def faculty_my_class_view():
     for s in all_students:
         student_data = {
             'student_id': s.student_id,
-            'name': f"{s.first_name} {s.last_name}",
+            'name': s.name,
             'roll_number': s.roll_number,
             'phone': s.phone,
             'guardian_phone': s.guardian_phone,
@@ -3225,6 +4266,7 @@ def faculty_my_class_view():
 
     class_data = {
         'section_name': managed_section.section_name,
+        'semester': managed_section.current_semester,
         'present_count': present_count,
         'total_students': total_students,
         'absentees': absentees,
@@ -3262,8 +4304,33 @@ def faculty_take_attendance_app():
             })
             seen_subjects.add(a.subject_id)
     
-    # Get ALL active sections from the database
-    all_sections = Section.query.filter_by(is_deleted=False).order_by(Section.section_name).all()
+    # Get only sections relevant to this faculty
+    # 1. Sections from their class schedules
+    # 2. Virtual sections for their assigned subjects
+    faculty_section_ids = set()
+    
+    # Get sections from faculty's schedules
+    schedule_sections = db.session.query(ClassSchedule.section_id).filter(
+        ClassSchedule.faculty_id == faculty_record.faculty_id,
+        ClassSchedule.is_deleted == False
+    ).distinct().all()
+    faculty_section_ids.update([s.section_id for s in schedule_sections])
+    
+    # Get virtual sections for faculty's assigned subjects
+    faculty_subject_ids = [a['subject_id'] for a in unique_allocations]
+    if faculty_subject_ids:
+        virtual_sections = Section.query.filter(
+            Section.linked_subject_id.in_(faculty_subject_ids),
+            Section.is_elective == True,
+            Section.is_deleted == False
+        ).all()
+        faculty_section_ids.update([s.section_id for s in virtual_sections])
+    
+    # Fetch only relevant sections
+    all_sections = Section.query.filter(
+        Section.section_id.in_(faculty_section_ids),
+        Section.is_deleted == False
+    ).order_by(Section.section_name).all() if faculty_section_ids else []
     
     return render_template('faculty/take_attendance_swipe.html', 
                          allocations=unique_allocations,
@@ -3397,73 +4464,122 @@ def api_faculty_subjects_for_section(section_id):
 @faculty_required
 def api_submit_attendance():
     """
-    Submit attendance from Swipe App
+    Submit attendance for a class session with validation
+    Ensures students can only be marked in sessions for their section or enrolled subjects
     """
-    data = request.json
-    current_user = get_current_user()
-    faculty_record = Faculty.query.filter_by(user_id=current_user.user_id).first()
-    
     try:
-        # Get class start and end times from the request
-        class_start_time_str = data.get('class_start_time')  # e.g., "10:00"
-        class_end_time_str = data.get('class_end_time')      # e.g., "11:00"
+        data = request.get_json()
+        subject_id = data.get('subject_id')
+        section_id = data.get('section_id')
+        topic = data.get('topic', '')
+        class_start_time = data.get('class_start_time')
+        class_end_time = data.get('class_end_time')
+        records = data.get('records', [])
         
-        # Parse times
-        start_time = datetime.strptime(class_start_time_str, '%H:%M').time() if class_start_time_str else None
-        end_time = datetime.strptime(class_end_time_str, '%H:%M').time() if class_end_time_str else None
+        if not subject_id or not records:
+            return jsonify({'success': False, 'error': 'Missing required fields'}), 400
         
-        # Use today's date for the class schedule
-        class_date = date.today()
+        # Get current faculty
+        current_user = get_current_user()
+        faculty = Faculty.query.filter_by(user_id=current_user.user_id).first()
         
-        # 1. Create ClassSchedule Entry
-        schedule = ClassSchedule(
-            subject_id=data['subject_id'],
-            faculty_id=faculty_record.faculty_id,
-            section_id=data['section_id'],
-            date=class_date,
-            start_time=start_time,
-            end_time=end_time,
-            class_type='theory'  # Default
-        )
-        db.session.add(schedule)
-        db.session.flush()  # Get ID
+        if not faculty:
+            return jsonify({'success': False, 'error': 'Faculty not found'}), 404
         
-        # 2. Create AttendanceSession
-        # IMPORTANT: taken_at is set to NOW (when attendance is actually being entered)
-        session_id = gen_uuid()
-        diary_number = f"DN-{datetime.now().strftime('%Y%m%d')}-{session_id[:4].upper()}"
-        
-        session = AttendanceSession(
-            attendance_session_id=session_id,
-            schedule_id=schedule.schedule_id,
-            taken_by_user_id=current_user.user_id,
-            taken_at=datetime.utcnow(),  # Automatically captured - when attendance was entered
-            status='finalized',
-            topic_taught=data.get('topic', ''),
-            diary_number=diary_number
-        )
-        db.session.add(session)
-        db.session.flush()
-        
-        # 3. Create Records
-        for rec in data['records']:
-            status = 'present' if rec['status'] == 'present' else 'absent'
-            record = AttendanceRecord(
-                attendance_session_id=session.attendance_session_id,
-                student_id=rec['student_id'],
-                status=status,
-                remarks=''
-            )
-            db.session.add(record)
+        # Create or get schedule for this session
+        schedule = None
+        if section_id:
+            # Try to find existing schedule
+            schedule = ClassSchedule.query.filter_by(
+                subject_id=subject_id,
+                section_id=section_id,
+                faculty_id=faculty.faculty_id,
+                is_deleted=False
+            ).first()
             
+            # If no schedule exists, create a temporary one
+            if not schedule:
+                schedule = ClassSchedule(
+                    subject_id=subject_id,
+                    section_id=section_id,
+                    faculty_id=faculty.faculty_id,
+                    day_of_week=datetime.now().strftime('%A'),
+                    start_time=datetime.strptime(class_start_time, '%H:%M').time() if class_start_time else None,
+                    end_time=datetime.strptime(class_end_time, '%H:%M').time() if class_end_time else None
+                )
+                db.session.add(schedule)
+                db.session.flush()  # Get the schedule_id
+        
+        # Create attendance session
+        session_obj = AttendanceSession(
+            schedule_id=schedule.schedule_id if schedule else None,
+            taken_by_user_id=current_user.user_id,
+            topic_taught=topic,
+            status='finalized'
+        )
+        db.session.add(session_obj)
+        db.session.flush()  # Get the session_id
+        
+        # Generate diary number
+        from models import WorkDiary
+        session_obj.diary_number = WorkDiary.generate_diary_number()
+        
+        # Validate and create attendance records
+        subject = Subject.query.get(subject_id)
+        section = Section.query.get(section_id) if section_id else None
+        
+        valid_student_ids = set()
+        
+        # Get valid students for this session
+        if section:
+            # For section-based subjects: students in the section
+            valid_student_ids.update([s.student_id for s in section.students.filter_by(is_deleted=False).all()])
+        
+        # Also include students enrolled in this subject (for electives/languages)
+        from models import StudentSubjectEnrollment
+        enrolled_students = StudentSubjectEnrollment.query.filter_by(
+            subject_id=subject_id,
+            is_deleted=False
+        ).all()
+        valid_student_ids.update([e.student_id for e in enrolled_students])
+        
+        # Create attendance records only for valid students
+        created_count = 0
+        skipped_count = 0
+        
+        for record in records:
+            student_id = record.get('student_id')
+            status = record.get('status', 'absent')
+            
+            # VALIDATION: Only create record if student is valid for this session
+            if student_id not in valid_student_ids:
+                skipped_count += 1
+                continue
+            
+            attendance_record = AttendanceRecord(
+                attendance_session_id=session_obj.attendance_session_id,
+                student_id=student_id,
+                status=status
+            )
+            db.session.add(attendance_record)
+            created_count += 1
+        
         db.session.commit()
-        return jsonify({'success': True, 'session_id': session.attendance_session_id})
+        
+        return jsonify({
+            'success': True,
+            'message': f'Attendance submitted successfully! {created_count} records created.',
+            'session_id': session_obj.attendance_session_id,
+            'diary_number': session_obj.diary_number,
+            'created_count': created_count,
+            'skipped_count': skipped_count
+        })
         
     except Exception as e:
         db.session.rollback()
         import traceback
         traceback.print_exc()
-        return jsonify({'success': False, 'error': str(e)})
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @app.route('/api/section/<section_id>/students')
@@ -3471,21 +4587,48 @@ def api_submit_attendance():
 def api_get_section_students(section_id):
     """
     Get all students in a specific section
-    For Swipe Attendance App
+    For Swipe Attendance App - Updated to handle virtual sections
     """
     section = Section.query.get(section_id)
     if not section:
         return jsonify([]), 404
-        
-    students = section.students.filter_by(is_deleted=False).all()
+    
+    # Use get_students method which handles both regular and virtual sections
+    students = section.get_students()
     
     return jsonify([{
         'student_id': s.student_id,
-        'first_name': s.first_name,
-        'last_name': s.last_name,
+        'name': s.name,
         'usn': s.roll_number or s.usn,
         'roll_number': s.roll_number
     } for s in students])
+
+
+@app.route('/api/subject/<subject_id>/students')
+@login_required
+def api_get_subject_students(subject_id):
+    """
+    Get all students enrolled in a subject (for elective subjects)
+    """
+    try:
+        from models import StudentSubjectEnrollment
+        
+        # Get students enrolled in this subject
+        enrollments = StudentSubjectEnrollment.query.filter_by(
+            subject_id=subject_id,
+            is_deleted=False
+        ).all()
+        
+        students_data = [{
+            'student_id': e.student.student_id,
+            'name': e.student.name,
+            'usn': e.student.roll_number or e.student.usn,
+            'roll_number': e.student.roll_number
+        } for e in enrollments if e.student and not e.student.is_deleted]
+        
+        return jsonify(students_data)
+    except Exception as e:
+        return jsonify([]), 400
 
 @app.route('/class-teacher/dashboard')
 @faculty_required
@@ -3723,7 +4866,7 @@ def api_monthly_attendance_report():
         report_data.append({
             'student_id': student.student_id,
             'roll_number': student.roll_number,
-            'name': f"{student.first_name} {student.last_name}",
+            'name': f"{student.name}",
             'total_classes': total_classes,
             'present': present_count,
             'absent': absent_count,
@@ -3995,7 +5138,7 @@ def api_faculty_student_analytics(student_id):
             print(f"ERROR: Student not found with ID: {student_id}")
             return jsonify({'success': False, 'error': 'Student not found'}), 404
         
-        print(f"Step 2: Found student: {student.first_name} {student.last_name}")
+        print(f"Step 2: Found student: {student.name}")
         print(f"Step 3: Student section_id: {student.section_id}")
         
         # Get the student's section to find the semester
@@ -4109,7 +5252,7 @@ def api_faculty_student_analytics(student_id):
         
         return jsonify({
             'success': True,
-            'student_name': f"{student.first_name} {student.last_name}",
+            'student_name': student.name,
             'roll_number': student.roll_number,
             'subject_stats': final_subject_stats,
             'day_analysis': final_day_analysis
@@ -4197,9 +5340,17 @@ def student_dashboard():
     # Get student's section
     section = Section.query.get(student_record.section_id)
     
-    # Calculate overall attendance percentage
+    # Get Enrolled Elective Sections
+    enrollments = StudentSubjectEnrollment.query.filter_by(
+        student_id=student_record.student_id,
+        semester=section.current_semester
+    ).all()
+    enrolled_section_ids = [e.section_id for e in enrollments if e.section_id]
+    all_section_ids = [student_record.section_id] + enrolled_section_ids
+
+    # Calculate overall attendance percentage (Core + Electives)
     total_sessions = db.session.query(AttendanceSession.attendance_session_id).join(ClassSchedule).filter(
-        ClassSchedule.section_id == student_record.section_id,
+        ClassSchedule.section_id.in_(all_section_ids),
         AttendanceSession.is_deleted == False
     ).distinct().count()
     
@@ -4208,7 +5359,7 @@ def student_dashboard():
     ).join(ClassSchedule).filter(
         AttendanceRecord.student_id == student_record.student_id,
         AttendanceRecord.status == 'present',
-        ClassSchedule.section_id == student_record.section_id
+        ClassSchedule.section_id.in_(all_section_ids)
     ).distinct().count()
     
     overall_percentage = int((attended / total_sessions * 100)) if total_sessions > 0 else 0
@@ -4220,14 +5371,65 @@ def student_dashboard():
     import random
     motivational_quote = random.choice(MOTIVATIONAL_QUOTES)
     
-    # Check today's check-in status
-    today = date.today()
-    checkin_today = CampusCheckIn.query.filter_by(
-        student_id=student_record.student_id,
-        checkin_date=today
-    ).first()
+
+    # --- Fetch Subjects and Calculate Per-Subject Attendance ---
+    # 1. Compulsory Subjects
+    compulsory_subjects = Subject.query.filter(
+        Subject.program_id == section.program_id,
+        Subject.semester_id == section.current_semester,
+        Subject.subject_category == 'compulsory'
+    ).all()
     
-    has_checked_in = bool(checkin_today)
+    # 2. Enrolled Elective Subjects
+    # Filter by Semester instead of Academic Year to avoid string mismatch issues
+    enrolled_electives = db.session.query(Subject).join(StudentSubjectEnrollment).filter(
+        StudentSubjectEnrollment.student_id == student_record.student_id,
+        StudentSubjectEnrollment.semester == section.current_semester
+    ).all()
+    
+    all_subjects_objs = compulsory_subjects + enrolled_electives
+    
+    subjects_data = []
+    for subj in all_subjects_objs:
+        # Verify if subject has a virtual section (for electives) or uses main section
+        target_section_id = student_record.section_id # Default to core section
+        
+        # If elective, find the virtual section id
+        if subj.subject_category != 'compulsory':
+            # Find the enrollment for this subject to get section_id
+            enrollment = next((e for e in enrollments if e.subject_id == subj.subject_id), None)
+            if enrollment and enrollment.section_id:
+                target_section_id = enrollment.section_id
+        
+        # Get total classes for this subject/section
+        # Note: This might be slightly inefficient in a loop, but safe for N < 10 subjects
+        subj_total = db.session.query(AttendanceSession).join(ClassSchedule).filter(
+            ClassSchedule.section_id == target_section_id,
+            ClassSchedule.subject_id == subj.subject_id,
+            AttendanceSession.is_deleted == False
+        ).count()
+        
+        # Get attended classes
+        subj_attended = db.session.query(AttendanceRecord).join(AttendanceSession).join(ClassSchedule).filter(
+            AttendanceRecord.student_id == student_record.student_id,
+            AttendanceRecord.status == 'present',
+            AttendanceRecord.is_deleted == False,
+            ClassSchedule.subject_id == subj.subject_id,
+            ClassSchedule.section_id == target_section_id
+        ).count()
+        
+        pct = int((subj_attended / subj_total * 100)) if subj_total > 0 else 0
+        
+        subjects_data.append({
+            'subject_name': subj.subject_name,
+            'subject_code': subj.subject_code,
+            'attendance_pct': pct if subj_total > 0 else None
+        })
+    
+    # Check if today is a holiday
+    today = date.today()
+    holiday = Holiday.query.filter_by(holiday_date=today).first()
+    is_holiday = holiday is not None
     
     dashboard_data = {
         'student': student_record,
@@ -4237,8 +5439,9 @@ def student_dashboard():
         'attended': attended,
         'is_red_zone': is_red_zone,
         'motivational_quote': motivational_quote,
-        'has_checked_in': has_checked_in,
-        'current_checkin': checkin_today
+        'subjects': subjects_data,
+        'is_holiday': is_holiday,
+        'holiday': holiday
     }
     
     return render_template('student/dashboard.html', **dashboard_data)
@@ -4263,8 +5466,21 @@ def api_student_analytics():
         if not section:
             return jsonify({'success': False, 'error': 'Section not found'}), 404
         
-        # Get ALL subjects for this semester
-        subjects = Subject.query.filter_by(semester_id=section.current_semester).all()
+        # Get ALL subjects for this semester (Compulsory + Enrolled Electives)
+        # 1. Compulsory Subjects
+        compulsory_subjects = Subject.query.filter(
+            Subject.program_id == section.program_id,
+            Subject.semester_id == section.current_semester,
+            Subject.subject_category == 'compulsory'
+        ).all()
+        
+        # 2. Enrolled Elective Subjects
+        enrolled_subjects = db.session.query(Subject).join(StudentSubjectEnrollment).filter(
+            StudentSubjectEnrollment.student_id == student_record.student_id,
+            StudentSubjectEnrollment.semester == section.current_semester
+        ).all()
+        
+        subjects = compulsory_subjects + enrolled_subjects
         
         # Initialize stats for ALL subjects in this semester
         subject_stats = {}
@@ -4287,8 +5503,35 @@ def api_student_analytics():
             Subject, ClassSchedule.subject_id == Subject.subject_id
         ).filter(
             ClassSchedule.section_id == student_record.section_id,
-            AttendanceSession.is_deleted == False
+            AttendanceSession.is_deleted == False,
+            ClassSchedule.is_deleted == False,
+            Subject.is_deleted == False
         ).all()
+        
+        # ALSO get sessions for enrolled subjects (for virtual sections/electives)
+        # These sessions might not have a schedule_id or might be for virtual sections
+        enrolled_subject_ids = [s.subject_id for s in enrolled_subjects]
+        if enrolled_subject_ids:
+            enrolled_sessions = db.session.query(
+                AttendanceSession,
+                Subject
+            ).join(
+                ClassSchedule, AttendanceSession.schedule_id == ClassSchedule.schedule_id
+            ).join(
+                Subject, ClassSchedule.subject_id == Subject.subject_id
+            ).filter(
+                Subject.subject_id.in_(enrolled_subject_ids),
+                AttendanceSession.is_deleted == False,
+                ClassSchedule.is_deleted == False,
+                Subject.is_deleted == False
+            ).all()
+            
+            # Add these to all_sessions (with None for schedule since we already have it)
+            for session, subject in enrolled_sessions:
+                # Check if this session is already in all_sessions
+                session_ids = [s[0].attendance_session_id for s in all_sessions]
+                if session.attendance_session_id not in session_ids:
+                    all_sessions.append((session, None, subject))
         
         # Get all attendance records for this student
         student_records = AttendanceRecord.query.filter_by(
@@ -4300,11 +5543,15 @@ def api_student_analytics():
         attendance_map = {r.attendance_session_id: r.status for r in student_records}
         
         # Process Stats - Count EVERY session
-        for session, schedule, subject in all_sessions:
-            sub_id = subject.subject_id
+        for session_data in all_sessions:
+            session = session_data[0]
+            schedule = session_data[1] if len(session_data) > 1 else None
+            subject = session_data[2] if len(session_data) > 2 else None
+            
+            sub_id = subject.subject_id if subject else None
             
             # Only count if this subject is in the semester
-            if sub_id in subject_stats:
+            if sub_id and sub_id in subject_stats:
                 subject_stats[sub_id]['total_classes'] += 1
                 
                 # Check attendance
@@ -4321,6 +5568,7 @@ def api_student_analytics():
             percentage = round((attended / total * 100), 1) if total > 0 else 0
             
             final_subject_stats.append({
+                'subject_id': sub_id,
                 'subject_name': stats['subject_name'],
                 'subject_code': stats['subject_code'],
                 'total_classes': total,
@@ -4335,7 +5583,7 @@ def api_student_analytics():
         
         return jsonify({
             'success': True,
-            'student_name': f"{student_record.first_name} {student_record.last_name}",
+            'student_name': f"{student_record.name}",
             'roll_number': student_record.roll_number,
             'overall_percentage': overall_percentage,
             'is_red_zone': overall_percentage < 75,
@@ -4346,6 +5594,81 @@ def api_student_analytics():
         print(f"Analytics Error: {str(e)}")
         print(traceback.format_exc())
         return jsonify({'success': False, 'error': str(e)}), 400
+
+
+@app.route('/api/student/subject/<subject_id>/history')
+@student_required
+def api_student_subject_history(subject_id):
+    """
+    Get detailed class history for a specific subject for the logged-in student
+    """
+    current_user = get_current_user()
+    student_record = Student.query.filter_by(user_id=current_user.user_id).first()
+    
+    if not student_record:
+        return jsonify({'success': False, 'error': 'Student not found'}), 404
+        
+    try:
+        subject = Subject.query.get_or_404(subject_id)
+        
+        # Determine the target section (consider electives)
+        enrollment = StudentSubjectEnrollment.query.filter_by(
+            student_id=student_record.student_id,
+            subject_id=subject_id,
+            is_deleted=False
+        ).first()
+        
+        target_section_id = enrollment.section_id if enrollment and enrollment.section_id else student_record.section_id
+        
+        # Get Teacher Name from Allocation
+        allocation = SubjectAllocation.query.filter_by(
+            subject_id=subject_id,
+            section_id=target_section_id
+        ).first()
+        
+        teacher_name = "Not Assigned"
+        if allocation and allocation.faculty:
+            faculty = allocation.faculty
+            teacher_name = faculty.name or f"{faculty.first_name} {faculty.last_name}"
+        
+        # Get all attendance sessions for this subject/section
+        # Join with ClassSchedule and AttendanceRecord
+        sessions = db.session.query(
+            AttendanceSession,
+            AttendanceRecord.status
+        ).join(
+            ClassSchedule, AttendanceSession.schedule_id == ClassSchedule.schedule_id
+        ).outerjoin(
+            AttendanceRecord, db.and_(
+                AttendanceRecord.attendance_session_id == AttendanceSession.attendance_session_id,
+                AttendanceRecord.student_id == student_record.student_id
+            )
+        ).filter(
+            ClassSchedule.subject_id == subject_id,
+            ClassSchedule.section_id == target_section_id,
+            AttendanceSession.is_deleted == False
+        ).order_by(AttendanceSession.taken_at.desc()).all()
+        
+        history = []
+        for session, status in sessions:
+            history.append({
+                'date': session.taken_at.strftime('%d %b, %Y'),
+                'time': session.taken_at.strftime('%I:%M %p'),
+                'topic': session.topic_taught or "Regular Class",
+                'status': status or "absent"  # Default to absent if no record found
+            })
+            
+        return jsonify({
+            'success': True,
+            'subject_name': subject.subject_name,
+            'subject_code': subject.subject_code,
+            'teacher_name': teacher_name,
+            'history': history
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+
 
 
 @app.route('/api/student/check-in', methods=['POST'])
@@ -4628,21 +5951,21 @@ def api_student_holidays():
 
 
 MOTIVATIONAL_QUOTES = [
-    "The only way to do great work is to love what you do. – Steve Jobs",
-    "Believe you can and you're halfway there. – Theodore Roosevelt",
-    "Success is not final, failure is not fatal: It is the courage to continue that counts. – Winston Churchill",
-    "Don't watch the clock; do what it does. Keep going. – Sam Levenson",
-    "The future belongs to those who believe in the beauty of their dreams. – Eleanor Roosevelt",
-    "Education is the most powerful weapon which you can use to change the world. – Nelson Mandela",
-    "Expert in anything was once a beginner. – Helen Hayes",
-    "There are no shortcuts to any place worth going. – Beverly Sills",
-    "Motivation is what gets you started. Habit is what keeps you going. – Jim Ryun",
-    "Your time is limited, so don't waste it living someone else's life. – Steve Jobs",
-    "The beautiful thing about learning is that no one can take it away from you. – B.B. King",
-    "Start where you are. Use what you have. Do what you can. – Arthur Ashe",
-    "Success doesn't come to you, you've got to go to it. – Marva Collins",
-    "Dream big and dare to fail. – Norman Vaughan",
-    "It always seems impossible until it's done. – Nelson Mandela"
+    "The only way to do great work is to love what you do. â€“ Steve Jobs",
+    "Believe you can and you're halfway there. â€“ Theodore Roosevelt",
+    "Success is not final, failure is not fatal: It is the courage to continue that counts. â€“ Winston Churchill",
+    "Don't watch the clock; do what it does. Keep going. â€“ Sam Levenson",
+    "The future belongs to those who believe in the beauty of their dreams. â€“ Eleanor Roosevelt",
+    "Education is the most powerful weapon which you can use to change the world. â€“ Nelson Mandela",
+    "Expert in anything was once a beginner. â€“ Helen Hayes",
+    "There are no shortcuts to any place worth going. â€“ Beverly Sills",
+    "Motivation is what gets you started. Habit is what keeps you going. â€“ Jim Ryun",
+    "Your time is limited, so don't waste it living someone else's life. â€“ Steve Jobs",
+    "The beautiful thing about learning is that no one can take it away from you. â€“ B.B. King",
+    "Start where you are. Use what you have. Do what you can. â€“ Arthur Ashe",
+    "Success doesn't come to you, you've got to go to it. â€“ Marva Collins",
+    "Dream big and dare to fail. â€“ Norman Vaughan",
+    "It always seems impossible until it's done. â€“ Nelson Mandela"
 ]
 
 @app.route('/api/student/motivational-quote')
@@ -4710,6 +6033,531 @@ def api_student_update_profile():
 # ============================================
 # Parent Dashboard Routes
 # ============================================
+
+
+
+# ============================================
+# Fee Management Page Routes
+# ============================================
+
+@app.route('/student/fees')
+@student_required
+def student_fees_page():
+    """Student fee management page"""
+    from models import Student, FeeStructure
+    import json
+
+    current_user = get_current_user()
+    student = Student.query.filter_by(user_id=current_user.user_id).first()
+
+    if not student:
+        flash('Student record not found', 'error')
+        return redirect(url_for('student_dashboard'))
+    
+    # Get all fee structures for this student
+    fee_structures = FeeStructure.query.filter_by(
+        student_id=student.student_id,
+        is_deleted=False
+    ).order_by(FeeStructure.academic_year.desc()).all()
+    
+    # Debug: Print what we found
+    print(f"DEBUG: Student ID: {student.student_id}")
+    print(f"DEBUG: Found {len(fee_structures)} fee structures")
+    for fs in fee_structures:
+        print(f"  - {fs.academic_year}: Base={fs.base_fees}, Total={fs.total_fees}")
+    
+    # Parse additional fees from JSON and fetch receipts
+    for fee_structure in fee_structures:
+        # Additional fees list
+        if fee_structure.additional_fees:
+            try:
+                fee_structure.additional_fees_list = json.loads(fee_structure.additional_fees)
+            except:
+                fee_structure.additional_fees_list = []
+        else:
+            fee_structure.additional_fees_list = []
+            
+        # Fetch associated receipts
+        from models import FeeReceipt
+        fee_structure.receipts = FeeReceipt.query.filter_by(
+            fee_structure_id=fee_structure.fee_structure_id,
+            is_deleted=False
+        ).order_by(FeeReceipt.payment_date.desc()).all()
+    
+    return render_template('student/fees.html', 
+                         student=student,
+                         fee_structures=fee_structures)
+
+
+@app.route('/api/student/fees/submit-receipt', methods=['POST'])
+@student_required
+def api_submit_fee_receipt():
+    """Submit a fee receipt for verification"""
+    from models import Student, FeeStructure, FeeReceipt
+    import datetime
+    
+    current_user = get_current_user()
+    student = Student.query.filter_by(user_id=current_user.user_id).first()
+    
+    if not student:
+        return jsonify({'success': False, 'error': 'Student record not found'}), 404
+        
+    try:
+        data = request.get_json()
+        fee_structure_id = data.get('fee_structure_id')
+        receipt_number = data.get('receipt_number')
+        receipt_phone = data.get('receipt_phone')
+        payment_date_str = data.get('payment_date')
+        amount_paid = data.get('amount_paid')
+        
+        if not all([fee_structure_id, receipt_number, receipt_phone, payment_date_str, amount_paid]):
+            return jsonify({'success': False, 'error': 'All fields are required'}), 400
+            
+        fee_structure = FeeStructure.query.get(fee_structure_id)
+        if not fee_structure or fee_structure.student_id != student.student_id:
+            return jsonify({'success': False, 'error': 'Invalid fee structure'}), 400
+            
+        # Check for duplicate receipt number
+        existing_receipt = FeeReceipt.query.filter_by(receipt_number=receipt_number).first()
+        if existing_receipt:
+            return jsonify({'success': False, 'error': 'Receipt number already submitted'}), 400
+            
+        payment_date = datetime.datetime.strptime(payment_date_str, '%Y-%m-%d').date()
+        
+        new_receipt = FeeReceipt(
+            fee_structure_id=fee_structure_id,
+            student_id=student.student_id,
+            receipt_number=receipt_number,
+            receipt_phone=receipt_phone,
+            amount_paid=float(amount_paid),
+            payment_date=payment_date,
+            payment_mode='Online/Self-Reported',
+            entered_by_user_id=current_user.user_id,
+            entered_by_role='student',
+            approved=False # Requires faculty approval
+        )
+        
+        db.session.add(new_receipt)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True, 
+            'message': 'Receipt submitted successfully for verification.'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+
+@app.route('/admin/holidays')
+@admin_required
+def admin_holidays():
+    """Admin holiday management page"""
+    academic_year = SystemSettings.get_current_academic_year()
+    return render_template('admin_holidays.html', academic_year=academic_year)
+
+
+@app.route('/api/admin/holidays', methods=['GET'])
+@admin_required
+def api_get_holidays():
+    from models import Holiday
+    holidays = Holiday.query.order_by(Holiday.holiday_date).all()
+    return jsonify({
+        'success': True,
+        'holidays': [h.to_dict() for h in holidays]
+    })
+
+
+@app.route('/api/admin/holidays/settings', methods=['POST'])
+@admin_required
+def api_save_holiday_settings():
+    try:
+        data = request.get_json()
+        start_date = data.get('academic_year_start')
+        end_date = data.get('academic_year_end')
+        
+        if not start_date or not end_date:
+            return jsonify({'success': False, 'error': 'Start and end dates required'}), 400
+            
+        SystemSettings.query.filter_by(setting_key='academic_year_start').delete()
+        SystemSettings.query.filter_by(setting_key='academic_year_end').delete()
+        
+        db.session.add(SystemSettings(setting_key='academic_year_start', setting_value=start_date))
+        db.session.add(SystemSettings(setting_key='academic_year_end', setting_value=end_date))
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Holidays settings updated'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+
+@app.route('/api/admin/holidays/auto-generate', methods=['POST'])
+@admin_required
+def api_auto_generate_holidays():
+    from models import Holiday, SystemSettings
+    from datetime import datetime, timedelta
+    
+    try:
+        start_setting = SystemSettings.query.get('academic_year_start')
+        end_setting = SystemSettings.query.get('academic_year_end')
+        academic_year = SystemSettings.get_current_academic_year()
+        
+        if not start_setting or not end_setting:
+            return jsonify({'success': False, 'error': 'Please set academic year start and end dates first'}), 400
+            
+        start_date = datetime.strptime(start_setting.setting_value, '%Y-%m-%d').date()
+        end_date = datetime.strptime(end_setting.setting_value, '%Y-%m-%d').date()
+        
+        curr = start_date
+        created_count = 0
+        
+        while curr <= end_date:
+            # Sunday
+            if curr.weekday() == 6:
+                name = "Sunday"
+                h_type = "sunday"
+                add = True
+            # Saturday
+            elif curr.weekday() == 5:
+                # 2nd Saturday or 4th Saturday
+                day_num = curr.day
+                if 8 <= day_num <= 14:
+                    name = "2nd Saturday"
+                    h_type = "saturday"
+                    add = True
+                elif 22 <= day_num <= 28:
+                    name = "4th Saturday"
+                    h_type = "saturday"
+                    add = True
+                else:
+                    add = False
+            else:
+                add = False
+                
+            if add:
+                existing = Holiday.query.filter_by(holiday_date=curr).first()
+                if not existing:
+                    new_h = Holiday(
+                        holiday_date=curr,
+                        holiday_name=name,
+                        holiday_type=h_type,
+                        academic_year=academic_year
+                    )
+                    db.session.add(new_h)
+                    created_count += 1
+            
+            curr += timedelta(days=1)
+            
+        db.session.commit()
+        return jsonify({'success': True, 'message': f'Generated {created_count} holidays automatically.'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+
+@app.route('/api/admin/holidays', methods=['POST'])
+@admin_required
+def api_add_holiday():
+    from models import Holiday, SystemSettings
+    from datetime import datetime
+    
+    try:
+        data = request.get_json()
+        h_date_str = data.get('holiday_date')
+        h_name = data.get('holiday_name')
+        h_type = data.get('holiday_type', 'public')
+        
+        if not h_date_str or not h_name:
+            return jsonify({'success': False, 'error': 'Date and Name required'}), 400
+            
+        h_date = datetime.strptime(h_date_str, '%Y-%m-%d').date()
+        academic_year = SystemSettings.get_current_academic_year()
+        
+        existing = Holiday.query.filter_by(holiday_date=h_date).first()
+        if existing:
+            existing.holiday_name = h_name
+            existing.holiday_type = h_type
+        else:
+            new_h = Holiday(
+                holiday_date=h_date,
+                holiday_name=h_name,
+                holiday_type=h_type,
+                academic_year=academic_year
+            )
+            db.session.add(new_h)
+            
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Holiday saved'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+
+@app.route('/api/admin/holidays/<holiday_id>', methods=['DELETE'])
+@admin_required
+def api_delete_holiday(holiday_id):
+    from models import Holiday
+    try:
+        h = Holiday.query.get(holiday_id)
+        if not h:
+            return jsonify({'success': False, 'error': 'Holiday not found'}), 404
+            
+        db.session.delete(h)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Holiday removed (Marked as working day)'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+
+@app.route('/faculty/fees')
+@faculty_required
+def faculty_fees_page():
+    """Faculty fee management page"""
+    return render_template('faculty_fee_management.html')
+
+
+@app.route('/admin/fees')
+@admin_required
+def admin_fees_page():
+    """Admin fee management and defaulter reports"""
+    return render_template('admin_fees.html')
+
+
+# ---------------------------------------------
+# Fee Template Management Routes (Admin)
+# ---------------------------------------------
+@app.route('/admin/fee-templates')
+@admin_required
+def admin_fee_templates():
+    """List all fee templates grouped by batch year"""
+    from models import FeeTemplate
+    from sqlalchemy import desc
+    
+    # Get all templates, ordered by batch year and academic year
+    templates = FeeTemplate.query.filter_by(is_deleted=False).order_by(
+        desc(FeeTemplate.batch_year),
+        desc(FeeTemplate.academic_year),
+        FeeTemplate.seat_type,
+        FeeTemplate.quota_type
+    ).all()
+    
+    # Group by batch year, then by academic year
+    templates_by_batch = {}
+    for template in templates:
+        batch = template.batch_year
+        if batch not in templates_by_batch:
+            templates_by_batch[batch] = {}
+        
+        year = template.academic_year
+        if year not in templates_by_batch[batch]:
+            templates_by_batch[batch][year] = []
+        templates_by_batch[batch][year].append(template)
+    
+    return render_template('admin_fee_templates.html', templates_by_batch=templates_by_batch)
+
+
+@app.route('/admin/fee-templates/add', methods=['GET', 'POST'])
+@admin_required
+def admin_add_fee_template():
+    """Add a new fee template"""
+    from models import FeeTemplate
+    
+    if request.method == 'POST':
+        try:
+            academic_year = request.form.get('academic_year')
+            batch_year = request.form.get('batch_year')
+            seat_type = request.form.get('seat_type')
+            quota_type = request.form.get('quota_type') if request.form.get('quota_type') else None
+            base_fees = float(request.form.get('base_fees'))
+            description = request.form.get('description')
+            
+            # Validate
+            if not academic_year or not batch_year or not seat_type or base_fees < 0:
+                flash('Please fill all required fields', 'error')
+                return redirect(url_for('admin_add_fee_template'))
+            
+            # Check for duplicates
+            existing = FeeTemplate.query.filter_by(
+                academic_year=academic_year,
+                batch_year=batch_year,
+                seat_type=seat_type,
+                quota_type=quota_type,
+                is_deleted=False
+            ).first()
+            
+            if existing:
+                flash(f'Fee template already exists for Batch {batch_year}, Year {academic_year}, {seat_type} - {quota_type or "N/A"}', 'error')
+                return redirect(url_for('admin_add_fee_template'))
+            
+            # Create template
+            current_user = get_current_user()
+            template = FeeTemplate(
+                academic_year=academic_year,
+                batch_year=batch_year,
+                seat_type=seat_type,
+                quota_type=quota_type,
+                base_fees=base_fees,
+                description=description,
+                created_by_user_id=current_user.user_id
+            )
+            
+            db.session.add(template)
+            db.session.commit()
+            
+            flash(f'Fee template created successfully for Batch {batch_year}, Year {academic_year}', 'success')
+            return redirect(url_for('admin_fee_templates'))
+            
+        except Exception as e:
+            db.session.rollback()
+
+            # debug code
+            print(f'Error creating fee template: {str(e)}')
+            flash(f'Error creating fee template: {str(e)}', 'error')
+            return redirect(url_for('admin_add_fee_template'))
+    
+    return render_template('admin_fee_template_form.html', template=None)
+
+
+@app.route('/admin/fee-templates/<template_id>/edit', methods=['GET', 'POST'])
+@admin_required
+def admin_edit_fee_template(template_id):
+    """Edit an existing fee template"""
+    from models import FeeTemplate
+    
+    template = FeeTemplate.query.filter_by(fee_template_id=template_id, is_deleted=False).first()
+    if not template:
+        flash('Fee template not found', 'error')
+        return redirect(url_for('admin_fee_templates'))
+    
+    if request.method == 'POST':
+        try:
+            template.base_fees = float(request.form.get('base_fees'))
+            template.description = request.form.get('description')
+            
+            db.session.commit()
+            
+            flash(f'Fee template updated successfully', 'success')
+            return redirect(url_for('admin_fee_templates'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating fee template: {str(e)}', 'error')
+    
+    return render_template('admin_fee_template_form.html', template=template)
+
+
+@app.route('/admin/fee-templates/<template_id>/delete', methods=['POST'])
+@admin_required
+def admin_delete_fee_template(template_id):
+    """Soft delete a fee template"""
+    from models import FeeTemplate
+    
+    template = FeeTemplate.query.filter_by(fee_template_id=template_id, is_deleted=False).first()
+    if not template:
+        return jsonify({'success': False, 'message': 'Template not found'}), 404
+    
+    try:
+        template.is_deleted = True
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Template deleted successfully'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@app.route('/admin/assign-fees', methods=['GET', 'POST'])
+@admin_required
+def admin_assign_fees():
+    """Bulk assign fees to students without fee structures"""
+    from models import Student, FeeTemplate, FeeStructure
+    import uuid
+    
+    if request.method == 'POST':
+        try:
+            # Get students without fee structures
+            students = Student.query.filter_by(is_deleted=False).all()
+            
+            assigned_count = 0
+            errors = []
+            
+            for student in students:
+                # Check if student already has fee structure
+                existing = FeeStructure.query.filter_by(
+                    student_id=student.student_id,
+                    is_deleted=False
+                ).first()
+                
+                if existing:
+                    continue
+                
+                # Find matching template
+                template = FeeTemplate.query.filter_by(
+                    academic_year=student.joining_academic_year,
+                    batch_year=student.joining_academic_year,
+                    seat_type=student.seat_type,
+                    quota_type=student.quota_type,
+                    is_deleted=False
+                ).first()
+                
+                if not template:
+                    errors.append(f"{student.roll_number}: No matching template")
+                    continue
+                
+                # Create fee structure
+                fee_structure = FeeStructure(
+                    fee_structure_id=str(uuid.uuid4()),
+                    student_id=student.student_id,
+                    academic_year=student.joining_academic_year,
+                    base_fees=template.base_fees,
+                    total_fees=template.base_fees,
+                    additional_fees=None,
+                    fee_template_id=template.fee_template_id
+                )
+                
+                db.session.add(fee_structure)
+                assigned_count += 1
+            
+            db.session.commit()
+            
+            if assigned_count > 0:
+                flash(f'Successfully assigned fees to {assigned_count} students!', 'success')
+            else:
+                flash('No new fee assignments needed', 'info')
+            
+            if errors:
+                flash(f'Errors: {", ".join(errors[:5])}', 'warning')
+            
+            return redirect(url_for('admin_assign_fees'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error: {str(e)}', 'error')
+            return redirect(url_for('admin_assign_fees'))
+    
+    # GET request - show students without fees
+    from models import Student, FeeStructure
+    
+    students = Student.query.filter_by(is_deleted=False).all()
+    students_without_fees = []
+    
+    for student in students:
+        has_fees = FeeStructure.query.filter_by(
+            student_id=student.student_id,
+            is_deleted=False
+        ).first() is not None
+        
+        if not has_fees:
+            students_without_fees.append(student)
+    
+    return render_template('admin_assign_fees.html', 
+                         students=students_without_fees,
+                         total_students=len(students),
+                         students_with_fees=len(students) - len(students_without_fees))
+
 
 @app.route('/parent/dashboard')
 @student_required
@@ -4855,6 +6703,393 @@ def api_parent_student_status():
     })
 
 
+
+# ============================================================================
+# INTERNAL MARKS SYSTEM - FACULTY ROUTES
+# ============================================================================
+
+@app.route('/faculty/internal-marks')
+@login_required
+def faculty_internal_marks():
+    """
+    Faculty Internal Marks - List all assessments created by faculty
+    """
+    current_user = get_current_user()
+    
+    # Get faculty record
+    faculty_record = Faculty.query.filter_by(user_id=current_user.user_id).first()
+    if not faculty_record:
+        flash('Faculty record not found.', 'danger')
+        return redirect(url_for('login'))
+    
+    # Get all tests created by this faculty
+    tests = Test.query.filter_by(
+        faculty_id=faculty_record.faculty_id,
+        is_deleted=False
+    ).order_by(Test.test_date.desc()).all()
+    
+    # Get faculty's subject allocations for dropdown
+    allocations = SubjectAllocation.query.filter_by(
+        faculty_id=faculty_record.faculty_id,
+        is_deleted=False
+    ).all()
+    
+    return render_template('faculty/internal_marks.html', 
+                         tests=tests, 
+                         allocations=allocations,
+                         faculty=faculty_record)
+
+
+@app.route('/faculty/internal-marks/create', methods=['GET', 'POST'])
+@login_required
+def faculty_create_assessment():
+    """
+    Create new internal assessment
+    """
+    current_user = get_current_user()
+    faculty_record = Faculty.query.filter_by(user_id=current_user.user_id).first()
+    
+    if not faculty_record:
+        flash('Faculty record not found.', 'danger')
+        return redirect(url_for('login'))
+    
+    if request.method == 'POST':
+        try:
+            subject_id = request.form.get('subject_id')
+            section_id = request.form.get('section_id')
+            if not section_id: # Handle empty string from form as None for DB matching
+                section_id = None
+            
+            test_name = request.form.get('test_name')
+            component_type = request.form.get('component_type', 'test')
+            max_marks = float(request.form.get('max_marks', 0))
+            weightage = request.form.get('weightage')
+            test_date = request.form.get('test_date')
+            description = request.form.get('description')
+            
+            # Validate that faculty teaches this subject in this section
+            allocation = SubjectAllocation.query.filter_by(
+                faculty_id=faculty_record.faculty_id,
+                subject_id=subject_id,
+                section_id=section_id,
+                is_deleted=False
+            ).first()
+            
+            if not allocation:
+                flash('You are not authorized to create assessments for this subject/section.', 'danger')
+                return redirect(url_for('faculty_internal_marks'))
+            
+            # Create new test
+            new_test = Test(
+                test_name=test_name,
+                subject_id=subject_id,
+                faculty_id=faculty_record.faculty_id,
+                section_id=section_id,
+                component_type=component_type,
+                max_marks=max_marks,
+                weightage=float(weightage) if weightage else None,
+                test_date=datetime.strptime(test_date, '%Y-%m-%d').date() if test_date else None,
+                description=description,
+                is_published=False
+            )
+            
+            db.session.add(new_test)
+            db.session.commit()
+            
+            flash(f'Assessment "{test_name}" created successfully!', 'success')
+            return redirect(url_for('faculty_enter_marks', test_id=new_test.test_id))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error creating assessment: {str(e)}', 'danger')
+            return redirect(url_for('faculty_internal_marks'))
+    
+    # GET request - show form
+    allocations = SubjectAllocation.query.filter_by(
+        faculty_id=faculty_record.faculty_id,
+        is_deleted=False
+    ).all()
+    
+    # Get all potential sections for each subject
+    current_year = SystemSettings.get_current_academic_year()
+    
+    subject_sections = {}
+    for allocation in allocations:
+        subject = allocation.subject
+        if not subject or subject.subject_id in subject_sections:
+            continue
+            
+        # 1. Get regular sections for this subject's semester and program
+        # Regular sections match the subject's program and semester
+        matching_sections = Section.query.filter_by(
+            program_id=subject.program_id,
+            current_semester=subject.semester_id,
+            academic_year=current_year,
+            is_deleted=False
+        ).all()
+        
+        # 2. Get elective/virtual sections linked to this subject
+        elective_sections = Section.query.filter_by(
+            linked_subject_id=subject.subject_id,
+            is_elective=True,
+            academic_year=current_year,
+            is_deleted=False
+        ).all()
+        
+        # Combine and ensure unique
+        all_sections = list(set(matching_sections + elective_sections))
+        
+        subject_sections[subject.subject_id] = [
+            {
+                'section_id': s.section_id,
+                'section_name': s.section_name
+            } for s in all_sections
+        ]
+    
+    return render_template('faculty/create_assessment.html', 
+                         allocations=allocations,
+                         subject_sections=subject_sections,
+                         faculty=faculty_record)
+
+
+@app.route('/faculty/internal-marks/<test_id>/enter-marks')
+@login_required
+def faculty_enter_marks(test_id):
+    """
+    Enter/Edit marks for an assessment
+    """
+    current_user = get_current_user()
+    faculty_record = Faculty.query.filter_by(user_id=current_user.user_id).first()
+    
+    if not faculty_record:
+        flash('Faculty record not found.', 'danger')
+        return redirect(url_for('login'))
+    
+    # Get test
+    test = Test.query.get_or_404(test_id)
+    
+    # Verify faculty owns this test
+    if test.faculty_id != faculty_record.faculty_id:
+        flash('You are not authorized to edit this assessment.', 'danger')
+        return redirect(url_for('faculty_internal_marks'))
+    
+    # Get students in the section
+    section = Section.query.get(test.section_id)
+    students = section.get_students()
+    
+    # Get existing results
+    existing_results = {r.student_id: r for r in test.results.all()}
+    
+    # Prepare student data with marks
+    student_data = []
+    for student in students:
+        result = existing_results.get(student.student_id)
+        student_data.append({
+            'student': student,
+            'marks': result.marks_obtained if result else None,
+            'remarks': result.remarks if result else ''
+        })
+    
+    return render_template('faculty/enter_marks.html',
+                         test=test,
+                         student_data=student_data,
+                         faculty=faculty_record)
+
+
+@app.route('/api/faculty/internal-marks/<test_id>/save-marks', methods=['POST'])
+@login_required
+def api_save_marks(test_id):
+    """
+    Save marks for multiple students
+    """
+    current_user = get_current_user()
+    faculty_record = Faculty.query.filter_by(user_id=current_user.user_id).first()
+    
+    if not faculty_record:
+        return jsonify({'success': False, 'error': 'Faculty not found'}), 404
+    
+    test = Test.query.get_or_404(test_id)
+    
+    # Verify ownership
+    if test.faculty_id != faculty_record.faculty_id:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+    
+    try:
+        marks_data = request.json.get('marks', [])
+        
+        for item in marks_data:
+            student_id = item.get('student_id')
+            marks = item.get('marks')
+            remarks = item.get('remarks', '')
+            
+            # Validate marks
+            if marks is not None:
+                marks = float(marks)
+                if marks < 0 or marks > test.max_marks:
+                    return jsonify({
+                        'success': False, 
+                        'error': f'Marks must be between 0 and {test.max_marks}'
+                    }), 400
+            
+            # Check if result exists
+            result = TestResult.query.filter_by(
+                test_id=test_id,
+                student_id=student_id
+            ).first()
+            
+            if result:
+                # Update existing
+                result.marks_obtained = marks
+                result.remarks = remarks
+            else:
+                # Create new
+                result = TestResult(
+                    test_id=test_id,
+                    student_id=student_id,
+                    marks_obtained=marks,
+                    remarks=remarks
+                )
+                db.session.add(result)
+        
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Marks saved successfully'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/faculty/internal-marks/<test_id>/publish', methods=['POST'])
+@login_required
+def api_publish_marks(test_id):
+    """
+    Toggle publish status of marks
+    """
+    current_user = get_current_user()
+    faculty_record = Faculty.query.filter_by(user_id=current_user.user_id).first()
+    
+    if not faculty_record:
+        return jsonify({'success': False, 'error': 'Faculty not found'}), 404
+    
+    test = Test.query.get_or_404(test_id)
+    
+    # Verify ownership
+    if test.faculty_id != faculty_record.faculty_id:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+    
+    try:
+        test.is_published = not test.is_published
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'is_published': test.is_published,
+            'message': 'Marks published' if test.is_published else 'Marks unpublished'
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ============================================================================
+# INTERNAL MARKS SYSTEM - STUDENT ROUTES
+# ============================================================================
+
+@app.route('/student/internal-marks')
+@student_required
+def student_internal_marks():
+    """
+    Student view of internal marks
+    """
+    current_user = get_current_user()
+    student_record = Student.query.filter_by(user_id=current_user.user_id).first()
+    
+    if not student_record:
+        flash('Student record not found.', 'danger')
+        return redirect(url_for('login'))
+    
+    # Get student's section
+    section = Section.query.get(student_record.section_id)
+    
+    # Get all published tests for student's subjects
+    # Get compulsory subjects
+    compulsory_subjects = Subject.query.filter(
+        Subject.program_id == section.program_id,
+        Subject.semester_id == section.current_semester,
+        Subject.subject_category == 'compulsory'
+    ).all()
+    
+    # Get enrolled electives
+    enrollments = StudentSubjectEnrollment.query.filter_by(
+        student_id=student_record.student_id,
+        semester=section.current_semester,
+        is_deleted=False
+    ).all()
+    enrolled_subjects = [Subject.query.get(e.subject_id) for e in enrollments]
+    
+    all_subjects = compulsory_subjects + enrolled_subjects
+    
+    # Get marks for each subject
+    subject_marks = {}
+    for subject in all_subjects:
+        # Find target section (main or elective)
+        target_section_id = student_record.section_id
+        enrollment = next((e for e in enrollments if e.subject_id == subject.subject_id), None)
+        if enrollment and enrollment.section_id:
+            target_section_id = enrollment.section_id
+        
+        # Get published tests for this subject/section
+        tests = Test.query.filter_by(
+            subject_id=subject.subject_id,
+            section_id=target_section_id,
+            is_published=True,
+            is_deleted=False
+        ).order_by(Test.test_date.desc()).all()
+        
+        # Get student's results
+        marks_list = []
+        for test in tests:
+            result = TestResult.query.filter_by(
+                test_id=test.test_id,
+                student_id=student_record.student_id
+            ).first()
+            
+            marks_list.append({
+                'test': test,
+                'marks': result.marks_obtained if result else None,
+                'percentage': round((result.marks_obtained / test.max_marks * 100), 2) if result and result.marks_obtained is not None else None
+            })
+        
+        if marks_list:
+            subject_marks[subject.subject_id] = {
+                'subject': subject,
+                'marks': marks_list
+            }
+    
+    return render_template('student/internal_marks.html',
+                         subject_marks=subject_marks,
+                         student=student_record,
+                         section=section)
+
+
+@app.route('/api/student/internal-marks')
+@student_required
+def api_student_internal_marks():
+    """
+    API endpoint for student internal marks
+    """
+    current_user = get_current_user()
+    student_record = Student.query.filter_by(user_id=current_user.user_id).first()
+    
+    if not student_record:
+        return jsonify({'success': False, 'error': 'Student not found'}), 404
+    
+    # Similar logic as above but return JSON
+    # Implementation similar to student_internal_marks route
+    return jsonify({'success': True, 'message': 'API endpoint for future use'})
+
+
+
 if __name__ == '__main__':
     # Create database tables if they don't exist
     init_db()
@@ -4865,12 +7100,12 @@ if __name__ == '__main__':
     print("  BCA BUB Attendance System")
     print("  Mobile-First PWA Application")
     print("="*50)
-    print("\n📱 Access the app at:")
-    print("   • Local: http://localhost:5000")
-    print("   • Mobile: http://YOUR_IP:5000")
-    print("\n🔧 Running in DEBUG mode")
+    print("\nðŸ“± Access the app at:")
+    print("   â€¢ Local: http://localhost:5000")
+    print("   â€¢ Mobile: http://YOUR_IP:5000")
+    print("\nðŸ”§ Running in DEBUG mode")
     print("="*50 + "\n")
     
     app.run(debug=True, host='0.0.0.0', port=5000)
 # Faculty Check-In/Checkout API Endpoints
-# Add these to app.py
+# Add these to app.py# ============================================================================

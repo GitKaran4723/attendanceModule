@@ -38,6 +38,24 @@
                 </a>
             </li>
             <li class="admin-nav-item">
+                <a href="{{ url_for('admin_programs') }}">
+                    <i class="material-icons">school</i>
+                    <span>Programs</span>
+                </a>
+            </li>
+            <li class="admin-nav-item">
+                <a href="{{ url_for('admin_sections') }}">
+                    <i class="material-icons">class</i>
+                    <span>Sections</span>
+                </a>
+            </li>
+            <li class="admin-nav-item">
+                <a href="{{ url_for('admin_subjects') }}">
+                    <i class="material-icons">book</i>
+                    <span>Subjects</span>
+                </a>
+            </li>
+            <li class="admin-nav-item">
                 <a href="{{ url_for('admin_faculty') }}">
                     <i class="material-icons">school</i>
                     <span>Faculty</span>
@@ -50,21 +68,39 @@
                 </a>
             </li>
             <li class="admin-nav-item">
-                <a href="{{ url_for('admin_subjects') }}">
-                    <i class="material-icons">book</i>
-                    <span>Subjects</span>
+                <a href="{{ url_for('enrollment.admin_enrollment_page') }}">
+                    <i class="material-icons">how_to_reg</i>
+                    <span>Enrollment</span>
                 </a>
             </li>
             <li class="admin-nav-item">
-                <a href="{{ url_for('admin_sections') }}">
-                    <i class="material-icons">class</i>
-                    <span>Sections</span>
+                <a href="{{ url_for('admin_fees_page') }}">
+                    <i class="material-icons">payments</i>
+                    <span>Fee Management</span>
                 </a>
             </li>
             <li class="admin-nav-item active">
                 <a href="{{ url_for('admin_work_diary') }}">
                     <i class="material-icons">assignment</i>
                     <span>Work Diaries</span>
+                </a>
+            </li>
+            <li class="admin-nav-item">
+                <a href="{{ url_for('admin_holidays') }}">
+                    <i class="material-icons">event</i>
+                    <span>Manage Holidays</span>
+                </a>
+            </li>
+            <li class="admin-nav-item">
+                <a href="{{ url_for('admin_import') }}">
+                    <i class="material-icons">upload_file</i>
+                    <span>Bulk Import</span>
+                </a>
+            </li>
+            <li class="admin-nav-item">
+                <a href="{{ url_for('public_home') }}">
+                    <i class="material-icons">public</i>
+                    <span>View Public Site</span>
                 </a>
             </li>
         </ul>

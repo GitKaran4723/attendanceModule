@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1a237e">
+    <title>Fee Templates - BCA BUB Admin</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <style>
+        .page-header {
+            background: var(--admin-gradient);
+            padding: 24px;
+            margin: -24px -24px 24px -24px;
+            border-radius: 0 0 var(--admin-radius-xl) var(--admin-radius-xl);
+            color: white;
+        }
+
+        .batch-section {
+            background: var(--admin-card-bg);
+            border-radius: var(--admin-radius-lg);
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: var(--admin-shadow-sm);
+        }
+
+        .batch-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 3px solid var(--admin-primary);
+        }
+
+        .batch-title {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--admin-primary);
+        }
+
+        .year-subsection {
+            margin-bottom: 20px;
+        }
+
+        .year-label {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--admin-text-secondary);
+            margin-bottom: 12px;
+            padding-left: 12px;
+            border-left: 4px solid var(--admin-accent);
+        }
+
+        .template-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .template-card {
+            background: linear-gradient(135deg, rgba(26, 35, 126, 0.03) 0%, rgba(255, 111, 0, 0.03) 100%);
+            border: 2px solid rgba(26, 35, 126, 0.1);
+            border-radius: var(--admin-radius-md);
+            padding: 20px;
+            transition: all 0.3s;
+        }
+
+        .template-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--admin-shadow-md);
+            border-color: var(--admin-primary);
+        }
+
+        .template-type {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--admin-text-primary);
+            margin-bottom: 8px;
+        }
+
+        .template-quota {
+            font-size: 13px;
+            color: var(--admin-text-secondary);
+            margin-bottom: 12px;
+        }
+
+        .template-fee {
+            font-size: 28px;
+            font-weight: 800;
+            color: var(--admin-accent);
+            margin-bottom: 12px;
+        }
+
+        .template-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 16px;
+        }
+
+        .btn-edit-template {
+            flex: 1;
+            padding: 8px 12px;
+            background: rgba(26, 35, 126, 0.08);
+            color: var(--admin-primary);
+            border: none;
+            border-radius: var(--admin-radius-sm);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-edit-template:hover {
+            background: var(--admin-primary);
+            color: white;
+        }
+
+        .btn-delete-template {
+            padding: 8px 12px;
+            background: rgba(239, 68, 68, 0.08);
+            color: #ef4444;
+            border: none;
+            border-radius: var(--admin-radius-sm);
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-delete-template:hover {
+            background: #ef4444;
+            color: white;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 24px;
+            background: var(--admin-card-bg);
+            border-radius: var(--admin-radius-xl);
+            box-shadow: var(--admin-shadow-sm);
+        }
+
+        .fab {
+            position: fixed;
+            bottom: 84px;
+            right: 24px;
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: var(--admin-accent-gradient);
+            color: white;
+            border: none;
+            box-shadow: 0 6px 20px rgba(255, 111, 0, 0.4);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+            z-index: 100;
+        }
+
+        .fab:hover {
+            transform: scale(1.1);
+        }
+    </style>
+</head>
+
+<body class="admin-page">
+    <header class="admin-app-bar">
+        <button class="menu-btn" onclick="location.href='{{ url_for('admin_dashboard') }}'">
+            <i class="material-icons">arrow_back</i>
+        </button>
+        <h1 class="app-title">Fee Templates</h1>
+        <button class="icon-btn" onclick="location.href='{{ url_for('logout') }}'">
+            <i class="material-icons">logout</i>
+        </button>
+    </header>
+
+    <main class="admin-main">
+        <div class="admin-container">
+            <div class="page-header">
+                <h2>💰 Fee Templates</h2>
+                <p>Manage base fees by batch and academic year</p>
+            </div>
+
+            {% if templates_by_batch %}
+            {% for batch_year, years_data in templates_by_batch.items() | sort(reverse=True) %}
+            <div class="batch-section">
+                <div class="batch-header">
+                    <div class="batch-title">🎓 Batch {{ batch_year }}</div>
+                    <button class="admin-btn admin-btn-secondary"
+                        onclick="location.href='{{ url_for('admin_add_fee_template') }}'">
+                        <i class="material-icons">add</i> Add Template
+                    </button>
+                </div>
+
+                {% for academic_year, templates in years_data.items() | sort(reverse=True) %}
+                <div class="year-subsection">
+                    <div class="year-label">📅 Academic Year {{ academic_year }}</div>
+
+                    <div class="template-grid">
+                        {% for template in templates %}
+                        <div class="template-card">
+                            <div class="template-type">
+                                {% if template.seat_type == 'GOVERNMENT' %}
+                                🏛️ Government Seat
+                                {% else %}
+                                🏢 Management Seat
+                                {% endif %}
+                            </div>
+                            <div class="template-quota">
+                                {% if template.quota_type == 'MERIT' %}
+                                Merit Quota (General category)
+                                {% elif template.quota_type == 'CATEGORY' %}
+                                Category Quota (Reserved)
+                                {% else %}
+                                Management Quota
+                                {% endif %}
+                            </div>
+                            <div class="template-fee">₹{{ "{:,.0f}".format(template.base_fees) }}</div>
+                            {% if template.description %}
+                            <div style="font-size: 12px; color: var(--admin-text-muted); margin-bottom: 8px;">
+                                {{ template.description }}
+                            </div>
+                            {% endif %}
+                            <div class="template-actions">
+                                <button class="btn-edit-template"
+                                    onclick="location.href='/admin/fee-templates/{{ template.fee_template_id }}/edit'">
+                                    <i class="material-icons" style="font-size: 16px; vertical-align: middle;">edit</i>
+                                    Edit
+                                </button>
+                                <button class="btn-delete-template"
+                                    onclick="deleteTemplate('{{ template.fee_template_id }}', '{{ batch_year }}', '{{ academic_year }}')">
+                                    <i class="material-icons"
+                                        style="font-size: 16px; vertical-align: middle;">delete</i>
+                                </button>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="empty-state">
+                <i class="material-icons"
+                    style="font-size: 64px; color: var(--admin-primary); opacity: 0.3;">account_balance_wallet</i>
+                <h3>No Fee Templates Yet</h3>
+                <p>Click "Add Template" to create your first fee template</p>
+            </div>
+            {% endif %}
+        </div>
+    </main>
+
+    <button class="fab" onclick="location.href='{{ url_for('admin_add_fee_template') }}'">
+        <i class="material-icons">add</i>
+    </button>
+
+    <nav class="admin-bottom-nav">
+        <a href="{{ url_for('admin_dashboard') }}">
+            <i class="material-icons">dashboard</i>
+            <span>Dashboard</span>
+        </a>
+        <a href="{{ url_for('admin_faculty') }}">
+            <i class="material-icons">school</i>
+            <span>Faculty</span>
+        </a>
+        <a href="{{ url_for('admin_students') }}">
+            <i class="material-icons">people</i>
+            <span>Students</span>
+        </a>
+        <a href="{{ url_for('admin_subjects') }}">
+            <i class="material-icons">menu_book</i>
+            <span>Subjects</span>
+        </a>
+    </nav>
+
+    <script>
+        async function deleteTemplate(templateId, batchYear, academicYear) {
+            if (!confirm(`Delete template for Batch ${batchYear}, Year ${academicYear}?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/admin/fee-templates/${templateId}/delete`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert('Template deleted successfully');
+                    location.reload();
+                } else {
+                    alert('Error: ' + result.message);
+                }
+            } catch (error) {
+                alert('Failed to delete template');
+                console.error(error);
+            }
+        }
+    </script>
+</body>
+
+</html>

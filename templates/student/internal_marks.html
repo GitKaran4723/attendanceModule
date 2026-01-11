@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Internal Marks</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding-bottom: 80px;
+        }
+
+        .app-bar {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .page-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #2d3748;
+        }
+
+        .content {
+            padding: 20px;
+        }
+
+        .subject-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .subject-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #edf2f7;
+        }
+
+        .subject-name {
+            font-size: 18px;
+            font-weight: 700;
+            color: #2d3748;
+        }
+
+        .subject-code {
+            font-size: 12px;
+            color: #718096;
+            margin-top: 4px;
+        }
+
+        .assessment-item {
+            background: #f7fafc;
+            padding: 12px;
+            border-radius: 12px;
+            margin-bottom: 8px;
+            border-left: 4px solid #667eea;
+        }
+
+        .assessment-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .assessment-name {
+            font-weight: 600;
+            font-size: 15px;
+            color: #2d3748;
+        }
+
+        .marks-display {
+            font-weight: 700;
+            font-size: 16px;
+            color: #667eea;
+        }
+
+        .assessment-details {
+            display: flex;
+            gap: 12px;
+            font-size: 12px;
+            color: #718096;
+        }
+
+        .badge {
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-test {
+            background: #ede7f6;
+            color: #4527a0;
+        }
+
+        .badge-assignment {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+
+        .badge-project {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .badge-quiz {
+            background: #fff9c4;
+            color: #f57f17;
+        }
+
+        .percentage-badge {
+            padding: 4px 10px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .badge-green {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .badge-orange {
+            background: #fed7aa;
+            color: #92400e;
+        }
+
+        .badge-red {
+            background: #fecaca;
+            color: #991b1b;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: white;
+        }
+
+        .empty-state i {
+            font-size: 64px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            display: flex;
+            justify-content: space-around;
+            padding: 12px 0 24px 0;
+            box-shadow: 0 -2px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: #718096;
+            text-decoration: none;
+            font-size: 11px;
+            font-weight: 500;
+            gap: 4px;
+        }
+
+        .nav-item.active {
+            color: #667eea;
+        }
+
+        .nav-item i {
+            font-size: 22px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-bar">
+        <h1 class="page-title">Internal Marks</h1>
+        <i class="fas fa-times" onclick="location.href='{{ url_for('student_dashboard') }}'"
+            style="color: #718096; cursor: pointer; font-size: 20px;"></i>
+    </div>
+
+    <div class="content">
+        {% if subject_marks %}
+        {% for subject_id, data in subject_marks.items() %}
+        <div class="subject-card">
+            <div class="subject-header">
+                <div>
+                    <div class="subject-name">{{ data.subject.subject_name }}</div>
+                    <div class="subject-code">{{ data.subject.subject_code }}</div>
+                </div>
+            </div>
+
+            {% for item in data.marks %}
+            <div class="assessment-item">
+                <div class="assessment-header">
+                    <div class="assessment-name">{{ item.test.test_name }}</div>
+                    <div class="marks-display">
+                        {% if item.marks is not none %}
+                        {{ item.marks }}/{{ item.test.max_marks }}
+                        {% else %}
+                        --/{{ item.test.max_marks }}
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="assessment-details">
+                    <span class="badge badge-{{ item.test.component_type }}">{{ item.test.component_type|title }}</span>
+                    {% if item.test.test_date %}
+                    <span><i class="far fa-calendar"></i> {{ item.test.test_date.strftime('%d %b %Y') }}</span>
+                    {% endif %}
+                    {% if item.percentage is not none %}
+                    <span
+                        class="percentage-badge {% if item.percentage >= 75 %}badge-green{% elif item.percentage >= 50 %}badge-orange{% else %}badge-red{% endif %}">
+                        {{ item.percentage }}%
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="empty-state">
+            <i class="fas fa-clipboard-list"></i>
+            <h3>No Marks Published Yet</h3>
+            <p>Your internal assessment marks will appear here once published by faculty.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <nav class="bottom-nav">
+        <a href="{{ url_for('student_dashboard') }}" class="nav-item">
+            <i class="fas fa-home"></i>
+            <span>Home</span>
+        </a>
+        <a href="{{ url_for('student_internal_marks') }}" class="nav-item active">
+            <i class="fas fa-clipboard-list"></i>
+            <span>Internal Marks</span>
+        </a>
+        <a href="{{ url_for('student_fees_page') }}" class="nav-item">
+            <i class="fas fa-wallet"></i>
+            <span>Fees</span>
+        </a>
+        <a href="{{ url_for('student_profile') }}" class="nav-item">
+            <i class="fas fa-user"></i>
+            <span>Profile</span>
+        </a>
+    </nav>
+</body>
+
+</html>

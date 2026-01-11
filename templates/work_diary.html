@@ -251,6 +251,138 @@
         .nav-item.active i {
             font-variation-settings: 'FILL' 1;
         }
+
+        /* Download Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--surface-color);
+            border-radius: var(--border-radius);
+            padding: 24px;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            animation: modalSlideIn 0.3s ease-out;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin: 0;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 50%;
+            transition: background 0.2s;
+        }
+
+        .modal-close:hover {
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            box-sizing: border-box;
+            transition: border-color 0.3s;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(98, 0, 234, 0.3);
+        }
+
+        .btn-secondary {
+            background: #f5f5f5;
+            color: var(--text-primary);
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
     </style>
 </head>
 
@@ -261,8 +393,8 @@
             <i class="material-icons-round">arrow_back</i>
         </button>
         <h1 class="app-bar-title">Work Diary</h1>
-        <button class="icon-btn" onclick="window.print()">
-            <i class="material-icons-round">print</i>
+        <button class="icon-btn" onclick="openDownloadModal()" title="Download as Word Document">
+            <i class="material-icons-round">download</i>
         </button>
     </header>
 
@@ -335,6 +467,35 @@
         </table>
     </div>
 
+    <!-- Download Modal -->
+    <div class="modal-overlay" id="downloadModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Download Work Diary</h2>
+                <button class="modal-close" onclick="closeDownloadModal()">
+                    <i class="material-icons-round">close</i>
+                </button>
+            </div>
+            <form id="downloadForm" onsubmit="handleDownload(event)">
+                <div class="form-group">
+                    <label class="form-label" for="startDate">Start Date</label>
+                    <input type="date" id="startDate" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="endDate">End Date</label>
+                    <input type="date" id="endDate" class="form-input" required>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeDownloadModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="material-icons-round" style="font-size: 16px; vertical-align: middle;">download</i>
+                        Download
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Bottom Navigation -->
     <nav class="bottom-nav">
         <a href="{{ url_for('faculty_dashboard_view') }}" class="nav-item">
@@ -345,6 +506,12 @@
         <a href="{{ url_for('faculty_my_class_view') }}" class="nav-item">
             <i class="material-icons-round">school</i>
             <span>My Class</span>
+        </a>
+        {% endif %}
+        {% if faculty.is_coordinator %}
+        <a href="{{ url_for('faculty_department') }}" class="nav-item">
+            <i class="material-icons-round">supervisor_account</i>
+            <span>My Department</span>
         </a>
         {% endif %}
         <a href="{{ url_for('faculty_work_diary') }}" class="nav-item active">
@@ -372,6 +539,60 @@
                 }
             });
         }
+
+
+        function openDownloadModal() {
+            const modal = document.getElementById('downloadModal');
+            modal.classList.add('active');
+
+            // Set default dates (current month)
+            const now = new Date();
+            const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+            const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+            document.getElementById('startDate').valueAsDate = firstDay;
+            document.getElementById('endDate').valueAsDate = lastDay;
+        }
+
+        function closeDownloadModal() {
+            const modal = document.getElementById('downloadModal');
+            modal.classList.remove('active');
+        }
+
+        function handleDownload(event) {
+            event.preventDefault();
+
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+
+            if (!startDate || !endDate) {
+                alert('Please select both start and end dates');
+                return;
+            }
+
+            if (new Date(startDate) > new Date(endDate)) {
+                alert('Start date must be before end date');
+                return;
+            }
+
+            // Construct download URL with date range
+            const url = "{{ url_for('generate_work_diary_docx') }}?start_date=" + encodeURIComponent(startDate) +
+                "&end_date=" + encodeURIComponent(endDate) + "&faculty=current";
+
+            // Open in new tab to trigger download
+            window.open(url, '_blank');
+
+            // Close modal
+            closeDownloadModal();
+        }
+
+        // Close modal when clicking outside
+        document.addEventListener('click', function (event) {
+            const modal = document.getElementById('downloadModal');
+            if (event.target === modal) {
+                closeDownloadModal();
+            }
+        });
     </script>
 </body>
 

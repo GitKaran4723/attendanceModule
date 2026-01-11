@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance Report - {{ faculty.first_name }} {{ faculty.last_name }}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #1a237e;
+            --text-main: #333;
+            --text-muted: #666;
+            --border-color: #ddd;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0;
+            color: var(--text-main);
+            background-color: #f5f5f5;
+        }
+
+        .report-content {
+            background-color: white;
+            width: 210mm;
+            min-height: 297mm;
+            margin: 20px auto;
+            padding: 15mm;
+            box-sizing: border-box;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        @media print {
+            body {
+                background: none;
+            }
+
+            .report-content {
+                margin: 0;
+                box-shadow: none;
+                width: 100%;
+                padding: 10mm;
+            }
+
+            .no-print {
+                display: none;
+            }
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+
+        .logo {
+            width: 70px;
+            height: auto;
+            margin-right: 20px;
+        }
+
+        .header-text h1 {
+            margin: 0;
+            font-size: 20px;
+            color: var(--primary-color);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .header-text h2 {
+            margin: 5px 0 0 0;
+            font-size: 15px;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .report-title {
+            text-align: center;
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            text-decoration: underline;
+            color: #000;
+        }
+
+        .faculty-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 25px;
+            font-size: 14px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #eee;
+        }
+
+        .info-item b {
+            width: 120px;
+            display: inline-block;
+            color: var(--primary-color);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 40px;
+            font-size: 12px;
+        }
+
+        th {
+            background-color: #1a237e;
+            color: white;
+            font-weight: 600;
+            text-align: left;
+            border: 1px solid #eee;
+            padding: 10px;
+        }
+
+        td {
+            border: 1px solid #eee;
+            padding: 8px 10px;
+        }
+
+        tr:nth-child(even) {
+            background-color: #fcfcfc;
+        }
+
+        .status-present {
+            color: #2e7d32;
+            font-weight: 600;
+        }
+
+        .status-absent {
+            color: #c62828;
+        }
+
+        .status-holiday {
+            color: #1565c0;
+            font-style: italic;
+        }
+
+        .footer-signatures {
+            margin-top: 50px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .signature-box {
+            width: 200px;
+            text-align: center;
+        }
+
+        .signature-line {
+            border-top: 1.5px solid #000;
+            margin-bottom: 8px;
+        }
+
+        .signature-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #333;
+        }
+
+        .print-btn {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+            transition: transform 0.2s;
+        }
+
+        .print-btn:hover {
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+
+<body>
+
+    <button class="print-btn no-print" onclick="window.print()">
+        <span>Print Attendance Report</span>
+    </button>
+
+    <div class="report-content">
+        <div class="header">
+            <img src="{{ url_for('static', filename='icons/Bangalore_University_logo.png') }}" alt="BU Logo"
+                class="logo">
+            <div class="header-text">
+                <h1>Bangalore University</h1>
+                <h2>Department of Computer Applications (BCA)</h2>
+            </div>
+        </div>
+
+        <div class="report-title">OFFICIAL ATTENDANCE STATEMENT</div>
+
+        <div class="faculty-info">
+            <div class="info-item"><b>Faculty Name:</b> {{ faculty.first_name }} {{ faculty.last_name }}</div>
+            <div class="info-item"><b>Designation:</b> {{ faculty.designation or 'Assistant Professor' }}</div>
+            <div class="info-item"><b>Employee ID:</b> {{ faculty.employee_id or 'GF25' + faculty.faculty_id[:5]|upper
+                }}</div>
+            <div class="info-item"><b>Department:</b> {{ faculty.department or 'BCA' }}</div>
+            <div class="info-item"><b>Report Period:</b> {{ start_date }} - {{ end_date }}</div>
+            <div class="info-item"><b>Issued On:</b> {{ generated_at }}</div>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 20%;">Date</th>
+                    <th style="width: 20%;">Day</th>
+                    <th style="width: 20%;">Status</th>
+                    <th>Remarks</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in report_data %}
+                <tr>
+                    <td>{{ row.date }}</td>
+                    <td>{{ row.day }}</td>
+                    <td class="status-{{ row.status.lower() if row.status != '-' else 'default' }}">
+                        {{ row.status }}
+                    </td>
+                    <td>{{ row.remarks }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="footer-signatures">
+            <div class="signature-box">
+                <div class="signature-line"></div>
+                <div class="signature-title">Signature of Faculty</div>
+            </div>
+            <div class="signature-box">
+                <div class="signature-line"></div>
+                <div class="signature-title">HOD / Coordinator</div>
+            </div>
+        </div>
+
+        <div
+            style="margin-top: 50px; font-size: 10px; color: #777; text-align: center; border-top: 1px solid #eee; padding-top: 20px;">
+            This document is a computer-generated official attendance record from the BU-BCA Department portal.
+        </div>
+    </div>
+
+</body>
+
+</html>

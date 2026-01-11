@@ -1,0 +1,798 @@
+{% extends "base.html" %}
+
+{% block title %}Fee Management - Faculty Portal{% endblock %}
+
+{% block extra_css %}
+<style>
+    .fee-management {
+        padding: 20px;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    .page-header {
+        margin-bottom: 30px;
+    }
+
+    .page-header h1 {
+        font-size: 2rem;
+        color: #1f2937;
+        margin-bottom: 10px;
+    }
+
+    .filters-bar {
+        background: white;
+        padding: 20px;
+        border-radius: 12px;
+        margin-bottom: 25px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+        display: flex;
+        gap: 15px;
+        flex-wrap: wrap;
+        align-items: end;
+    }
+
+    .filter-group {
+        flex: 1;
+        min-width: 200px;
+    }
+
+    .filter-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: 600;
+        color: #374151;
+        font-size: 0.9rem;
+    }
+
+    .filter-group select {
+        width: 100%;
+        padding: 10px;
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        font-size: 1rem;
+    }
+
+    .btn {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+
+    .btn-primary {
+        background: #8b5cf6;
+        color: white;
+    }
+
+    .btn-primary:hover {
+        background: #7c3aed;
+        transform: translateY(-2px);
+    }
+
+    .btn-success {
+        background: #10b981;
+        color: white;
+    }
+
+    .btn-success:hover {
+        background: #059669;
+    }
+
+    .students-grid {
+        display: grid;
+        gap: 20px;
+    }
+
+    .student-card {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+        transition: all 0.3s;
+    }
+
+    .student-card:hover {
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+    }
+
+    .student-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
+        margin-bottom: 15px;
+        padding-bottom: 15px;
+        border-bottom: 2px solid #f3f4f6;
+    }
+
+    .student-info h3 {
+        margin: 0 0 5px 0;
+        color: #1f2937;
+        font-size: 1.2rem;
+    }
+
+    .student-meta {
+        color: #6b7280;
+        font-size: 0.9rem;
+    }
+
+    .fee-stats-mini {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 15px;
+        margin: 15px 0;
+    }
+
+    .stat-mini {
+        text-align: center;
+        padding: 10px;
+        background: #f9fafb;
+        border-radius: 8px;
+    }
+
+    .stat-mini-label {
+        font-size: 0.75rem;
+        color: #6b7280;
+        text-transform: uppercase;
+        margin-bottom: 5px;
+    }
+
+    .stat-mini-value {
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: #1f2937;
+    }
+
+    .receipts-section {
+        margin-top: 15px;
+    }
+
+    .receipts-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+
+    .receipts-header h4 {
+        margin: 0;
+        color: #374151;
+        font-size: 1rem;
+    }
+
+    .receipt-item {
+        background: #f9fafb;
+        padding: 12px;
+        border-radius: 8px;
+        margin-bottom: 8px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .receipt-info {
+        flex: 1;
+    }
+
+    .receipt-number {
+        font-weight: 600;
+        color: #1f2937;
+    }
+
+    .receipt-details {
+        font-size: 0.85rem;
+        color: #6b7280;
+        margin-top: 3px;
+    }
+
+    .receipt-actions {
+        display: flex;
+        gap: 8px;
+    }
+
+    .btn-sm {
+        padding: 6px 12px;
+        font-size: 0.85rem;
+    }
+
+    .btn-approve {
+        background: #10b981;
+        color: white;
+    }
+
+    .btn-edit {
+        background: #3b82f6;
+        color: white;
+    }
+
+    .btn-delete {
+        background: #ef4444;
+        color: white;
+    }
+
+    .status-badge {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+
+    .status-approved {
+        background: #d1fae5;
+        color: #065f46;
+    }
+
+    .status-pending {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .modal.active {
+        display: flex;
+    }
+
+    .modal-content {
+        background: white;
+        border-radius: 15px;
+        padding: 30px;
+        max-width: 600px;
+        width: 90%;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 25px;
+    }
+
+    .modal-header h3 {
+        margin: 0;
+        font-size: 1.5rem;
+    }
+
+    .close-modal {
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        cursor: pointer;
+        color: #6b7280;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 600;
+        color: #374151;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        width: 100%;
+        padding: 12px;
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        font-size: 1rem;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus {
+        outline: none;
+        border-color: #8b5cf6;
+    }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+    }
+
+    .submit-btn {
+        width: 100%;
+        padding: 14px;
+        background: #8b5cf6;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .submit-btn:hover {
+        background: #7c3aed;
+    }
+
+    .alert {
+        padding: 12px 16px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+
+    .alert-success {
+        background: #d1fae5;
+        color: #065f46;
+    }
+
+    .alert-error {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: #9ca3af;
+    }
+
+    .empty-state i {
+        font-size: 4rem;
+        margin-bottom: 20px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="fee-management">
+    <div class="page-header">
+        <h1>💰 Fee Management</h1>
+        <p style="color: #6b7280;">Manage fee structures and approve student receipts</p>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters-bar">
+        <div class="filter-group">
+            <label>Section</label>
+            <select id="sectionFilter">
+                <option value="">All My Sections</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>Approval Status</label>
+            <select id="statusFilter">
+                <option value="">All</option>
+                <option value="pending">Pending Only</option>
+                <option value="approved">Approved Only</option>
+            </select>
+        </div>
+        <div>
+            <button class="btn btn-primary" onclick="loadStudents()">
+                <i class="fas fa-filter"></i> Apply Filters
+            </button>
+        </div>
+    </div>
+
+    <!-- Alert Container -->
+    <div id="alertContainer"></div>
+
+    <!-- Students List -->
+    <div class="students-grid" id="studentsContainer">
+        <div class="empty-state">
+            <i class="fas fa-spinner fa-spin"></i>
+            <h3>Loading students...</h3>
+        </div>
+    </div>
+</div>
+
+<!-- Set Fee Structure Modal -->
+<div class="modal" id="feeStructureModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Set Fee Structure</h3>
+            <button class="close-modal" onclick="closeModal('feeStructureModal')">&times;</button>
+        </div>
+        <form id="feeStructureForm">
+            <input type="hidden" id="studentId" name="student_id">
+            <input type="hidden" id="sectionId" name="section_id">
+
+            <div class="form-group">
+                <label>Student</label>
+                <input type="text" id="studentName" readonly style="background: #f3f4f6;">
+            </div>
+
+            <div class="form-group">
+                <label>Academic Year *</label>
+                <select id="academicYear" name="academic_year" required>
+                    <option value="2024-2025">2024-2025</option>
+                    <option value="2025-2026" selected>2025-2026</option>
+                    <option value="2026-2027">2026-2027</option>
+                </select>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Base Fees (₹) *</label>
+                    <input type="number" id="baseFees" name="base_fees" step="0.01" required oninput="calculateTotal()">
+                </div>
+                <div class="form-group">
+                    <label>Carry Forward (₹)</label>
+                    <input type="number" id="carryForward" name="carry_forward" step="0.01" value="0"
+                        oninput="calculateTotal()">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Additional Charges (₹)</label>
+                    <input type="number" id="additionalCharges" name="additional_charges" step="0.01" value="0"
+                        oninput="calculateTotal()">
+                </div>
+                <div class="form-group">
+                    <label>Total Fees (₹) *</label>
+                    <input type="number" id="totalFees" name="total_fees" step="0.01" readonly
+                        style="background: #f3f4f6; font-weight: 700;">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="isRetained" name="is_retained" style="width: auto; margin-right: 8px;">
+                    Student is retained (same year)
+                </label>
+            </div>
+
+            <div class="form-group" id="previousYearGroup" style="display: none;">
+                <label>Previous Academic Year</label>
+                <select id="previousYear" name="previous_year">
+                    <option value="2023-2024">2023-2024</option>
+                    <option value="2024-2025">2024-2025</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Remarks</label>
+                <textarea id="remarks" name="remarks" rows="3"></textarea>
+            </div>
+
+            <button type="submit" class="submit-btn">Save Fee Structure</button>
+        </form>
+    </div>
+</div>
+
+<!-- Add Receipt Modal -->
+<div class="modal" id="addReceiptModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Add Receipt</h3>
+            <button class="close-modal" onclick="closeModal('addReceiptModal')">&times;</button>
+        </div>
+        <form id="addReceiptForm">
+            <input type="hidden" id="receiptFeeStructureId" name="fee_structure_id">
+
+            <div class="form-group">
+                <label>Receipt Number *</label>
+                <input type="text" id="receiptNumber" name="receipt_number" required>
+            </div>
+
+            <div class="form-group">
+                <label>Phone on Receipt *</label>
+                <input type="tel" id="receiptPhone" name="receipt_phone" required>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Amount (₹) *</label>
+                    <input type="number" id="receiptAmount" name="amount_paid" step="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label>Payment Date *</label>
+                    <input type="date" id="receiptDate" name="payment_date" required>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Payment Mode</label>
+                <select id="receiptMode" name="payment_mode">
+                    <option value="cash">Cash</option>
+                    <option value="online">Online/UPI</option>
+                    <option value="cheque">Cheque</option>
+                    <option value="dd">DD</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="approveImmediately" name="approve_immediately"
+                        style="width: auto; margin-right: 8px;">
+                    Approve immediately
+                </label>
+            </div>
+
+            <button type="submit" class="submit-btn">Add Receipt</button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let sections = [];
+    let studentsData = [];
+
+    document.addEventListener('DOMContentLoaded', function () {
+        loadStudents();
+
+        // Retention checkbox handler
+        document.getElementById('isRetained').addEventListener('change', function () {
+            document.getElementById('previousYearGroup').style.display = this.checked ? 'block' : 'none';
+        });
+    });
+
+    async function loadStudents() {
+        const sectionId = document.getElementById('sectionFilter').value;
+        const approvalStatus = document.getElementById('statusFilter').value;
+
+        const params = new URLSearchParams();
+        if (sectionId) params.append('section_id', sectionId);
+        if (approvalStatus) params.append('approval_status', approvalStatus);
+
+        try {
+            const response = await fetch(`/fees/faculty/students?${params}`);
+            const data = await response.json();
+
+            if (data.success) {
+                studentsData = data.data;
+                sections = data.sections;
+                populateSectionFilter();
+                renderStudents();
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showAlert('Failed to load students', 'error');
+        }
+    }
+
+    function populateSectionFilter() {
+        const select = document.getElementById('sectionFilter');
+        select.innerHTML = '<option value="">All My Sections</option>';
+        sections.forEach(section => {
+            select.innerHTML += `<option value="${section.section_id}">${section.section_name}</option>`;
+        });
+    }
+
+    function renderStudents() {
+        const container = document.getElementById('studentsContainer');
+
+        if (studentsData.length === 0) {
+            container.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-users-slash"></i>
+                <h3>No Students Found</h3>
+                <p>No fee records match your filters.</p>
+            </div>
+        `;
+            return;
+        }
+
+        container.innerHTML = studentsData.map(item => {
+            const structure = item.structure;
+            const receipts = item.receipts;
+            const pendingReceipts = receipts.filter(r => !r.approved);
+
+            return `
+            <div class="student-card">
+                <div class="student-header">
+                    <div class="student-info">
+                        <h3>${structure.student_name}</h3>
+                        <div class="student-meta">
+                            ${structure.roll_number} • ${structure.section_name} • ${structure.academic_year}
+                        </div>
+                    </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="fee-stats-mini">
+                    <div class="stat-mini">
+                        <div class="stat-mini-label">Total</div>
+                        <div class="stat-mini-value">₹${structure.total_fees.toLocaleString()}</div>
+                    </div>
+                    <div class="stat-mini">
+                        <div class="stat-mini-label">Paid</div>
+                        <div class="stat-mini-value">₹${structure.total_paid.toLocaleString()}</div>
+                    </div>
+                    <div class="stat-mini">
+                        <div class="stat-mini-label">Outstanding</div>
+                        <div class="stat-mini-value" style="color: ${structure.outstanding > 0 ? '#ef4444' : '#10b981'}">
+                            ₹${structure.outstanding.toLocaleString()}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="receipts-section">
+                    <div class="receipts-header">
+                        <h4>Receipts (${receipts.length})</h4>
+                        ${structure.fee_structure_id ? `
+                            <button class="btn btn-success btn-sm" onclick="openAddReceiptModal('${structure.fee_structure_id}')">
+                                <i class="fas fa-plus"></i> Add
+                            </button>
+                        ` : `<span style="color: #ef4444; font-size: 0.85rem; font-weight: 600;">Fees not set by admin</span>`}
+                    </div>
+                    ${receipts.length > 0 ? receipts.map(receipt => `
+                        <div class="receipt-item">
+                            <div class="receipt-info">
+                                <div class="receipt-number">${receipt.receipt_number}</div>
+                                <div class="receipt-details">
+                                    ₹${receipt.amount_paid.toLocaleString()} • ${new Date(receipt.payment_date).toLocaleDateString()} • 
+                                    <span class="status-badge status-${receipt.approved ? 'approved' : 'pending'}">
+                                        ${receipt.approved ? '✓ Approved' : '⏳ Pending'}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="receipt-actions">
+                                ${!receipt.approved ? `
+                                    <button class="btn btn-approve btn-sm" onclick="approveReceipt('${receipt.fee_receipt_id}')">
+                                        Approve
+                                    </button>
+                                ` : ''}
+                                <button class="btn btn-delete btn-sm" onclick="deleteReceipt('${receipt.fee_receipt_id}')">
+                                    Delete
+                                </button>
+                            </div>
+                        </div>
+                    `).join('') : '<p style="color: #9ca3af; text-align: center; padding: 20px;">No receipts yet</p>'}
+                </div>
+            </div>
+        `;
+        }).join('');
+    }
+
+    function openFeeStructureModal(structure) {
+        document.getElementById('studentId').value = structure.student_id;
+        document.getElementById('sectionId').value = structure.section_id;
+        document.getElementById('studentName').value = structure.student_name;
+        document.getElementById('academicYear').value = structure.academic_year || '2025-2026';
+        document.getElementById('baseFees').value = structure.base_fees || '';
+        document.getElementById('carryForward').value = structure.carry_forward || 0;
+        document.getElementById('additionalCharges').value = structure.additional_charges || 0;
+        document.getElementById('totalFees').value = structure.total_fees || '';
+        document.getElementById('isRetained').checked = structure.is_retained || false;
+        document.getElementById('remarks').value = structure.remarks || '';
+
+        document.getElementById('feeStructureModal').classList.add('active');
+    }
+
+    function openAddReceiptModal(feeStructureId) {
+        document.getElementById('receiptFeeStructureId').value = feeStructureId;
+        document.getElementById('addReceiptModal').classList.add('active');
+        document.getElementById('addReceiptForm').reset();
+        document.getElementById('receiptDate').valueAsDate = new Date();
+    }
+
+    function closeModal(modalId) {
+        document.getElementById(modalId).classList.remove('active');
+    }
+
+    function calculateTotal() {
+        const base = parseFloat(document.getElementById('baseFees').value) || 0;
+        const carry = parseFloat(document.getElementById('carryForward').value) || 0;
+        const additional = parseFloat(document.getElementById('additionalCharges').value) || 0;
+        document.getElementById('totalFees').value = (base + carry + additional).toFixed(2);
+    }
+
+    // Form submissions
+    document.getElementById('feeStructureForm').addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const data = Object.fromEntries(formData.entries());
+        data.is_retained = document.getElementById('isRetained').checked;
+
+        try {
+            const response = await fetch('/fees/faculty/set-structure', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const result = await response.json();
+
+            if (result.success) {
+                showAlert(result.message, 'success');
+                closeModal('feeStructureModal');
+                loadStudents();
+            } else {
+                showAlert(result.error, 'error');
+            }
+        } catch (error) {
+            showAlert('Failed to save fee structure', 'error');
+        }
+    });
+
+    document.getElementById('addReceiptForm').addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const data = Object.fromEntries(formData.entries());
+        data.approve_immediately = document.getElementById('approveImmediately').checked;
+
+        try {
+            const response = await fetch('/fees/faculty/add-receipt', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const result = await response.json();
+
+            if (result.success) {
+                showAlert(result.message, 'success');
+                closeModal('addReceiptModal');
+                loadStudents();
+            } else {
+                showAlert(result.error, 'error');
+            }
+        } catch (error) {
+            showAlert('Failed to add receipt', 'error');
+        }
+    });
+
+    async function approveReceipt(receiptId) {
+        if (!confirm('Approve this receipt?')) return;
+
+        try {
+            const response = await fetch(`/fees/faculty/receipt/${receiptId}/approve`, {
+                method: 'POST'
+            });
+            const result = await response.json();
+
+            if (result.success) {
+                showAlert('Receipt approved successfully', 'success');
+                loadStudents();
+            } else {
+                showAlert(result.error, 'error');
+            }
+        } catch (error) {
+            showAlert('Failed to approve receipt', 'error');
+        }
+    }
+
+    async function deleteReceipt(receiptId) {
+        if (!confirm('Delete this receipt? This action cannot be undone.')) return;
+
+        try {
+            const response = await fetch(`/fees/faculty/receipt/${receiptId}`, {
+                method: 'DELETE'
+            });
+            const result = await response.json();
+
+            if (result.success) {
+                showAlert('Receipt deleted successfully', 'success');
+                loadStudents();
+            } else {
+                showAlert(result.error, 'error');
+            }
+        } catch (error) {
+            showAlert('Failed to delete receipt', 'error');
+        }
+    }
+
+    function showAlert(message, type) {
+        const container = document.getElementById('alertContainer');
+        const alert = document.createElement('div');
+        alert.className = `alert alert-${type}`;
+        alert.textContent = message;
+        container.appendChild(alert);
+        setTimeout(() => alert.remove(), 5000);
+    }
+</script>
+{% endblock %}

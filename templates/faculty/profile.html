@@ -397,6 +397,12 @@
             <span>My Class</span>
         </a>
         {% endif %}
+        {% if faculty.is_coordinator %}
+        <a href="{{ url_for('faculty_department') }}" class="nav-item">
+            <i class="material-icons-round">supervisor_account</i>
+            <span>My Department</span>
+        </a>
+        {% endif %}
         <a href="{{ url_for('faculty_work_diary') }}" class="nav-item">
             <i class="material-icons-round">book</i>
             <span>Diary</span>

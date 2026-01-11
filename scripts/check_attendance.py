@@ -9,7 +9,7 @@ if not student:
     print("Student not found!")
     exit()
 
-print(f"Student: {student.first_name} {student.last_name}")
+print(f"Student: {student.name}")
 print(f"Section ID: {student.section_id}")
 print(f"Student ID: {student.student_id}")
 print()

@@ -335,18 +335,36 @@
                             </div>
                         </div>
 
-                        <div class="form-group">
-                            <label class="form-label"
-                                style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                                <input type="checkbox" name="is_specialization" value="true"
-                                    style="width: 20px; height: 20px;" {{ 'checked' if subject and
-                                    subject.is_specialization else '' }}>
-                                Specialization / Elective Subject
-                                <span
-                                    style="font-weight: 400; color: var(--admin-text-secondary); font-size: 13px;">(Students
-                                    must be enrolled individually)</span>
-                            </label>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">Subject Category <span class="required">*</span></label>
+                                <select name="subject_category" class="form-select" required>
+                                    <option value="compulsory" {{ 'selected' if not subject or
+                                        subject.subject_category=='compulsory' else '' }}>Compulsory (Standard)</option>
+                                    <option value="language" {{ 'selected' if subject and
+                                        subject.subject_category=='language' else '' }}>Language (Kannada/Hindi etc)
+                                    </option>
+                                    <option value="specialization" {{ 'selected' if subject and
+                                        subject.subject_category=='specialization' else '' }}>Specialization (IoT/Data
+                                        Science)</option>
+                                    <option value="elective" {{ 'selected' if subject and
+                                        subject.subject_category=='elective' else '' }}>Open Elective (OEC)</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label">Elective Group</label>
+                                <input type="text" name="elective_group" class="form-input"
+                                    value="{{ subject.elective_group if subject and subject.elective_group else '' }}"
+                                    placeholder="e.g. Language II, Specialization Group A">
+                                <small style="color: grey; display: block; margin-top: 4px;">Group name for user
+                                    selection (e.g. 'Language')</small>
+                            </div>
                         </div>
+
+                        <!-- Legacy hidden field for compatibility -->
+                        <input type="hidden" name="is_specialization"
+                            value="{{ 'true' if subject and subject.is_specialization else 'false' }}">
 
                         <div class="form-group">
                             <label class="form-label"

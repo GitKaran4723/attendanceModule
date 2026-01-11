@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Holiday Management - Admin</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-light: #818cf8;
+            --secondary: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text-main);
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, var(--primary) 0%, #312e81 100%);
+            padding: 30px;
+            border-radius: 20px;
+            color: white;
+            box-shadow: var(--shadow);
+        }
+
+        .header h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            padding: 25px;
+            border-radius: 20px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+        }
+
+        .card h2 {
+            font-size: 1.2rem;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--primary);
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--text-muted);
+        }
+
+        input,
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            font-size: 0.95rem;
+            transition: all 0.2s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+
+        .btn {
+            padding: 12px 20px;
+            border-radius: 10px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.95rem;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #4338ca;
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: var(--secondary);
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #059669;
+            transform: translateY(-2px);
+        }
+
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger);
+        }
+
+        .btn-danger:hover {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-block {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .holiday-list {
+            background: var(--card-bg);
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: var(--shadow);
+        }
+
+        .holiday-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        .holiday-table th {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 2px solid var(--border);
+            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .holiday-table td {
+            padding: 15px 12px;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.95rem;
+        }
+
+        .badge {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-sunday {
+            background: #fee2e2;
+            color: #ef4444;
+        }
+
+        .badge-saturday {
+            background: #fef3c7;
+            color: #f59e0b;
+        }
+
+        .badge-public {
+            background: #dcfce7;
+            color: #10b981;
+        }
+
+        .badge-special {
+            background: #e0e7ff;
+            color: #4f46e5;
+        }
+
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Loading spinner */
+        .spinner {
+            animation: rotate 2s linear infinite;
+            width: 18px;
+            height: 18px;
+        }
+
+        @keyframes rotate {
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <h1>Holiday Management</h1>
+                <p>Academic Year: <strong>{{ academic_year }}</strong></p>
+            </div>
+            <a href="/admin/dashboard" style="color: white; text-decoration: none; font-weight: 500;">
+                <i class="fas fa-arrow-left"></i> Back to Dashboard
+            </a>
+        </div>
+
+        <div class="grid">
+            <!-- Academic Year Settings -->
+            <div class="card">
+                <h2><i class="fas fa-calendar-alt"></i> Academic Year Settings</h2>
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 20px;">
+                    Set start and end dates to enable automatic holiday generation.
+                </p>
+                <form id="settingsForm">
+                    <div class="form-group">
+                        <label>Academic Year Start</label>
+                        <input type="date" id="yearStart" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Academic Year End</label>
+                        <input type="date" id="yearEnd" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block">
+                        <i class="fas fa-save"></i> Save Academic Year Dates
+                    </button>
+                </form>
+                <hr style="margin: 20px 0; border: none; border-top: 1px solid var(--border);">
+                <button onclick="autoGenerateHolidays()" class="btn btn-secondary btn-block">
+                    <i class="fas fa-magic"></i> Auto-Generate Sundays & Saturdays
+                </button>
+            </div>
+
+            <!-- Add Public Holiday -->
+            <div class="card">
+                <h2><i class="fas fa-plus-circle"></i> Add Custom Holiday</h2>
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 20px;">
+                    Add specific holidays like Independence Day or festivals.
+                </p>
+                <form id="holidayForm">
+                    <div class="form-group">
+                        <label>Holiday Date</label>
+                        <input type="date" id="holidayDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Holiday Name</label>
+                        <input type="text" id="holidayName" placeholder="e.g. Independence Day" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Type</label>
+                        <select id="holidayType">
+                            <option value="public">Public Holiday</option>
+                            <option value="special">Special Holiday</option>
+                            <option value="sunday">Administrative Sunday</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block">
+                        <i class="fas fa-check"></i> Add Holiday
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Holiday List -->
+        <div class="holiday-list">
+            <h2 style="display: flex; align-items: center; justify-content: space-between;">
+                <span><i class="fas fa-list"></i> Calendar of Holidays</span>
+                <span id="holidayCount" style="font-size: 0.9rem; font-weight: 500; color: var(--text-muted);">0
+                    Records</span>
+            </h2>
+            <div style="overflow-x: auto;">
+                <table class="holiday-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Day</th>
+                            <th>Holiday Name</th>
+                            <th>Type</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="holidayTableBody">
+                        <tr>
+                            <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 40px;">
+                                <i class="fas fa-spinner spinner"></i> Loading holidays...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('settingsForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const payload = {
+                academic_year_start: document.getElementById('yearStart').value,
+                academic_year_end: document.getElementById('yearEnd').value
+            };
+
+            const res = await fetch('/api/admin/holidays/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            alert(data.message || data.error);
+        });
+
+        document.getElementById('holidayForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const payload = {
+                holiday_date: document.getElementById('holidayDate').value,
+                holiday_name: document.getElementById('holidayName').value,
+                holiday_type: document.getElementById('holidayType').value
+            };
+
+            const res = await fetch('/api/admin/holidays', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (data.success) {
+                document.getElementById('holidayForm').reset();
+                loadHolidays();
+            } else {
+                alert(data.error);
+            }
+        });
+
+        async function autoGenerateHolidays() {
+            if (!confirm("This will generate all Sundays, 2nd Saturdays, and 4th Saturdays for the selected academic year. Continue?")) return;
+
+            const res = await fetch('/api/admin/holidays/auto-generate', { method: 'POST' });
+            const data = await res.json();
+            alert(data.message || data.error);
+            if (data.success) loadHolidays();
+        }
+
+        async function deleteHoliday(id) {
+            if (!confirm("Are you sure you want to remove this holiday? This date will become a working day.")) return;
+
+            const res = await fetch(`/api/admin/holidays/${id}`, { method: 'DELETE' });
+            const data = await res.json();
+            if (data.success) loadHolidays();
+            else alert(data.error);
+        }
+
+        async function loadHolidays() {
+            const res = await fetch('/api/admin/holidays');
+            const data = await res.json();
+            const tbody = document.getElementById('holidayTableBody');
+
+            if (!data.success || data.holidays.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 40px;">No holidays found.</td></tr>';
+                return;
+            }
+
+            document.getElementById('holidayCount').innerText = `${data.holidays.length} Records`;
+
+            tbody.innerHTML = data.holidays.map(h => `
+                <tr>
+                    <td><strong>${h.holiday_date}</strong></td>
+                    <td style="color: var(--text-muted);">${h.day_name}</td>
+                    <td>${h.holiday_name}</td>
+                    <td><span class="badge badge-${h.holiday_type}">${h.holiday_type}</span></td>
+                    <td>
+                        <button onclick="deleteHoliday('${h.holiday_id}')" class="btn btn-danger" style="padding: 6px 12px; font-size: 0.8rem;">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // Initialize
+        loadHolidays();
+    </script>
+</body>
+
+</html>

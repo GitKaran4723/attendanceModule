@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Fees - Student Portal</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0 0 80px 0;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            color: white;
+            text-align: center;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 1.5rem;
+        }
+
+        .container {
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .fee-card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+        }
+
+        .fee-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        .year-title {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #1f2937;
+        }
+
+        .fee-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #f3f4f6;
+        }
+
+        .fee-label {
+            color: #6b7280;
+            font-weight: 500;
+        }
+
+        .fee-value {
+            font-weight: 600;
+            color: #1f2937;
+        }
+
+        .total-row {
+            background: #f9fafb;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+
+        .total-row .fee-value {
+            color: #667eea;
+            font-size: 1.2rem;
+        }
+
+        .additional-fees {
+            background: #fef3c7;
+            padding: 10px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+
+        .additional-fees-title {
+            font-weight: 600;
+            color: #92400e;
+            margin-bottom: 8px;
+        }
+
+        .additional-fee-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            color: #78350f;
+        }
+
+        .no-fees {
+            text-align: center;
+            padding: 60px 20px;
+            color: #9ca3af;
+        }
+
+        .no-fees i {
+            font-size: 4rem;
+            margin-bottom: 20px;
+        }
+
+        /* Bottom Nav */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            display: flex;
+            justify-content: space-around;
+            padding: 15px 0;
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.05);
+            z-index: 1000;
+        }
+
+        .nav-item {
+            text-align: center;
+            color: #718096;
+            text-decoration: none;
+            font-size: 11px;
+            transition: color 0.2s;
+        }
+
+        .nav-item.active {
+            color: #764ba2;
+            font-weight: 600;
+        }
+
+        .nav-icon {
+            font-size: 20px;
+            display: block;
+            margin-bottom: 4px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <h1>💰 My Fees</h1>
+        <p>{{ student.name }}</p>
+    </div>
+
+    <div class="container">
+        {% if fee_structures %}
+        {% for fee_structure in fee_structures %}
+        <div class="fee-card">
+            <div class="fee-header">
+                <div class="year-title">📅 {{ fee_structure.academic_year }}</div>
+            </div>
+
+            <div class="fee-row">
+                <span class="fee-label">Base Fees</span>
+                <span class="fee-value">₹{{ "{:,.0f}".format(fee_structure.base_fees) }}</span>
+            </div>
+
+            {% if fee_structure.additional_fees_list %}
+            <div class="additional-fees">
+                <div class="additional-fees-title">Additional Fees:</div>
+                {% for fee in fee_structure.additional_fees_list %}
+                <div class="additional-fee-item">
+                    <span>{{ fee.description }}</span>
+                    <span>₹{{ "{:,.0f}".format(fee.amount) }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="total-row fee-row">
+                <span class="fee-label" style="font-weight: 700; color: #1f2937;">Total Fees</span>
+                <span class="fee-value">₹{{ "{:,.0f}".format(fee_structure.total_fees) }}</span>
+            </div>
+
+            {% if fee_structure.template %}
+            <div
+                style="margin-top: 10px; padding: 10px; background: #f3f4f6; border-radius: 8px; font-size: 0.9rem; color: #6b7280;">
+                <strong>Seat Type:</strong> {{ fee_structure.template.seat_type }}
+                {% if fee_structure.template.quota_type %}
+                | <strong>Quota:</strong> {{ fee_structure.template.quota_type }}
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <!-- Balance Status -->
+            <div style="margin-top: 15px; padding: 12px; border-radius: 10px; border: 1px solid #e5e7eb;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span style="font-size: 0.9rem; color: #6b7280; font-weight: 500;">Balance to be paid</span>
+                    <span
+                        style="font-weight: 700; color: {{ '#10b981' if fee_structure.balance <= 0 else '#ef4444' }};">
+                        ₹{{ "{:,.0f}".format(fee_structure.balance) }}
+                    </span>
+                </div>
+                {% if fee_structure.balance > 0 %}
+                <div style="display: flex; align-items: center; gap: 8px; color: #ef4444; font-size: 0.85rem;">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <span>Still you have not paid fees</span>
+                </div>
+                {% else %}
+                <div style="display: flex; align-items: center; gap: 8px; color: #10b981; font-size: 0.85rem;">
+                    <i class="fas fa-check-circle"></i>
+                    <span>All fees paid for this year</span>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Receipt Submission Button -->
+            <button
+                onclick="openReceiptModal('{{ fee_structure.fee_structure_id }}', '{{ fee_structure.academic_year }}')"
+                style="width: 100%; margin-top: 15px; padding: 12px; background: #764ba2; color: white; border: none; border-radius: 10px; font-weight: 600; cursor: pointer; transition: all 0.2s;">
+                <i class="fas fa-plus-circle" style="margin-right: 8px;"></i> Submit Payment Receipt
+            </button>
+
+            <!-- Receipts List -->
+            {% if fee_structure.receipts %}
+            <div style="margin-top: 20px;">
+                <h4 style="margin-bottom: 10px; color: #4b5563; font-size: 0.95rem;">Recent Receipts:</h4>
+                {% for receipt in fee_structure.receipts %}
+                <div
+                    style="padding: 10px; background: #f9fafb; border-radius: 8px; margin-bottom: 8px; font-size: 0.85rem; border: 1px solid #f3f4f6;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                        <span style="font-weight: 600; color: #374151;">#{{ receipt.receipt_number }}</span>
+                        <span style="color: {{ '#10b981' if receipt.approved else '#f59e0b' }}; font-weight: 600;">
+                            {{ 'Approved' if receipt.approved else 'Pending Approval' }}
+                        </span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; color: #6b7280;">
+                        <span>₹{{ "{:,.0f}".format(receipt.amount_paid) }} on {{ receipt.payment_date.strftime('%d %b
+                            %Y') }}</span>
+                        <span>{{ receipt.receipt_phone }}</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="no-fees">
+            <i class="fas fa-inbox"></i>
+            <h3>No Fee Records</h3>
+            <p>Your fees haven't been assigned yet. Please contact your class teacher.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Receipt Submission Modal -->
+    <div id="receiptModal"
+        style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2000; align-items: center; justify-content: center; padding: 20px;">
+        <div
+            style="background: white; width: 100%; max-width: 450px; border-radius: 15px; padding: 25px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3 style="margin: 0; color: #1f2937;">Submit Receipt</h3>
+                <button onclick="closeReceiptModal()"
+                    style="background: none; border: none; font-size: 20px; color: #9ca3af; cursor: pointer;">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <p id="modalYear" style="margin-bottom: 20px; color: #6b7280; font-size: 0.95rem;"></p>
+
+            <form id="receiptForm" onsubmit="handleReceiptSubmit(event)">
+                <input type="hidden" id="modal_fee_structure_id">
+
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; color: #4b5563; font-weight: 500;">Receipt
+                        Number</label>
+                    <input type="text" id="receipt_number" required placeholder="Enter receipt number"
+                        style="width: 100%; padding: 12px; border: 1px solid #e5e7eb; border-radius: 8px; box-sizing: border-box;">
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; color: #4b5563; font-weight: 500;">Phone Number
+                        (on Receipt)</label>
+                    <input type="tel" id="receipt_phone" required placeholder="Enter phone number"
+                        style="width: 100%; padding: 12px; border: 1px solid #e5e7eb; border-radius: 8px; box-sizing: border-box;">
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; color: #4b5563; font-weight: 500;">Date on
+                            Receipt</label>
+                        <input type="date" id="payment_date" required
+                            style="width: 100%; padding: 12px; border: 1px solid #e5e7eb; border-radius: 8px; box-sizing: border-box;">
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; color: #4b5563; font-weight: 500;">Amount
+                            Paid</label>
+                        <input type="number" id="amount_paid" required placeholder="₹"
+                            style="width: 100%; padding: 12px; border: 1px solid #e5e7eb; border-radius: 8px; box-sizing: border-box;">
+                    </div>
+                </div>
+
+                <button type="submit" id="submitBtn"
+                    style="width: 100%; padding: 14px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 10px; font-weight: 700; cursor: pointer;">
+                    Submit for Verification
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function openReceiptModal(fsId, year) {
+            document.getElementById('modal_fee_structure_id').value = fsId;
+            document.getElementById('modalYear').innerText = `Academic Year: ${year}`;
+            document.getElementById('receiptModal').style.display = 'flex';
+        }
+
+        function closeReceiptModal() {
+            document.getElementById('receiptModal').style.display = 'none';
+            document.getElementById('receiptForm').reset();
+        }
+
+        async function handleReceiptSubmit(e) {
+            e.preventDefault();
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = true;
+            btn.innerText = 'Submitting...';
+
+            const payload = {
+                fee_structure_id: document.getElementById('modal_fee_structure_id').value,
+                receipt_number: document.getElementById('receipt_number').value,
+                receipt_phone: document.getElementById('receipt_phone').value,
+                payment_date: document.getElementById('payment_date').value,
+                amount_paid: document.getElementById('amount_paid').value
+            };
+
+            try {
+                const response = await fetch('/api/student/fees/submit-receipt', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    alert('Success! Receipt submitted for verification.');
+                    location.reload();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (err) {
+                alert('An error occurred. Please try again.');
+            } finally {
+                btn.disabled = false;
+                btn.innerText = 'Submit for Verification';
+            }
+        }
+    </script>
+    <!-- Bottom Nav -->
+    <div class="bottom-nav">
+        <a href="{{ url_for('student_dashboard') }}" class="nav-item">
+            <span class="nav-icon"><i class="fas fa-home"></i></span>
+            Home
+        </a>
+        <a href="{{ url_for('student_internal_marks') }}" class="nav-item">
+            <span class="nav-icon"><i class="fas fa-clipboard-list"></i></span>
+            Internal Marks
+        </a>
+        <a href="{{ url_for('student_fees_page') }}" class="nav-item active">
+            <span class="nav-icon"><i class="fas fa-wallet"></i></span>
+            Fees
+        </a>
+        <a href="{{ url_for('student_profile') }}" class="nav-item">
+            <span class="nav-icon"><i class="fas fa-user"></i></span>
+            Profile
+        </a>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elective Enrollment - BCA BUB Admin</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <meta name="theme-color" content="#1a237e">
+</head>
+
+<body class="admin-page">
+    <!-- App Bar -->
+    <header class="admin-app-bar">
+        <button class="menu-btn" onclick="location.href='{{ url_for('admin_dashboard') }}'">
+            <i class="material-icons">arrow_back</i>
+        </button>
+        <h1 class="app-title">Elective Enrollment</h1>
+        <button class="icon-btn" onclick="location.href='{{ url_for('logout') }}'">
+            <i class="material-icons">logout</i>
+        </button>
+    </header>
+
+    <main class="admin-main">
+        <div class="admin-container">
+            <!-- Page Header -->
+            <div class="page-header">
+                <h2>📝 Enroll Students</h2>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <p>Assign elective subjects to students for the current semester</p>
+                    <button id="saveChangesBtn" class="admin-btn admin-btn-primary" style="display: none;">
+                        <i class="material-icons">save</i> Save Changes
+                    </button>
+                </div>
+            </div>
+            <!-- Filters -->
+            <div class="filter-card"
+                style="background: white; padding: 1rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap; align-items: center;">
+                <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                    <label style="font-size: 0.85rem; color: #666;">Program</label>
+                    <select id="programSelect" class="form-control"
+                        style="padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; min-width: 150px;">
+                        <option value="">Select Program</option>
+                        {% for program in programs %}
+                        <option value="{{ program.program_id }}">{{ program.program_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                    <label style="font-size: 0.85rem; color: #666;">Semester</label>
+                    <select id="semesterSelect" class="form-control"
+                        style="padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; min-width: 100px;">
+                        {% for sem in semesters %}
+                        <option value="{{ sem }}">{{ sem }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                    <label style="font-size: 0.85rem; color: #666;">Academic Year</label>
+                    <!-- Ideally fetched from backend config or current year logic -->
+                    <input type="text" id="academicYearInput" class="form-control" placeholder="YYYY-YYYY"
+                        value="2024-2025"
+                        style="padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; width: 120px;">
+                </div>
+
+                <button id="loadDataBtn"
+                    style="margin-top: 1.4rem; background-color: #6200ee; color: white; border: none; padding: 0.5rem 1.5rem; border-radius: 4px; cursor: pointer; height: 38px;">
+                    Load Students
+                </button>
+            </div>
+
+            <!-- Dynamic Content -->
+            <div id="loadingIndicator" style="display: none; text-align: center; padding: 2rem;">
+                <div class="spinner"
+                    style="border: 4px solid #f3f3f3; border-top: 4px solid #6200ee; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto;">
+                </div>
+                <p style="color: #666; margin-top: 1rem;">Loading enrollment data...</p>
+            </div>
+
+            <div id="dataContainer" style="display: none;">
+                <div
+                    style="background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; min-width: 800px;">
+                        <thead>
+                            <tr id="tableHeaderRow" style="background-color: #f8f9fa; text-align: left;">
+                                <th
+                                    style="padding: 1rem; border-bottom: 2px solid #e0e0e0; color: #444; font-weight: 500;">
+                                    Student</th>
+                                <th
+                                    style="padding: 1rem; border-bottom: 2px solid #e0e0e0; color: #444; font-weight: 500;">
+                                    USN / Roll No</th>
+                                <th
+                                    style="padding: 1rem; border-bottom: 2px solid #e0e0e0; color: #444; font-weight: 500;">
+                                    Section</th>
+                                <!-- Dynamic Group Headers will be inserted here -->
+                            </tr>
+                        </thead>
+                        <tbody id="studentsTableBody">
+                            <!-- Student Rows -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+    </main>
+    </div>
+
+    <style>
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .select-subject {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: white;
+        }
+
+        .select-subject:focus {
+            border-color: #6200ee;
+            outline: none;
+        }
+    </style>
+
+    <script>
+        let currentData = null; // Store fetched data
+        let currentChanges = []; // Store unsaved changes (optimization if needed)
+
+        document.getElementById('loadDataBtn').addEventListener('click', loadEnrollmentData);
+        document.getElementById('saveChangesBtn').addEventListener('click', saveChanges);
+
+        async function loadEnrollmentData() {
+            const programId = document.getElementById('programSelect').value;
+            const semester = document.getElementById('semesterSelect').value;
+            const academicYear = document.getElementById('academicYearInput').value;
+
+            if (!programId || !semester || !academicYear) {
+                alert('Please select Program, Semester and Academic Year');
+                return;
+            }
+
+            document.getElementById('loadingIndicator').style.display = 'block';
+            document.getElementById('dataContainer').style.display = 'none';
+            document.getElementById('saveChangesBtn').style.display = 'none';
+
+            try {
+                const response = await fetch(`/api/admin/enrollment/data?program_id=${programId}&semester=${semester}&academic_year=${academicYear}`);
+                const data = await response.json();
+
+                if (response.ok) {
+                    currentData = data;
+                    renderTable(data);
+                } else {
+                    alert(data.error || 'Failed to load data');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('An error occurred while loading data');
+            } finally {
+                document.getElementById('loadingIndicator').style.display = 'none';
+            }
+        }
+
+        function renderTable(data) {
+            const { students, elective_groups } = data;
+            const tableBody = document.getElementById('studentsTableBody');
+            const headerRow = document.getElementById('tableHeaderRow');
+
+            // Reset Table
+            tableBody.innerHTML = '';
+
+            // Reset Header: Keep first 3 fixed columns
+            while (headerRow.children.length > 3) {
+                headerRow.removeChild(headerRow.lastChild);
+            }
+
+            // 1. Create Headers for Elective Groups
+            const groupNames = Object.keys(elective_groups).sort();
+            groupNames.forEach(groupName => {
+                const th = document.createElement('th');
+                th.style.padding = '1rem';
+                th.style.borderBottom = '2px solid #e0e0e0';
+                th.style.color = '#444';
+                th.style.fontWeight = '500';
+                th.textContent = groupName;
+                headerRow.appendChild(th);
+            });
+
+            if (groupNames.length === 0) {
+                alert("No elective subjects found for this selection.");
+                return;
+            }
+
+            // 2. Create Rows
+            if (!students || students.length === 0) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td colspan="${3 + groupNames.length}" style="padding: 2rem; text-align: center; color: #666;">No students found for this semester.</td>`;
+                tableBody.appendChild(tr);
+                document.getElementById('dataContainer').style.display = 'block';
+                return;
+            }
+
+            students.forEach(student => {
+                const tr = document.createElement('tr');
+                tr.style.borderBottom = '1px solid #eee';
+
+                // Fixed Columns
+                tr.innerHTML = `
+                <td style="padding: 1rem;">${student.name}</td>
+                <td style="padding: 1rem; color: #666;">${student.usn || '-'}</td>
+                <td style="padding: 1rem; color: #666;">${student.section}</td>
+            `;
+
+                // Dynamic Columns (Dropdowns)
+                groupNames.forEach(groupName => {
+                    const td = document.createElement('td');
+                    td.style.padding = '0.75rem 1rem';
+
+                    const select = document.createElement('select');
+                    select.className = 'select-subject';
+                    select.dataset.studentId = student.student_id;
+                    select.dataset.group = groupName;
+
+                    // Default Option
+                    const defaultOption = document.createElement('option');
+                    defaultOption.value = "";
+                    defaultOption.textContent = "Select Subject";
+                    select.appendChild(defaultOption);
+
+                    // Subject Options
+                    const subjects = elective_groups[groupName] || [];
+                    subjects.forEach(sub => {
+                        const option = document.createElement('option');
+                        option.value = sub.subject_id;
+                        option.textContent = sub.subject_name; // Assuming subject_name exists
+                        select.appendChild(option);
+                    });
+
+                    // Set Value if already enrolled
+                    const currentEnrollment = student.enrollments[groupName];
+                    if (currentEnrollment) {
+                        select.value = currentEnrollment;
+                    }
+
+                    td.appendChild(select);
+                    tr.appendChild(td);
+                });
+
+                tableBody.appendChild(tr);
+            });
+
+            document.getElementById('dataContainer').style.display = 'block';
+            document.getElementById('saveChangesBtn').style.display = 'block';
+        }
+
+        async function saveChanges() {
+            const programId = document.getElementById('programSelect').value;
+            const semester = document.getElementById('semesterSelect').value;
+            const academicYear = document.getElementById('academicYearInput').value;
+
+            // Gather all selections
+            const selects = document.querySelectorAll('.select-subject');
+            const enrollments = [];
+
+            selects.forEach(select => {
+                if (select.value) {
+                    enrollments.push({
+                        student_id: select.dataset.studentId,
+                        subject_id: select.value
+                    });
+                }
+            });
+
+            if (enrollments.length === 0) {
+                if (!confirm("No subjects selected. This might clear existing enrollments? (Note: Current implementation adds/updates only). Continue?")) return;
+            }
+
+            const confirmSave = confirm(`Saving ${enrollments.length} subject enrollments. Proceed?`);
+            if (!confirmSave) return;
+
+            const saveBtn = document.getElementById('saveChangesBtn');
+            saveBtn.disabled = true;
+            saveBtn.textContent = "Saving...";
+
+            try {
+                const response = await fetch('/api/admin/enrollment/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        program_id: programId,
+                        semester: semester,
+                        academic_year: academicYear,
+                        enrollments: enrollments
+                    })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    alert('Changes saved successfully!');
+                    // Reload to reflect changes (and potentially virtual section assignments)
+                    loadEnrollmentData();
+                } else {
+                    alert(result.error || 'Failed to save changes');
+                }
+            } catch (error) {
+                console.error(error);
+                alert('Network error while saving');
+            } finally {
+                saveBtn.disabled = false;
+                saveBtn.textContent = "Save Changes";
+            }
+        }
+    </script>
+    </script>
+</body>
+
+</html>

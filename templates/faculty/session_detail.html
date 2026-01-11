@@ -172,7 +172,8 @@
         <i class="material-icons-round back-btn" onclick="history.back()">arrow_back_ios_new</i>
         <div class="header-title">
             <h1>{{ session.schedule.subject.subject_name }}</h1>
-            <p>{{ session.schedule.section.section_name }} • {{ session.taken_at.strftime('%d %b, %Y') }}</p>
+            <p>{{ session.schedule.section|section_display(session.schedule.subject) }} • {{
+                session.taken_at.strftime('%d %b, %Y') }}</p>
         </div>
         <button onclick="promptDeleteSession()"
             style="background:none; border:none; color:#ef4444; font-weight:600; cursor:pointer;"
@@ -204,9 +205,9 @@
             </div>
             {% for record in records %}
             <div class="student-item">
-                <div class="student-avatar">{{ record.student.first_name[0] }}</div>
+                <div class="student-avatar">{{ record.student.name[0] }}</div>
                 <div class="student-info">
-                    <div class="student-name">{{ record.student.first_name }} {{ record.student.last_name }}</div>
+                    <div class="student-name">{{ record.student.name }}</div>
                     <div class="student-roll">Roll: {{ record.student.roll_number }}</div>
                 </div>
                 <div class="status-badge status-{{ record.status }}">

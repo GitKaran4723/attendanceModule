@@ -266,16 +266,16 @@
             <i class="material-icons">logout</i>
         </button>
         <h1>🎓 My Dashboard</h1>
-        <p>Welcome back, {{ student.first_name }}!</p>
+        <p>Welcome back, {{ student.name }}!</p>
     </header>
 
     <!-- Profile Card -->
     <div class="student-profile">
         <div class="profile-avatar">
-            {{ student.first_name[0] }}{{ student.last_name[0] }}
+            {{ student.name[0] if student.name else '?' }}
         </div>
         <div class="profile-info">
-            <h2>{{ student.first_name }} {{ student.last_name }}</h2>
+            <h2>{{ student.name }}</h2>
             <p>📋 {{ student.roll_number }} • {{ student.program.program_name if student.program else 'No Program' }}
             </p>
             {% if student.section %}
@@ -457,9 +457,9 @@
             <i class="material-icons">home</i>
             <span>Home</span>
         </a>
-        <a href="#" class="nav-item" onclick="alert('Coming soon!')">
-            <i class="material-icons">event</i>
-            <span>Timetable</span>
+        <a href="{{ url_for('student_fees_page') }}" class="nav-item">
+            <i class="material-icons">account_balance_wallet</i>
+            <span>Fees</span>
         </a>
         <a href="#" class="nav-item" onclick="alert('Coming soon!')">
             <i class="material-icons">check_circle</i>

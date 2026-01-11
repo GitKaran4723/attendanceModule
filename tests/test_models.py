@@ -53,8 +53,7 @@ class TestStudentModel:
     def test_create_student(self, app, sample_student):
         """Test creating a student"""
         with app.app_context():
-            assert sample_student.first_name == "Test"
-            assert sample_student.last_name == "Student"
+            assert sample_student.name == "Test"
             assert sample_student.roll_number == "BCA001"
     
     def test_student_program_relationship(self, app, sample_student):

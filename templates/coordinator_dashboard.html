@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coordinator Dashboard - BCA BUB</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        :root {
+            --primary-color: #6366f1;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --bg-color: #f9fafb;
+            --card-bg: #ffffff;
+            --text-primary: #111827;
+            --text-secondary: #6b7280;
+            --border-color: #e5e7eb;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-color);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+
+        .dashboard-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--primary-color) 0%, #4f46e5 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 16px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(99, 102, 241, 0.2);
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+
+        .department-selector {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .department-selector label {
+            font-weight: 600;
+            margin-right: 15px;
+            color: var(--text-primary);
+        }
+
+        .department-selector select {
+            padding: 10px 15px;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 1rem;
+            min-width: 250px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .department-selector select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
+        .holiday-banner {
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+        }
+
+        .holiday-banner h2 {
+            font-size: 1.5rem;
+            margin-bottom: 8px;
+        }
+
+        .holiday-banner p {
+            font-size: 1.1rem;
+            opacity: 0.95;
+        }
+
+        .section-card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .section-card h2 {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-card h2::before {
+            content: '';
+            width: 4px;
+            height: 24px;
+            background: var(--primary-color);
+            border-radius: 2px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        thead {
+            background: #f3f4f6;
+        }
+
+        th {
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            padding: 15px 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        tr:hover {
+            background: #f9fafb;
+        }
+
+        .faculty-name {
+            font-weight: 600;
+            color: var(--primary-color);
+            cursor: pointer;
+            transition: color 0.2s ease;
+        }
+
+        .faculty-name:hover {
+            color: #4f46e5;
+            text-decoration: underline;
+        }
+
+        .accuracy-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+
+        .accuracy-high {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .accuracy-medium {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .accuracy-low {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .accuracy-unknown {
+            background: #e5e7eb;
+            color: #6b7280;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+
+        .status-in {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .status-out {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .status-absent {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .gps-coords {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            font-family: 'Courier New', monospace;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+        }
+
+        .modal-content {
+            background: var(--card-bg);
+            margin: 5% auto;
+            padding: 0;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 700px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            animation: modalSlideIn 0.3s ease;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                transform: translateY(-50px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .modal-header {
+            padding: 25px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h3 {
+            font-size: 1.5rem;
+            color: var(--text-primary);
+        }
+
+        .close {
+            font-size: 28px;
+            font-weight: bold;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: color 0.2s ease;
+        }
+
+        .close:hover {
+            color: var(--text-primary);
+        }
+
+        .modal-body {
+            padding: 25px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .class-item {
+            padding: 15px;
+            background: #f9fafb;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border-left: 4px solid var(--primary-color);
+        }
+
+        .class-item h4 {
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .class-item p {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin: 4px 0;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-secondary);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+
+        .empty-state svg {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 20px;
+            opacity: 0.3;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard-container {
+                padding: 10px;
+            }
+
+            .header h1 {
+                font-size: 1.5rem;
+            }
+
+            table {
+                font-size: 0.875rem;
+            }
+
+            th,
+            td {
+                padding: 8px 6px;
+            }
+
+            .modal-content {
+                width: 95%;
+                margin: 10% auto;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="dashboard-container">
+        <div class="header">
+            <h1>📊 Coordinator Dashboard</h1>
+            <p>Department Management & Faculty Monitoring</p>
+
+            <!-- Role Display -->
+            <div
+                style="margin-top: 20px; padding: 15px; background: rgba(255, 255, 255, 0.15); border-radius: 12px; backdrop-filter: blur(10px);">
+                <div
+                    style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+                    <div style="flex: 1; min-width: 200px;">
+                        <div style="font-size: 0.9rem; opacity: 0.9; margin-bottom: 5px;">You are coordinator for:</div>
+                        <div style="font-size: 1.1rem; font-weight: 600;">
+                            {% if programs %}
+                            {% for program in programs %}
+                            {{ program.program_name }}{% if not loop.last %}, {% endif %}
+                            {% endfor %}
+                            {% else %}
+                            No programs assigned
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div>
+                        <a href="{{ url_for('index') }}"
+                            style="display: inline-flex; align-items: center; gap: 8px; padding: 12px 24px; background: rgba(255, 255, 255, 0.25); color: white; text-decoration: none; border-radius: 8px; font-weight: 600; transition: all 0.3s; border: 2px solid rgba(255, 255, 255, 0.3);">
+                            <span style="font-size: 20px;">👨‍🏫</span>
+                            Switch to Faculty View
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if programs|length > 1 %}
+        <div class="department-selector">
+            <label for="programSelect">Select Department:</label>
+            <select id="programSelect" onchange="selectDepartment()">
+                {% for program in programs %}
+                <option value="{{ program.program_id }}" {% if selected_program and
+                    program.program_id==selected_program.program_id %}selected{% endif %}>
+                    {{ program.program_name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+
+        {% if is_holiday %}
+        <div class="holiday-banner">
+            <h2>🎉 Today is a Holiday</h2>
+            <p>{{ holiday.holiday_name }}</p>
+        </div>
+        {% else %}
+        <!-- Faculty Timings Section -->
+        <div class="section-card">
+            <h2>Faculty Attendance & Timings</h2>
+            <div id="timingsTable">
+                <div class="loading">Loading faculty timings...</div>
+            </div>
+        </div>
+
+        <!-- Faculty Diary Section -->
+        <div class="section-card">
+            <h2>Today's Classes</h2>
+            <div id="diaryTable">
+                <div class="loading">Loading class schedule...</div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Faculty Details Modal -->
+    <div id="facultyModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalFacultyName">Faculty Details</h3>
+                <span class="close" onclick="closeModal()">&times;</span>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <div class="loading">Loading...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const selectedProgramId = "{{ selected_program.program_id if selected_program else '' }}";
+
+        function selectDepartment() {
+            const programId = document.getElementById('programSelect').value;
+            fetch('/coordinator/select-department', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ program_id: programId })
+            }).then(() => {
+                window.location.reload();
+            });
+        }
+
+        function loadFacultyTimings() {
+            if (!selectedProgramId) return;
+
+            fetch(`/api/coordinator/faculty-timings?program_id=${selectedProgramId}`)
+                .then(response => response.json())
+                .then(data => {
+                    const container = document.getElementById('timingsTable');
+
+                    if (data.timings && data.timings.length > 0) {
+                        let html = '<table><thead><tr>';
+                        html += '<th>Faculty Name</th>';
+                        html += '<th>Check-in Time</th>';
+                        html += '<th>GPS Location</th>';
+                        html += '<th>Accuracy</th>';
+                        html += '<th>Distance (m)</th>';
+                        html += '<th>Check-out Time</th>';
+                        html += '<th>Status</th>';
+                        html += '<th>Hours</th>';
+                        html += '</tr></thead><tbody>';
+
+                        data.timings.forEach(timing => {
+                            html += '<tr>';
+                            html += `<td><span class="faculty-name" onclick="showFacultyDetails('${timing.faculty_id}')">${timing.faculty_name}</span></td>`;
+                            html += `<td>${timing.check_in_time || '-'}</td>`;
+                            html += `<td class="gps-coords">${timing.check_in_latitude && timing.check_in_longitude ? `${timing.check_in_latitude.toFixed(4)}, ${timing.check_in_longitude.toFixed(4)}` : '-'}</td>`;
+                            html += `<td><span class="accuracy-badge accuracy-${timing.accuracy_level}">${timing.accuracy_level}</span></td>`;
+                            html += `<td>${timing.distance_from_dept ? timing.distance_from_dept + 'm' : '-'}</td>`;
+                            html += `<td>${timing.check_out_time || '-'}</td>`;
+                            html += `<td><span class="status-badge status-${timing.status === 'In Department' ? 'in' : timing.status === 'Checked Out' ? 'out' : 'absent'}">${timing.status}</span></td>`;
+                            html += `<td>${timing.hours_worked.toFixed(2)}h</td>`;
+                            html += '</tr>';
+                        });
+
+                        html += '</tbody></table>';
+                        container.innerHTML = html;
+                    } else {
+                        container.innerHTML = '<div class="empty-state"><p>No faculty attendance records for today</p></div>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading timings:', error);
+                    document.getElementById('timingsTable').innerHTML = '<div class="empty-state"><p>Error loading data</p></div>';
+                });
+        }
+
+        function loadFacultyDiary() {
+            if (!selectedProgramId) return;
+
+            fetch(`/api/coordinator/faculty-diary?program_id=${selectedProgramId}`)
+                .then(response => response.json())
+                .then(data => {
+                    const container = document.getElementById('diaryTable');
+
+                    if (data.diary_entries && data.diary_entries.length > 0) {
+                        let html = '<table><thead><tr>';
+                        html += '<th>Faculty</th>';
+                        html += '<th>Subject</th>';
+                        html += '<th>Section</th>';
+                        html += '<th>Time</th>';
+                        html += '<th>Duration</th>';
+                        html += '<th>Topic</th>';
+                        html += '<th>Attendance</th>';
+                        html += '</tr></thead><tbody>';
+
+                        data.diary_entries.forEach(entry => {
+                            html += '<tr>';
+                            html += `<td><span class="faculty-name" onclick="showFacultyDetails('${entry.faculty_id}')">${entry.faculty_name}</span></td>`;
+                            html += `<td>${entry.subject_name} (${entry.subject_code})</td>`;
+                            html += `<td>${entry.section_name}</td>`;
+                            html += `<td>${entry.start_time} - ${entry.end_time}</td>`;
+                            html += `<td>${entry.duration}h</td>`;
+                            html += `<td>${entry.topic}</td>`;
+                            html += `<td>${entry.present_count}/${entry.total_count} (${entry.attendance_percentage}%)</td>`;
+                            html += '</tr>';
+                        });
+
+                        html += '</tbody></table>';
+                        container.innerHTML = html;
+                    } else {
+                        container.innerHTML = '<div class="empty-state"><p>No classes scheduled for today</p></div>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading diary:', error);
+                    document.getElementById('diaryTable').innerHTML = '<div class="empty-state"><p>Error loading data</p></div>';
+                });
+        }
+
+        function showFacultyDetails(facultyId) {
+            const modal = document.getElementById('facultyModal');
+            const modalBody = document.getElementById('modalBody');
+
+            modal.style.display = 'block';
+            modalBody.innerHTML = '<div class="loading">Loading faculty details...</div>';
+
+            fetch(`/api/coordinator/faculty/${facultyId}/details`)
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('modalFacultyName').textContent = data.faculty_name;
+
+                    if (data.classes && data.classes.length > 0) {
+                        let html = '';
+                        data.classes.forEach(cls => {
+                            html += '<div class="class-item">';
+                            html += `<h4>${cls.subject_name} - ${cls.section_name}</h4>`;
+                            html += `<p><strong>Time:</strong> ${cls.start_time}</p>`;
+                            html += `<p><strong>Topic:</strong> ${cls.topic}</p>`;
+                            html += `<p><strong>Students:</strong> ${cls.present_count}/${cls.total_count} present (${cls.attendance_percentage}%)</p>`;
+                            html += '</div>';
+                        });
+                        modalBody.innerHTML = html;
+                    } else {
+                        modalBody.innerHTML = '<div class="empty-state"><p>No classes today</p></div>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading faculty details:', error);
+                    modalBody.innerHTML = '<div class="empty-state"><p>Error loading details</p></div>';
+                });
+        }
+
+        function closeModal() {
+            document.getElementById('facultyModal').style.display = 'none';
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function (event) {
+            const modal = document.getElementById('facultyModal');
+            if (event.target == modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        // Load data on page load
+        {% if not is_holiday and selected_program %}
+        window.addEventListener('DOMContentLoaded', function () {
+            loadFacultyTimings();
+            loadFacultyDiary();
+        });
+        {% endif %}
+    </script>
+</body>
+
+</html>

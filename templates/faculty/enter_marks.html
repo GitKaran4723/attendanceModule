@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enter Marks</title>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary-color: #6200ea;
+            --primary-light: #b388ff;
+            --secondary-color: #00bfa5;
+            --bg-color: #f5f5f7;
+            --surface-color: #ffffff;
+            --text-primary: #1d1d1f;
+            --text-secondary: #86868b;
+            --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            --border-radius: 16px;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding-bottom: 100px;
+            color: var(--text-primary);
+        }
+
+        .app-bar {
+            background: var(--surface-color);
+            padding: 16px 20px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+        }
+
+        .page-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin: 0 0 4px 0;
+        }
+
+        .page-subtitle {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin: 0;
+        }
+
+        .info-card {
+            background: var(--surface-color);
+            margin: 16px;
+            padding: 16px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--card-shadow);
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .info-label {
+            color: var(--text-secondary);
+        }
+
+        .info-value {
+            font-weight: 600;
+        }
+
+        .student-list {
+            padding: 0 16px;
+        }
+
+        .student-card {
+            background: var(--surface-color);
+            padding: 12px;
+            margin-bottom: 8px;
+            border-radius: 12px;
+            box-shadow: var(--card-shadow);
+        }
+
+        .student-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .student-name {
+            font-weight: 600;
+            font-size: 15px;
+        }
+
+        .student-usn {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .marks-input {
+            width: 80px;
+            padding: 8px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 700;
+            text-align: center;
+        }
+
+        .marks-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+
+        .bottom-actions {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--surface-color);
+            padding: 12px 16px 24px 16px;
+            box-shadow: 0 -2px 20px rgba(0, 0, 0, 0.1);
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 14px;
+            border: none;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 15px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
+            color: white;
+        }
+
+        .btn-secondary {
+            background: var(--secondary-color);
+            color: white;
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .toast {
+            position: fixed;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #323232;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            z-index: 1000;
+            display: none;
+        }
+
+        .toast.show {
+            display: block;
+            animation: slideDown 0.3s ease;
+        }
+
+        @keyframes slideDown {
+            from {
+                transform: translate(-50%, -20px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translate(-50%, 0);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <header class="app-bar">
+        <h1 class="page-title">{{ test.test_name }}</h1>
+        <p class="page-subtitle">{{ test.subject.subject_name }} - {{ test.section.section_name }}</p>
+    </header>
+
+    <div class="info-card">
+        <div class="info-row">
+            <span class="info-label">Component Type:</span>
+            <span class="info-value">{{ test.component_type|title }}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Maximum Marks:</span>
+            <span class="info-value">{{ test.max_marks }}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Total Students:</span>
+            <span class="info-value">{{ student_data|length }}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Status:</span>
+            <span class="info-value" style="color: {% if test.is_published %}#00695c{% else %}#e65100{% endif %}">
+                {% if test.is_published %}Published{% else %}Draft{% endif %}
+            </span>
+        </div>
+    </div>
+
+    <div class="student-list">
+        {% for item in student_data %}
+        <div class="student-card">
+            <div class="student-header">
+                <div>
+                    <div class="student-name">{{ item.student.first_name }} {{ item.student.last_name }}</div>
+                    <div class="student-usn">{{ item.student.usn }}</div>
+                </div>
+                <input type="number" class="marks-input" data-student-id="{{ item.student.student_id }}"
+                    value="{{ item.marks if item.marks is not none else '' }}" placeholder="--" min="0"
+                    max="{{ test.max_marks }}" step="0.5">
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="bottom-actions">
+        <button class="btn btn-primary" onclick="saveMarks()">
+            <i class="material-icons-round">save</i>
+            Save Marks
+        </button>
+        <button class="btn btn-secondary" onclick="togglePublish()">
+            <i class="material-icons-round">{% if test.is_published %}visibility_off{% else %}visibility{% endif %}</i>
+            {% if test.is_published %}Unpublish{% else %}Publish{% endif %}
+        </button>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script>
+        function saveMarks() {
+            const inputs = document.querySelectorAll('.marks-input');
+            const marks = [];
+
+            inputs.forEach(input => {
+                const studentId = input.dataset.studentId;
+                const marksValue = input.value ? parseFloat(input.value) : null;
+
+                marks.push({
+                    student_id: studentId,
+                    marks: marksValue,
+                    remarks: ''
+                });
+            });
+
+            // Show loading
+            showToast('Saving marks...');
+
+            fetch('/api/faculty/internal-marks/{{ test.test_id }}/save-marks', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ marks: marks })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        showToast('✓ Marks saved successfully!');
+                    } else {
+                        showToast('✗ Error: ' + data.error);
+                    }
+                })
+                .catch(err => {
+                    showToast('✗ Connection error');
+                });
+        }
+
+        function togglePublish() {
+            if (!confirm('{% if test.is_published %}Unpublish{% else %}Publish{% endif %} marks for students?')) {
+                return;
+            }
+
+            fetch('/api/faculty/internal-marks/{{ test.test_id }}/publish', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        showToast('✓ ' + data.message);
+                        setTimeout(() => location.reload(), 1500);
+                    } else {
+                        showToast('✗ Error: ' + data.error);
+                    }
+                })
+                .catch(err => {
+                    showToast('✗ Connection error');
+                });
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        // Auto-save on blur
+        document.querySelectorAll('.marks-input').forEach(input => {
+            input.addEventListener('blur', () => {
+                const value = parseFloat(input.value);
+                const max = parseFloat(input.max);
+
+                if (value > max) {
+                    input.value = max;
+                    showToast('Marks cannot exceed ' + max);
+                }
+            });
+        });
+    </script>
+</body>
+
+</html>

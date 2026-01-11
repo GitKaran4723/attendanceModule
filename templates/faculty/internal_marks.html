@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Internal Marks - Faculty</title>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary-color: #6200ea;
+            --primary-light: #b388ff;
+            --secondary-color: #00bfa5;
+            --bg-color: #f5f5f7;
+            --surface-color: #ffffff;
+            --text-primary: #1d1d1f;
+            --text-secondary: #86868b;
+            --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            --border-radius: 16px;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding-bottom: 80px;
+            color: var(--text-primary);
+        }
+
+        .app-bar {
+            background: var(--surface-color);
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+        }
+
+        .page-title {
+            font-size: 20px;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .content {
+            padding: 20px;
+        }
+
+        .create-btn {
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
+            color: white;
+            border: none;
+            padding: 16px;
+            border-radius: var(--border-radius);
+            font-weight: 700;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 20px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(98, 0, 234, 0.3);
+        }
+
+        .assessment-card {
+            background: var(--surface-color);
+            border-radius: var(--border-radius);
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: var(--card-shadow);
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .assessment-card:active {
+            transform: scale(0.98);
+        }
+
+        .assessment-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 8px;
+        }
+
+        .assessment-name {
+            font-weight: 700;
+            font-size: 16px;
+            margin-bottom: 4px;
+        }
+
+        .assessment-details {
+            font-size: 13px;
+            color: var(--text-secondary);
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .badge {
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-published {
+            background: #e0f2f1;
+            color: #00695c;
+        }
+
+        .badge-draft {
+            background: #fff3e0;
+            color: #e65100;
+        }
+
+        .badge-test {
+            background: #ede7f6;
+            color: #4527a0;
+        }
+
+        .badge-assignment {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+
+        .badge-project {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .badge-quiz {
+            background: #fff9c4;
+            color: #f57f17;
+        }
+
+        .stats-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .stat-chip {
+            background: #f5f5f5;
+            padding: 4px 10px;
+            border-radius: 8px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(12px);
+            display: flex;
+            justify-content: space-around;
+            padding: 12px 0 24px 0;
+            box-shadow: 0 -2px 20px rgba(0, 0, 0, 0.05);
+            z-index: 1000;
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 11px;
+            font-weight: 500;
+            gap: 4px;
+            width: 25%;
+        }
+
+        .nav-item.active {
+            color: var(--primary-color);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-secondary);
+        }
+
+        .empty-state i {
+            font-size: 64px;
+            color: #ddd;
+            margin-bottom: 16px;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- App Bar -->
+    <header class="app-bar">
+        <h1 class="page-title">Internal Marks</h1>
+        <i class="material-icons-round" onclick="location.href='{{ url_for('faculty_dashboard_view') }}'"
+            style="color: var(--text-secondary); cursor: pointer;">close</i>
+    </header>
+
+    <div class="content">
+        <!-- Create Assessment Button -->
+        <button class="create-btn" onclick="location.href='{{ url_for('faculty_create_assessment') }}'">
+            <i class="material-icons-round">add</i>
+            Create New Assessment
+        </button>
+
+        <!-- Assessments List -->
+        {% if tests %}
+        {% for test in tests %}
+        <div class="assessment-card"
+            onclick="location.href='{{ url_for('faculty_enter_marks', test_id=test.test_id) }}'">
+            <div class="assessment-header">
+                <div>
+                    <div class="assessment-name">{{ test.test_name }}</div>
+                    <div class="assessment-details">
+                        <span><i class="material-icons-round" style="font-size: 14px;">book</i> {{
+                            test.subject.subject_name }}</span>
+                        <span><i class="material-icons-round" style="font-size: 14px;">groups</i> {{
+                            test.section.section_name }}</span>
+                    </div>
+                </div>
+                <span class="badge {% if test.is_published %}badge-published{% else %}badge-draft{% endif %}">
+                    {% if test.is_published %}Published{% else %}Draft{% endif %}
+                </span>
+            </div>
+
+            <div class="stats-row">
+                <span class="badge badge-{{ test.component_type }}">{{ test.component_type|title }}</span>
+                <span class="stat-chip">Max: {{ test.max_marks }}</span>
+                {% if test.test_date %}
+                <span class="stat-chip">{{ test.test_date.strftime('%d %b') }}</span>
+                {% endif %}
+                <span class="stat-chip">{{ test.results.filter_by(is_deleted=False).count() }} students</span>
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="empty-state">
+            <i class="material-icons-round">assignment</i>
+            <h3>No Assessments Yet</h3>
+            <p>Create your first internal assessment to start tracking student performance.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav">
+        <a href="{{ url_for('faculty_dashboard_view') }}" class="nav-item">
+            <i class="material-icons-round">dashboard</i>
+            <span>Home</span>
+        </a>
+        {% if is_class_teacher %}
+        <a href="{{ url_for('faculty_my_class_view') }}" class="nav-item">
+            <i class="material-icons-round">school</i>
+            <span>My Class</span>
+        </a>
+        {% endif %}
+        <a href="{{ url_for('faculty_work_diary') }}" class="nav-item">
+            <i class="material-icons-round">book</i>
+            <span>Diary</span>
+        </a>
+        <a href="{{ url_for('faculty_profile') }}" class="nav-item">
+            <i class="material-icons-round">person</i>
+            <span>Profile</span>
+        </a>
+    </nav>
+</body>
+
+</html>

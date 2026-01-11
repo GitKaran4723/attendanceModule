@@ -181,15 +181,47 @@ def student_required(f):
     return decorated_function
 
 
+def coordinator_required(f):
+    """
+    Decorator to require coordinator role
+    Usage: @coordinator_required
+    """
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not is_authenticated():
+            flash('Please log in to access this page.', 'warning')
+            return redirect(url_for('login', next=request.url))
+        
+        # Check if user is a coordinator
+        user = get_current_user()
+        if user and user.faculty:
+            if user.faculty.is_coordinator or user.role.role_name == 'admin':
+                return f(*args, **kwargs)
+        
+        flash('Only coordinators can access this page.', 'danger')
+        return redirect(url_for('index'))
+    return decorated_function
+
+
 # ============================================
 # Permission Checking
 # ============================================
+
+def is_coordinator():
+    """
+    Check if current user is a coordinator
+    """
+    user = get_current_user()
+    if user and user.faculty:
+        return user.faculty.is_coordinator
+    return False
+
 
 def can_edit_work_diary(diary):
     """
     Check if current user can edit a work diary entry
     - Own diary if not submitted
-    - Admin/HOD can edit any
+    - Admin/Coordinator can edit any
     """
     user = get_current_user()
     if not user:
@@ -197,8 +229,8 @@ def can_edit_work_diary(diary):
     
     role = get_user_role()
     
-    # Admin and HOD can edit any
-    if role in ['admin', 'hod']:
+    # Admin and Coordinator can edit any
+    if role == 'admin' or (user.faculty and user.faculty.is_coordinator):
         return True
     
     # Faculty can edit their own if not submitted
@@ -212,16 +244,18 @@ def can_edit_work_diary(diary):
 def can_approve_work_diary(diary):
     """
     Check if current user can approve a work diary entry
-    Only HOD and Admin can approve
+    Only Coordinator and Admin can approve
     """
+    user = get_current_user()
     role = get_user_role()
-    return role in ['admin', 'hod']
+    return role == 'admin' or (user and user.faculty and user.faculty.is_coordinator)
 
 
 def can_view_all_diaries():
     """
     Check if user can view all work diaries
-    Admin and HOD can view all, faculty only their own
+    Admin and Coordinator can view all, faculty only their own
     """
+    user = get_current_user()
     role = get_user_role()
-    return role in ['admin', 'hod']
+    return role == 'admin' or (user and user.faculty and user.faculty.is_coordinator)

@@ -374,10 +374,17 @@
                 style="background: none; border: none; padding: 0; cursor: pointer; color: var(--text-primary); display: flex; align-items: center;">
                 <i class="material-icons-round" style="font-size: 24px;">arrow_back</i>
             </button>
-            <h1
-                style="margin: 0; font-size: 20px; font-weight: 700; background: -webkit-linear-gradient(45deg, #6200ea, #b388ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
-                {{ class_data.section_name if class_data else 'My Class' }}
-            </h1>
+            <div>
+                <h1
+                    style="margin: 0; font-size: 20px; font-weight: 700; background: -webkit-linear-gradient(45deg, #6200ea, #b388ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                    {{ class_data.section_name if class_data else 'My Class' }}
+                </h1>
+                <div
+                    style="font-size: 11px; color: var(--text-secondary); font-weight: 500; text-transform: uppercase; margin-top: 2px;">
+                    Semester {{ class_data.semester if class_data and class_data.semester else 'N/A' }} • Academic Year
+                    2025-2026
+                </div>
+            </div>
         </div>
 
         <a href="{{ url_for('logout') }}"
@@ -395,118 +402,295 @@
 
     <div class="container">
 
+        <!-- Tab Navigation (Moved to Top) -->
+        <div
+            style="display: flex; gap: 8px; margin-bottom: 20px; background: rgba(255,255,255,0.7); padding: 6px; border-radius: 16px; backdrop-filter: blur(8px);">
+            <button onclick="switchTab('students')" id="studentsTab" class="tab-btn active-tab"
+                style="flex: 1; padding: 12px; border: none; border-radius: 12px; font-weight: 600; cursor: pointer; transition: all 0.3s; background: var(--primary-color); color: white;">
+                <i class="material-icons-round" style="font-size: 18px; vertical-align: middle;">people</i>
+                Students
+            </button>
+            <button onclick="switchTab('fees')" id="feesTab" class="tab-btn"
+                style="flex: 1; padding: 12px; border: none; border-radius: 12px; font-weight: 600; cursor: pointer; transition: all 0.3s; background: transparent; color: var(--text-secondary);">
+                <i class="material-icons-round" style="font-size: 18px; vertical-align: middle;">payments</i>
+                Fee Management
+            </button>
+        </div>
+
         <!-- Stats Card -->
-        <div class="glass-card">
+        <div class="glass-card" id="mainStatsCard">
             <div class="stat-header">
-                <span class="stat-title">Attendance Today</span>
-                <span class="stat-value">{{ class_data.attendance_percentage }}%</span>
+                <span class="stat-title" id="statTitle">Attendance Today</span>
+                <span class="stat-value" id="statValue">{{ class_data.attendance_percentage }}%</span>
             </div>
             <div class="progress-track">
-                <div class="progress-fill"
+                <div class="progress-fill" id="statProgress"
                     style="width: {{ class_data.attendance_percentage }}%; background: {{ '#00c853' if class_data.attendance_percentage > 75 else '#ffab00' }}">
                 </div>
             </div>
-            <div
+            <div id="statFooter"
                 style="text-align: right; font-size: 14px; font-weight: 500; color: var(--text-secondary); margin-top: 8px;">
                 {{ class_data.present_count }} Present <span style="font-weight: 400; opacity: 0.6;">/ {{
                     class_data.total_students }} Total</span>
             </div>
         </div>
 
-        <!-- Absentees Alert -->
-        {% if class_data.absentees %}
-        <div style="margin-bottom: 24px;">
-            <h3
-                style="margin: 0 0 12px 4px; color: var(--danger-color); display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 600;">
-                <i class="material-icons-round">warning</i> Today's Absentees
-            </h3>
+        <!-- Students Tab Content -->
+        <div id="studentsContent" class="tab-content">
 
-            <div id="absenteesList">
-                {% for student in class_data.absentees %}
-                <div class="student-item absentee-item"
-                    style="border-left: 4px solid var(--danger-color); padding: 12px 16px; {{ 'display:none;' if loop.index > 3 else '' }}">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div>
-                            <div class="student-name" style="font-size: 15px;">{{ student.name }}</div>
-                            <div class="student-meta">{{ student.roll_number }}</div>
+            <!-- Absentees Alert -->
+            {% if class_data.absentees %}
+            <div style="margin-bottom: 24px;">
+                <h3
+                    style="margin: 0 0 12px 4px; color: var(--danger-color); display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 600;">
+                    <i class="material-icons-round">warning</i> Today's Absentees
+                </h3>
+
+                <div id="absenteesList">
+                    {% for student in class_data.absentees %}
+                    <div class="student-item absentee-item"
+                        style="border-left: 4px solid var(--danger-color); padding: 12px 16px; {{ 'display:none;' if loop.index > 3 else '' }}">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div class="student-name" style="font-size: 15px;">{{ student.name }}</div>
+                                <div class="student-meta">{{ student.roll_number }}</div>
+                            </div>
+                            {% if student.guardian_phone or student.phone %}
+                            <a href="tel:{{ student.guardian_phone or student.phone }}"
+                                class="action-btn btn-call-danger"
+                                style="flex: none; width: 36px; height: 36px; border-radius: 50%; padding: 0;">
+                                <i class="material-icons-round" style="font-size: 18px;">call</i>
+                            </a>
+                            {% endif %}
                         </div>
-                        {% if student.guardian_phone or student.phone %}
-                        <a href="tel:{{ student.guardian_phone or student.phone }}" class="action-btn btn-call-danger"
-                            style="flex: none; width: 36px; height: 36px; border-radius: 50%; padding: 0;">
-                            <i class="material-icons-round" style="font-size: 18px;">call</i>
-                        </a>
-                        {% endif %}
                     </div>
+                    {% endfor %}
                 </div>
-                {% endfor %}
-            </div>
 
-            {% if class_data.absentees|length > 3 %}
-            <div id="viewMoreAbsentees" style="text-align: center; margin-top: 8px;">
-                <button onclick="viewAllAbsentees()"
-                    style="background: none; border: none; color: var(--danger-color); font-weight: 500; cursor: pointer; font-size: 13px;">
-                    View All {{ class_data.absentees|length }} Absentees
-                </button>
+                {% if class_data.absentees|length > 3 %}
+                <div id="viewMoreAbsentees" style="text-align: center; margin-top: 8px;">
+                    <button onclick="viewAllAbsentees()"
+                        style="background: none; border: none; color: var(--danger-color); font-weight: 500; cursor: pointer; font-size: 13px;">
+                        View All {{ class_data.absentees|length }} Absentees
+                    </button>
+                </div>
+                {% endif %}
             </div>
             {% endif %}
+
+            <!-- Student List Header -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <h2 style="font-size: 20px; font-weight: 700; margin: 0;">All Students</h2>
+                <button onclick="window.location.href='{{ url_for('faculty_take_attendance_app') }}'"
+                    style="padding: 8px 16px; background: var(--primary-color); color: white; border: none; border-radius: 12px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 12px rgba(98, 0, 234, 0.2);">
+                    <i class="material-icons-round" style="font-size: 18px;">qr_code_scanner</i> Take Attendance
+                </button>
+            </div>
+
+            <input type="text" class="search-box" placeholder="Search by name or roll number..."
+                onkeyup="filterStudents(this.value)">
+
+            <div id="studentsList">
+                {% for student in class_data.students %}
+                {% set is_low = student.attendance_percentage < 75 %} <div
+                    class="student-item {{ 'alert-danger' if is_low else '' }}" data-name="{{ student.name|lower }}"
+                    data-roll="{{ student.roll_number|lower }}" style="{{ 'display:none;' if loop.index > 3 else '' }}">
+
+                    <div class="student-header">
+                        <div>
+                            <div class="student-name">{{ student.name }}</div>
+                            <div class="student-meta">{{ student.roll_number }}</div>
+                        </div>
+                        <div
+                            class="attendance-pill {{ 'pill-low' if is_low else ('pill-high' if student.attendance_percentage >= 85 else 'pill-med') }}">
+                            {{ student.attendance_percentage }}%
+                        </div>
+                    </div>
+
+                    <div class="action-row">
+                        <button class="action-btn btn-analytics" onclick="openAnalytics('{{ student.student_id }}')">
+                            <i class="material-icons-round" style="font-size: 18px">bar_chart</i> Analytics
+                        </button>
+
+                        {% if student.guardian_phone or student.phone %}
+                        <a href="tel:{{ student.guardian_phone or student.phone }}"
+                            class="action-btn {{ 'btn-call-danger' if is_low else 'btn-call' }}">
+                            <i class="material-icons-round" style="font-size: 18px">call</i> Call
+                        </a>
+                        {% endif %}
+
+                        <button class="action-btn btn-edit"
+                            onclick="openEditModal('{{ student.student_id }}', '{{ student.name }}', '{{ student.phone or '' }}', '{{ student.guardian_phone or '' }}', `{{ student.address or '' }}`)">
+                            <i class="material-icons-round">edit</i>
+                        </button>
+                    </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        {% if class_data.students|length > 3 %}
+        <div id="viewMoreContainer" style="text-align: center; margin-top: 10px;">
+            <button onclick="viewAllStudents()"
+                style="background: white; border: 1px solid #ddd; padding: 10px 20px; border-radius: 20px; color: var(--text-secondary); font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 5px; margin: 0 auto;">
+                View All {{ class_data.students|length }} Students <i class="material-icons-round">expand_more</i>
+            </button>
         </div>
         {% endif %}
+    </div>
+    </div>
+    </div> <!-- End Students Tab Content -->
 
-        <!-- Student List Header -->
-        <h2 style="font-size: 20px; font-weight: 700; margin: 0 0 16px 4px;">All Students</h2>
+    <!-- Fees Tab Content -->
+    <div id="feesContent" class="tab-content" style="display: none;">
+        <div id="feeAlertContainer"></div>
 
-        <input type="text" class="search-box" placeholder="Search by name or roll number..."
-            onkeyup="filterStudents(this.value)">
-
-        <div id="studentsList">
-            {% for student in class_data.students %}
-            {% set is_low = student.attendance_percentage < 75 %} <div
-                class="student-item {{ 'alert-danger' if is_low else '' }}" data-name="{{ student.name|lower }}"
-                data-roll="{{ student.roll_number|lower }}" style="{{ 'display:none;' if loop.index > 3 else '' }}">
-
-                <div class="student-header">
-                    <div>
-                        <div class="student-name">{{ student.name }}</div>
-                        <div class="student-meta">{{ student.roll_number }}</div>
-                    </div>
-                    <div
-                        class="attendance-pill {{ 'pill-low' if is_low else ('pill-high' if student.attendance_percentage >= 85 else 'pill-med') }}">
-                        {{ student.attendance_percentage }}%
-                    </div>
-                </div>
-
-                <div class="action-row">
-                    <button class="action-btn btn-analytics" onclick="openAnalytics('{{ student.student_id }}')">
-                        <i class="material-icons-round" style="font-size: 18px">bar_chart</i> Analytics
-                    </button>
-
-                    {% if student.guardian_phone or student.phone %}
-                    <a href="tel:{{ student.guardian_phone or student.phone }}"
-                        class="action-btn {{ 'btn-call-danger' if is_low else 'btn-call' }}">
-                        <i class="material-icons-round" style="font-size: 18px">call</i> Call
-                    </a>
-                    {% endif %}
-
-                    <button class="action-btn btn-edit"
-                        onclick="openEditModal('{{ student.student_id }}', '{{ student.name }}', '{{ student.phone or '' }}', '{{ student.guardian_phone or '' }}', `{{ student.address or '' }}`)">
-                        <i class="material-icons-round">edit</i>
-                    </button>
-                </div>
+        <!-- Fee Students List -->
+        <div id="feeStudentsContainer">
+            <div style="text-align: center; padding: 40px 20px; color: var(--text-secondary);">
+                <i class="material-icons-round" style="font-size: 48px; opacity: 0.3;">hourglass_empty</i>
+                <p>Loading fee data...</p>
+            </div>
         </div>
-        {% endfor %}
+    </div> <!-- End Fees Tab Content -->
+
+    {% endif %}
+
+    <!-- Fee Structure Modal -->
+    <div class="modal-overlay" id="feeStructureModal"
+        style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; align-items: center; justify-content: center;">
+        <div class="modal"
+            style="width: 90%; max-width: 500px; max-height: 85vh; overflow-y: auto; padding: 24px; border-radius: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 style="margin: 0; font-size: 20px;">Set Fee Structure</h2>
+                <button onclick="closeFeeModal('feeStructureModal')"
+                    style="background: none; border: none; font-size: 28px; color: #666; cursor: pointer;">&times;</button>
+            </div>
+
+            <form id="feeStructureForm" onsubmit="handleFeeStructureSubmit(event)">
+                <input type="hidden" id="feeStudentId">
+                <input type="hidden" id="feeSectionId">
+
+                <div style="margin-bottom: 15px;">
+                    <label
+                        style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 14px;">Student</label>
+                    <input type="text" id="feeStudentName" readonly
+                        style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 10px; background: #f5f5f5;">
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 14px;">Academic Year
+                        *</label>
+                    <select id="feeAcademicYear" required
+                        style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 10px;">
+                        <!-- Options populated dynamically -->
+                    </select>
+                    <small style="color: #666; font-size: 12px; display: block; margin-top: 4px;">
+                        Years from student's joining year onwards
+                    </small>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 14px;">Base Fees
+                            (₹) *</label>
+                        <input type="number" id="feeBaseFees" required step="0.01" oninput="calculateFeeTotal()"
+                            style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 10px;">
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 14px;">Carry
+                            Forward (₹)</label>
+                        <input type="number" id="feeCarryForward" value="0" step="0.01" oninput="calculateFeeTotal()"
+                            style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 10px;">
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 14px;">Additional
+                            (₹)</label>
+                        <input type="number" id="feeAdditional" value="0" step="0.01" oninput="calculateFeeTotal()"
+                            style="width: 100%; padding: 10px; border: 1px; border-radius: 10px;">
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 14px;">Total Fees
+                            (₹) *</label>
+                        <input type="number" id="feeTotalFees" readonly
+                            style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 10px; background: #f5f5f5; font-weight: 700;">
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label
+                        style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 14px;">Remarks</label>
+                    <textarea id="feeRemarks" rows="2"
+                        style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 10px;"></textarea>
+                </div>
+
+                <button type="submit"
+                    style="width: 100%; padding: 14px; background: var(--primary-color); color: white; border: none; border-radius: 12px; font-weight: 600; cursor: pointer;">
+                    Save Fee Structure
+                </button>
+            </form>
+        </div>
     </div>
 
-    {% if class_data.students|length > 3 %}
-    <div id="viewMoreContainer" style="text-align: center; margin-top: 10px;">
-        <button onclick="viewAllStudents()"
-            style="background: white; border: 1px solid #ddd; padding: 10px 20px; border-radius: 20px; color: var(--text-secondary); font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 5px; margin: 0 auto;">
-            View All {{ class_data.students|length }} Students <i class="material-icons-round">expand_more</i>
-        </button>
+    <!-- Add Receipt Modal -->
+    <div class="modal-overlay" id="addReceiptModal"
+        style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; align-items: center; justify-content: center;">
+        <div class="modal"
+            style="width: 90%; max-width: 450px; max-height: 85vh; overflow-y: auto; padding: 24px; border-radius: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 style="margin: 0; font-size: 20px;">Add Receipt</h2>
+                <button onclick="closeFeeModal('addReceiptModal')"
+                    style="background: none; border: none; font-size: 28px; color: #666; cursor: pointer;">&times;</button>
+            </div>
+
+            <form id="addReceiptForm" onsubmit="handleAddReceiptSubmit(event)">
+                <input type="hidden" id="receiptFeeStructureId">
+
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 14px;">Receipt Number
+                        *</label>
+                    <input type="text" id="receiptNumber" required
+                        style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 10px;">
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 14px;">Phone on
+                        Receipt *</label>
+                    <input type="tel" id="receiptPhone" required
+                        style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 10px;">
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 14px;">Amount (₹)
+                            *</label>
+                        <input type="number" id="receiptAmount" required step="0.01"
+                            style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 10px;">
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 14px;">Date
+                            *</label>
+                        <input type="date" id="receiptDate" required
+                            style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 10px;">
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="approveImmediately" style="width: auto;">
+                        <span style="font-size: 14px;">Approve immediately</span>
+                    </label>
+                </div>
+
+                <button type="submit"
+                    style="width: 100%; padding: 14px; background: var(--success-color); color: white; border: none; border-radius: 12px; font-weight: 600; cursor: pointer;">
+                    Add Receipt
+                </button>
+            </form>
+        </div>
     </div>
-    {% endif %}
-    </div>
-    </div>
-    {% endif %}
 
     <!-- Analytics Modal -->
     <div class="modal-overlay" id="analyticsModal"
@@ -761,6 +945,331 @@
                 btn.innerHTML = originalText;
                 btn.disabled = false;
             }
+        }
+
+        // Tab Switching
+        function switchTab(tabName) {
+            // Hide all tab contents
+            document.getElementById('studentsContent').style.display = 'none';
+            document.getElementById('feesContent').style.display = 'none';
+
+            // Remove active class from all tabs
+            document.getElementById('studentsTab').style.background = 'transparent';
+            document.getElementById('studentsTab').style.color = 'var(--text-secondary)';
+            document.getElementById('feesTab').style.background = 'transparent';
+            document.getElementById('feesTab').style.color = 'var(--text-secondary)';
+
+            // Show selected tab and mark as active
+            if (tabName === 'students') {
+                document.getElementById('studentsContent').style.display = 'block';
+                document.getElementById('studentsTab').style.background = 'var(--primary-color)';
+                document.getElementById('studentsTab').style.color = 'white';
+
+                // Restore Attendance Stats
+                document.getElementById('statTitle').textContent = 'Attendance Today';
+                document.getElementById('statValue').textContent = '{{ class_data.attendance_percentage }}%';
+                document.getElementById('statProgress').style.width = '{{ class_data.attendance_percentage }}%';
+                document.getElementById('statProgress').style.background = '{{ "#00c853" if class_data.attendance_percentage > 75 else "#ffab00" }}';
+                document.getElementById('statFooter').innerHTML = `{{ class_data.present_count }} Present <span style="font-weight: 400; opacity: 0.6;">/ {{ class_data.total_students }} Total</span>`;
+
+            } else if (tabName === 'fees') {
+                document.getElementById('feesContent').style.display = 'block';
+                document.getElementById('feesTab').style.background = 'var(--primary-color)';
+                document.getElementById('feesTab').style.color = 'white';
+
+                // Show Loading state for stats
+                document.getElementById('statTitle').textContent = 'Pending Payments';
+                document.getElementById('statValue').textContent = '...';
+
+                // Load fee data when tab is opened
+                if (!window.feeDataLoaded) {
+                    loadFeeData();
+                    window.feeDataLoaded = true;
+                } else if (window.lastFeeStats) {
+                    updateFeeStats(window.lastFeeStats);
+                }
+            }
+        }
+
+        // Load Fee Data
+        async function loadFeeData() {
+            try {
+                const response = await fetch('/fees/faculty/students');
+                const data = await response.json();
+
+                if (data.success) {
+                    renderFeeStudents(data.data);
+                    if (data.summary_stats) {
+                        window.lastFeeStats = data.summary_stats;
+                        updateFeeStats(data.summary_stats);
+                    }
+                } else {
+                    showFeeError('Failed to load fee data');
+                }
+            } catch (error) {
+                console.error('Error loading fees:', error);
+                showFeeError('Network error occurred');
+            }
+        }
+
+        function updateFeeStats(stats) {
+            // Only update if we are still on the fees tab
+            if (document.getElementById('feesTab').style.background === 'transparent') return;
+
+            const pending = stats.pending_payment_count;
+            const total = stats.total_students;
+            const percent = total > 0 ? Math.round(((total - pending) / total) * 100) : 100;
+
+            document.getElementById('statTitle').textContent = 'Pending Payments';
+            document.getElementById('statValue').textContent = pending;
+            document.getElementById('statProgress').style.width = (100 - (pending / total * 100)) + '%';
+            document.getElementById('statProgress').style.background = pending > 0 ? '#ff1744' : '#00c853';
+            document.getElementById('statFooter').innerHTML = `${pending} Students Pending <span style="font-weight: 400; opacity: 0.6;">/ ${total} Total</span>`;
+        }
+
+        function renderFeeStudents(students) {
+            const container = document.getElementById('feeStudentsContainer');
+
+            if (students.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align: center; padding: 40px 20px; color: var(--text-secondary);">
+                        <i class="material-icons-round" style="font-size: 48px; opacity: 0.3;">inbox</i>
+                        <p>No students found in your section</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = students.map(item => {
+                const s = item.structure;
+                const receipts = item.receipts;
+                const pending = receipts.filter(r => !r.approved).length;
+
+                return `
+                    <div class="glass-card" style="margin-bottom: 15px;">
+                        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
+                            <div>
+                                <div style="font-weight: 600; font-size: 16px;">${s.student_name}</div>
+                                <div style="font-size: 13px; color: var(--text-secondary);">
+                                    ${s.roll_number} • Joined: ${s.joining_year || 'N/A'} • Fee Year: ${s.academic_year}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px;">
+                            <div style="text-align: center; padding: 8px; background: rgba(0,0,0,0.03); border-radius: 8px;">
+                                <div style="font-size: 11px; color: var(--text-secondary);">Total</div>
+                                <div style="font-weight: 700; font-size: 15px;">₹${s.total_fees.toLocaleString()}</div>
+                            </div>
+                            <div style="text-align: center; padding: 8px; background: rgba(0,200,83,0.1); border-radius: 8px;">
+                                <div style="font-size: 11px; color: var(--text-secondary);">Paid</div>
+                                <div style="font-weight: 700; font-size: 15px; color: #00c853;">₹${s.total_paid.toLocaleString()}</div>
+                            </div>
+                            <div style="text-align: center; padding: 8px; background: rgba(255,23,68,0.1); border-radius: 8px;">
+                                <div style="font-size: 11px; color: var(--text-secondary);">Outstanding</div>
+                                <div style="font-weight: 700; font-size: 15px; color: #ff1744;">₹${s.outstanding.toLocaleString()}</div>
+                            </div>
+                        </div>
+                        
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 10px; border-top: 1px solid rgba(0,0,0,0.05);">
+                            <div style="font-size: 13px; color: var(--text-secondary);">
+                                ${s.fee_structure_id ? `${receipts.length} receipts ${pending > 0 ? `(${pending} pending)` : ''}` : `<span style="color: #ff1744; font-weight: 600;">Fees not set by admin</span>`}
+                            </div>
+                            ${s.fee_structure_id ? `
+                                <button onclick="openAddReceiptModal('${s.fee_structure_id}')" 
+                                    style="padding: 6px 12px; background: var(--success-color); color: white; border: none; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer;">
+                                    <i class="material-icons-round" style="font-size: 14px; vertical-align: middle;">add</i> Add Receipt
+                                </button>
+                            ` : ''}
+                        </div>
+                        
+                        ${receipts.length > 0 ? `
+                            <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(0,0,0,0.05);">
+                                ${receipts.slice(0, 2).map(r => `
+                                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: rgba(0,0,0,0.02); border-radius: 6px; margin-bottom: 6px;">
+                                        <div style="font-size: 13px;">
+                                            <strong>${r.receipt_number}</strong> • ₹${r.amount_paid.toLocaleString()}
+                                            <span style="margin-left: 8px; padding: 2px 8px; background: ${r.approved ? 'rgba(0,200,83,0.15)' : 'rgba(255,171,0,0.15)'}; color: ${r.approved ? '#008035' : '#bf8000'}; border-radius: 10px; font-size: 11px; font-weight: 600;">
+                                                ${r.approved ? '✓ Approved' : '⏳ Pending'}
+                                            </span>
+                                        </div>
+                                        ${!r.approved ? `
+                                            <button onclick="approveFeeReceipt('${r.fee_receipt_id}')" 
+                                                style="padding: 4px 10px; background: var(--success-color); color: white; border: none; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer;">
+                                                Approve
+                                            </button>
+                                        ` : ''}
+                                    </div>
+                                `).join('')}
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function openFeeStructureModal(studentId, studentName, sectionId, totalFees, baseFees, carryForward, additionalCharges, academicYear, joiningYear) {
+            document.getElementById('feeStudentId').value = studentId;
+            document.getElementById('feeStudentName').value = studentName + (joiningYear ? ` (Joined: ${joiningYear})` : '');
+            document.getElementById('feeSectionId').value = sectionId;
+            document.getElementById('feeBaseFees').value = baseFees || '';
+            document.getElementById('feeCarryForward').value = carryForward || 0;
+            document.getElementById('feeAdditional').value = additionalCharges || 0;
+            document.getElementById('feeTotalFees').value = totalFees || 0;
+
+            // Populate academic year dropdown dynamically
+            const yearDropdown = document.getElementById('feeAcademicYear');
+            yearDropdown.innerHTML = ''; // Clear existing options
+
+            // Parse joining year or use default
+            let startYear = 2024; // Default
+            if (joiningYear && joiningYear.includes('-')) {
+                startYear = parseInt(joiningYear.split('-')[0]);
+            }
+
+            // Generate years from joining year to 3 years ahead
+            const currentYear = new Date().getFullYear();
+            const endYear = Math.max(currentYear + 2, startYear + 5); // At least 5 years from joining
+
+            for (let year = startYear; year <= endYear; year++) {
+                const yearString = `${year}-${year + 1}`;
+                const option = document.createElement('option');
+                option.value = yearString;
+                option.textContent = yearString;
+                yearDropdown.appendChild(option);
+            }
+
+            // Set the selected year to the current structure's year or joining year
+            yearDropdown.value = academicYear || joiningYear || `${currentYear}-${currentYear + 1}`;
+
+            document.getElementById('feeStructureModal').style.display = 'flex';
+        }
+
+        function openAddReceiptModal(feeStructureId) {
+            document.getElementById('receiptFeeStructureId').value = feeStructureId;
+            document.getElementById('receiptDate').valueAsDate = new Date();
+            document.getElementById('addReceiptModal').style.display = 'flex';
+        }
+
+        function closeFeeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        }
+
+        function calculateFeeTotal() {
+            const base = parseFloat(document.getElementById('feeBaseFees').value) || 0;
+            const carry = parseFloat(document.getElementById('feeCarryForward').value) || 0;
+            const additional = parseFloat(document.getElementById('feeAdditional').value) || 0;
+            document.getElementById('feeTotalFees').value = (base + carry + additional).toFixed(2);
+        }
+
+        async function handleFeeStructureSubmit(e) {
+            e.preventDefault();
+            const btn = e.target.querySelector('button[type="submit"]');
+            btn.disabled = true;
+            btn.textContent = 'Saving...';
+
+            const data = {
+                student_id: document.getElementById('feeStudentId').value,
+                section_id: document.getElementById('feeSectionId').value,
+                academic_year: document.getElementById('feeAcademicYear').value,
+                base_fees: parseFloat(document.getElementById('feeBaseFees').value),
+                carry_forward: parseFloat(document.getElementById('feeCarryForward').value) || 0,
+                additional_charges: parseFloat(document.getElementById('feeAdditional').value) || 0,
+                total_fees: parseFloat(document.getElementById('feeTotalFees').value),
+                remarks: document.getElementById('feeRemarks').value
+            };
+
+            try {
+                const response = await fetch('/fees/faculty/set-structure', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    closeFeeModal('feeStructureModal');
+                    window.feeDataLoaded = false;
+                    loadFeeData();
+                    showFeeSuccess('Fee structure saved successfully');
+                } else {
+                    alert(result.error || 'Failed to save');
+                }
+            } catch (error) {
+                alert('Network error occurred');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Save Fee Structure';
+            }
+        }
+
+        async function handleAddReceiptSubmit(e) {
+            e.preventDefault();
+            const btn = e.target.querySelector('button[type="submit"]');
+            btn.disabled = true;
+            btn.textContent = 'Adding...';
+
+            const data = {
+                fee_structure_id: document.getElementById('receiptFeeStructureId').value,
+                receipt_number: document.getElementById('receiptNumber').value,
+                receipt_phone: document.getElementById('receiptPhone').value,
+                amount_paid: parseFloat(document.getElementById('receiptAmount').value),
+                payment_date: document.getElementById('receiptDate').value,
+                approve_immediately: document.getElementById('approveImmediately').checked
+            };
+
+            try {
+                const response = await fetch('/fees/faculty/add-receipt', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    closeFeeModal('addReceiptModal');
+                    window.feeDataLoaded = false;
+                    loadFeeData();
+                    showFeeSuccess('Receipt added successfully');
+                } else {
+                    alert(result.error || 'Failed to add receipt');
+                }
+            } catch (error) {
+                alert('Network error occurred');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Add Receipt';
+            }
+        }
+
+        async function approveFeeReceipt(receiptId) {
+            if (!confirm('Approve this receipt?')) return;
+
+            try {
+                const response = await fetch(`/fees/faculty/receipt/${receiptId}/approve`, { method: 'POST' });
+                const result = await response.json();
+
+                if (result.success) {
+                    window.feeDataLoaded = false;
+                    loadFeeData();
+                    showFeeSuccess('Receipt approved');
+                } else {
+                    alert(result.error || 'Failed to approve');
+                }
+            } catch (error) {
+                alert('Network error occurred');
+            }
+        }
+
+        function showFeeSuccess(message) {
+            const container = document.getElementById('feeAlertContainer');
+            container.innerHTML = `<div style="padding: 12px; background: rgba(0,200,83,0.15); color: #008035; border-radius: 10px; margin-bottom: 15px;">${message}</div>`;
+            setTimeout(() => container.innerHTML = '', 3000);
+        }
+
+        function showFeeError(message) {
+            const container = document.getElementById('feeAlertContainer');
+            container.innerHTML = `<div style="padding: 12px; background: rgba(255,23,68,0.15); color: #c62828; border-radius: 10px; margin-bottom: 15px;">${message}</div>`;
         }
 
         // Close overlay clicks

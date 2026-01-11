@@ -38,6 +38,9 @@ class Config:
     # File Upload Settings (if needed in future)
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max file size
     UPLOAD_FOLDER = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'uploads')
+    
+    # Timezone Configuration
+    TIMEZONE = 'Asia/Kolkata'  # Indian Standard Time (IST)
 
 
 class DevelopmentConfig(Config):

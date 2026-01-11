@@ -264,8 +264,7 @@
 
             .btn-group {
                 flex-direction: column;
-            }
-        }
+            }}
 
         /* Prevent bottom nav overlap */
         .admin-container {
@@ -276,6 +275,7 @@
 
 <body class="admin-page">
     <!-- App Bar -->
+
     <header class="admin-app-bar">
         <button class="menu-btn" onclick="location.href='{{ url_for('admin_faculty') }}'">
             <i class="material-icons">arrow_back</i>
@@ -411,29 +411,87 @@
                             <input type="text" name="qualification" class="form-input"
                                 value="{{ faculty.qualification if faculty else '' }}" placeholder="e.g., M.Tech, Ph.D">
                         </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Workload (Hours/Week)</label>
+                            <input type="number" name="workload_hours_per_week" class="form-input" min="0" max="60"
+                                value="{{ faculty.workload_hours_per_week if faculty else 0 }}" placeholder="e.g., 18">
+                            <small style="display: block; margin-top: 6px; color: #666; font-size: 13px;">
+                                <i class="material-icons" style="font-size: 14px; vertical-align: middle;">info</i>
+                                Total teaching hours assigned per week
+                            </small>
+                        </div>
+                        <div class="form-group"
+                            style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(99, 102, 241, 0.02) 100%); padding: 16px; border-radius: var(--admin-radius-md); border: 2px solid rgba(99, 102, 241, 0.1);">
+                            <label class="form-label"
+                                style="display: flex; align-items: center; gap: 12px; cursor: pointer;">
+                                <input type="checkbox" name="is_coordinator" value="1" {% if faculty and
+                                    faculty.is_coordinator %}checked{% endif %}
+                                    style="width: 20px; height: 20px; accent-color: var(--admin-primary); cursor: pointer;">
+                                <span style="flex: 1;">
+                                    <strong style="color: var(--admin-primary);">Program Coordinator</strong>
+                                    <small style="display: block; margin-top: 4px; color: #666; font-weight: normal;">
+                                        <i class="material-icons"
+                                            style="font-size: 14px; vertical-align: middle;">info</i>
+                                        Coordinators can manage department faculty, view attendance, and monitor classes
+                                    </small>
+                                </span>
+                            </label>
+                        </div>
+
                     </div>
 
                     <!-- Subject Assignment -->
                     <div class="form-section">
                         <div class="section-title">
                             <i class="material-icons">book</i>
-                            Assign Subjects
+                            Assign Subjects & Sections
                         </div>
 
                         {% if subjects %}
                         <div class="subject-selector">
                             {% for subject in subjects %}
-                            <div class="subject-item"
-                                onclick="document.getElementById('subject_{{ subject.subject_id }}').click()">
-                                <input type="checkbox" name="subjects" value="{{ subject.subject_id }}"
-                                    id="subject_{{ subject.subject_id }}" {% if faculty and subject.subject_id in
-                                    faculty_subject_ids %}checked{% endif %} onclick="event.stopPropagation()">
-                                <label for="subject_{{ subject.subject_id }}">
-                                    <strong>{{ subject.subject_code }}</strong> - {{ subject.subject_name }}
-                                    <small>
-                                        Semester {{ subject.semester_id }} | Credits: {{ subject.credits }}
-                                    </small>
-                                </label>
+                            <div class="subject-item-container"
+                                style="margin-bottom: 12px; border: 1px solid #eee; border-radius: 8px; padding: 12px; background: white;">
+                                <div class="subject-item" style="border: none; margin: 0; padding: 0;"
+                                    onclick="toggleSubjectSelection('{{ subject.subject_id }}')">
+                                    <input type="checkbox" name="subjects" value="{{ subject.subject_id }}"
+                                        id="subject_{{ subject.subject_id }}" {% if faculty and subject.subject_id in
+                                        faculty_subject_ids %}checked{% endif %}
+                                        onclick="event.stopPropagation(); updateSubjectControls('{{ subject.subject_id }}')">
+                                    <label for="subject_{{ subject.subject_id }}">
+                                        <strong>{{ subject.subject_code }}</strong> - {{ subject.subject_name }}
+                                        <small>Semester {{ subject.semester_id }} | Credits: {{ subject.credits
+                                            }}</small>
+                                    </label>
+                                </div>
+
+                                <div id="controls_{{ subject.subject_id }}" class="subject-controls"
+                                    style="margin-top: 12px; display: {% if faculty and subject.subject_id in faculty_subject_ids %}flex{% else %}none{% endif %}; gap: 12px; flex-wrap: wrap; padding-top: 12px; border-top: 1px dashed #eee;">
+                                    <div style="flex: 1; min-width: 200px;">
+                                        <label class="form-label" style="font-size: 12px;">Program</label>
+                                        <select class="form-select" style="padding: 8px; font-size: 14px;"
+                                            id="program_select_{{ subject.subject_id }}"
+                                            onchange="filterSections('{{ subject.subject_id }}')">
+                                            <option value="">Select Program</option>
+                                            {% for prog in programs %}
+                                            <option value="{{ prog.program_id }}" {% if
+                                                prog.program_id==subject.program_id %}selected{% endif %}>
+                                                {{ prog.program_code }}
+                                            </option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div style="flex: 1; min-width: 200px;">
+                                        <label class="form-label" style="font-size: 12px;">Section</label>
+                                        <select name="section_{{ subject.subject_id }}" class="form-select"
+                                            style="padding: 8px; font-size: 14px;"
+                                            id="section_select_{{ subject.subject_id }}">
+                                            <option value="">General / All Sections</option>
+                                            <!-- Sections will be populated by JS -->
+                                        </select>
+                                    </div>
+                                </div>
                             </div>
                             {% endfor %}
                         </div>
@@ -465,6 +523,34 @@
                                 <input type="password" name="password" class="form-input" required
                                     placeholder="Password (min 6 characters)" minlength="6">
                             </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if faculty %}
+                    <!-- Reset Credentials Section -->
+                    <div class="form-section">
+                        <div class="section-title">
+                            <i class="material-icons">lock_reset</i>
+                            Reset Credentials
+                        </div>
+                        <div
+                            style="background: #fff3cd; border: 1px solid #ffc107; border-radius: var(--admin-radius-md); padding: 16px; margin-bottom: 16px;">
+                            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+                                <i class="material-icons" style="color: #ff9800;">warning</i>
+                                <strong style="color: #856404;">Reset Username & Password</strong>
+                            </div>
+                            <p style="margin: 0 0 12px 0; color: #856404; font-size: 14px;">
+                                This will reset the username and password to the email prefix (before @): <strong>{{
+                                    faculty.email.split('@')[0] if faculty.email and '@' in faculty.email else 'N/A'
+                                    }}</strong>
+                            </p>
+                            <button type="button" class="admin-btn"
+                                style="background: linear-gradient(135deg, #ff9800, #f57c00); color: white; padding: 12px 20px; border: none; border-radius: var(--admin-radius-md); cursor: pointer; display: flex; align-items: center; gap: 8px; font-weight: 600;"
+                                onclick="resetFacultyPassword()">
+                                <i class="material-icons">lock_reset</i>
+                                Reset to Default
+                            </button>
                         </div>
                     </div>
                     {% endif %}
@@ -504,6 +590,100 @@
             <span>Subjects</span>
         </a>
     </nav>
+
+    <script>
+        console.log("Hello world")
+        // Data passed from backend
+        const allSections = {{ sections | tojson }};
+        const facultyAllocations = {{ faculty_allocations | tojson }};
+
+        const subjects = [
+            {% for subject in subjects %}
+        { id: '{{ subject.subject_id }}', semester: {{ subject.semester_id }}, program_id: '{{ subject.program_id }}' },
+        {% endfor %}
+        ];
+
+        function toggleSubjectSelection(subjectId) {
+            const checkbox = document.getElementById('subject_' + subjectId);
+            checkbox.checked = !checkbox.checked;
+            updateSubjectControls(subjectId);
+        }
+
+        function updateSubjectControls(subjectId) {
+            const checkbox = document.getElementById('subject_' + subjectId);
+            const controls = document.getElementById('controls_' + subjectId);
+
+            if (checkbox.checked) {
+                controls.style.display = 'flex';
+                filterSections(subjectId);
+            } else {
+                controls.style.display = 'none';
+            }}
+
+        function filterSections(subjectId) {
+            const programSelect = document.getElementById('program_select_' + subjectId);
+            const sectionSelect = document.getElementById('section_select_' + subjectId);
+            const selectedProgram = programSelect.value;
+
+            // Find subject details to match semester
+            const subject = subjects.find(s => s.id == subjectId);
+
+            // Clear current options
+            const currentValue = sectionSelect.value || (facultyAllocations[subjectId] || "");
+            sectionSelect.innerHTML = '<option value="">General / All Sections</option>';
+
+            if (selectedProgram) {
+                const filtered = allSections.filter(s =>
+                    s.program_id == selectedProgram &&
+                    s.current_semester == subject.semester_id
+                );
+
+                filtered.forEach(s => {
+                    const option = document.createElement('option');
+                    option.value = s.section_id;
+                    option.textContent = s.section_name;
+                    if (s.section_id == currentValue) option.selected = true;
+                    sectionSelect.appendChild(option);
+                });
+            }}
+
+        // Initialize state for edit mode
+        window.addEventListener('DOMContentLoaded', () => {
+            subjects.forEach(s => {
+                const checkbox = document.getElementById('subject_' + s.id);
+                if (checkbox && checkbox.checked) {
+                    filterSections(s.id);
+                }});
+        });
+        {% if faculty %}
+        async function resetFacultyPassword() {
+            const facultyEmail = '{{ faculty.email }}';
+            const emailPrefix = facultyEmail.split('@')[0];
+            const facultyName = '{{ faculty.first_name }} {{ faculty.last_name }}';
+
+            if (!confirm(`Reset username and password for ${facultyName}?\n\nNew credentials will be:\nUsername: ${emailPrefix}\nPassword: ${emailPrefix}\n\nThe faculty member will need to use these credentials to login.`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/admin/faculty/{{ faculty.faculty_id }}/reset-password', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }});
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert(`✓ Success!\n\n${result.message}\n\nThe faculty member can now login with:\nUsername: ${result.username}\nPassword: ${result.username}`);
+                } else {
+                    alert(`Error: ${result.error}`);
+                }} catch (error) {
+                alert(`Failed to reset password: ${error.message}`);
+                console.error(error);
+            }}
+        {% endif %}
+    </script>
 </body>
 
 </html>

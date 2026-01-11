@@ -223,10 +223,10 @@ def copy_legacy_data():
         # Update Students
         students = Student.query.all()
         for student in students:
-            if student.name and not student.first_name:
+            if student.name and not student.name:
                 parts = student.name.split(' ', 1)
-                student.first_name = parts[0]
-                student.last_name = parts[1] if len(parts) > 1 else ''
+                student.name = parts[0]
+                student.name = parts[1] if len(parts) > 1 else ''
                 print(f"  ✅ Updated student: {student.name}")
             
             if student.usn and not student.roll_number:

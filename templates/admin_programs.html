@@ -90,7 +90,7 @@
         }
 
         .btn-edit {
-            background:rgba(26, 35, 126, 0.08);
+            background: rgba(26, 35, 126, 0.08);
             color: var(--admin-primary);
         }
 
@@ -195,7 +195,13 @@
                             </div>
                             <div class="meta-item">
                                 <i class="material-icons">schedule</i>
-                                <span><strong>Duration:</strong> {{ program.duration_years or program.duration }} Years</span>
+                                <span><strong>Duration:</strong> {{ program.duration_years or program.duration }}
+                                    Years</span>
+                            </div>
+                            <div class="meta-item">
+                                <i class="material-icons">calendar_today</i>
+                                <span><strong>Academic Year:</strong> {{ program.current_academic_year or 'Not Set'
+                                    }}</span>
                             </div>
                             <div class="meta-item">
                                 <i class="material-icons">class</i>
@@ -205,7 +211,7 @@
                     </div>
                     <div class="card-actions">
                         <button class="btn-action btn-edit"
-                            onclick="openEditModal('{{ program.program_id }}', '{{ program.program_code }}', '{{ program.program_name or program.name }}', '{{ program.duration_years or program.duration }}')">
+                            onclick="openEditModal('{{ program.program_id }}', '{{ program.program_code }}', '{{ program.program_name or program.name }}', '{{ program.duration_years or program.duration }}', '{{ program.current_academic_year or '' }}')">
                             <i class="material-icons">edit</i>
                             Edit
                         </button>
@@ -239,7 +245,8 @@
                 </div>
                 <div class="form-group">
                     <label>Program Name *</label>
-                    <input type="text" name="program_name" required placeholder="e.g., Bachelor of Computer Applications">
+                    <input type="text" name="program_name" required
+                        placeholder="e.g., Bachelor of Computer Applications">
                 </div>
                 <div class="form-group">
                     <label>Duration (Years) *</label>
@@ -262,18 +269,38 @@
                 <input type="hidden" id="editProgramId" name="program_id">
                 <div class="form-group">
                     <label>Program Code</label>
-                    <input type="text" id="editProgramCode" name="program_code" disabled 
-                           style="background: #f5f5f5; cursor: not-allowed;">
+                    <input type="text" id="editProgramCode" name="program_code" disabled
+                        style="background: #f5f5f5; cursor: not-allowed;">
                     <small style="color: #666;">Program code cannot be changed</small>
                 </div>
                 <div class="form-group">
                     <label>Program Name *</label>
-                    <input type="text" id="editProgramName" name="program_name" required 
-                           placeholder="e.g., Bachelor of Computer Applications">
+                    <input type="text" id="editProgramName" name="program_name" required
+                        placeholder="e.g., Bachelor of Computer Applications">
                 </div>
                 <div class="form-group">
                     <label>Duration (Years) *</label>
                     <input type="number" id="editDurationYears" name="duration_years" min="1" max="10" required>
+                </div>
+                <div class="form-group">
+                    <label>Program Coordinators</label>
+                    <div id="coordinatorsList" style="margin-bottom: 12px; max-height: 150px; overflow-y: auto;">
+                        <div style="text-align: center; padding: 20px; color: #999;">Loading...</div>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <select id="coordinatorSelect" style="flex: 1;">
+                            <option value="">Select Faculty...</option>
+                        </select>
+                        <button type="button" class="admin-btn admin-btn-primary" onclick="addCoordinator()" style="white-space: nowrap; padding: 10px 16px;">
+                            <i class="material-icons" style="font-size: 18px;">add</i> Add
+                        </button>
+                    </div>
+                    <small style="color: #666;">Coordinators can manage this department's faculty and classes</small>
+                </div>
+                <div class="form-group">
+                    <label>Current Academic Year</label>
+                    <input type="text" id="editAcademicYear" name="current_academic_year" placeholder="e.g., 2024-2025">
+                    <small style="color: #666;">Format: YYYY-YYYY (e.g., 2024-2025)</small>
                 </div>
                 <div class="form-actions">
                     <button type="button" class="admin-btn admin-btn-secondary"
@@ -313,11 +340,13 @@
             document.getElementById('addForm').reset();
         }
 
-        function openEditModal(programId, programCode, programName, durationYears) {
+        function openEditModal(programId, programCode, programName, durationYears, academicYear) {
             document.getElementById('editProgramId').value = programId;
             document.getElementById('editProgramCode').value = programCode;
             document.getElementById('editProgramName').value = programName;
             document.getElementById('editDurationYears').value = durationYears;
+            document.getElementById('editAcademicYear').value = academicYear || '';
+            loadCoordinators(programId);
             document.getElementById('editModal').style.display = 'flex';
         }
 
@@ -396,6 +425,119 @@
                 console.error(error);
             }
         }
+
+        let currentProgramId = null;
+        let allFaculties = [];
+
+        async function loadFaculties() {
+            try {
+                const response = await fetch('/api/admin/faculties/available-coordinators');
+                const data = await response.json();
+                allFaculties = data.faculties || [];
+                updateCoordinatorSelect();
+            } catch (error) {
+                console.error('Error loading faculties:', error);
+            }
+        }
+
+        function updateCoordinatorSelect() {
+            const select = document.getElementById('coordinatorSelect');
+            select.innerHTML = '<option value="">Select Faculty...</option>';
+            
+            allFaculties.forEach(faculty => {
+                const option = document.createElement('option');
+                option.value = faculty.faculty_id;
+                option.textContent = `${faculty.name} (${faculty.employee_id || 'N/A'}) - ${faculty.department || 'N/A'}`;
+                select.appendChild(option);
+            });
+        }
+
+        async function loadCoordinators(programId) {
+            currentProgramId = programId;
+            const container = document.getElementById('coordinatorsList');
+            
+            try {
+                const response = await fetch(`/api/admin/programs/${programId}/coordinators`);
+                const data = await response.json();
+                
+                if (data.coordinators && data.coordinators.length > 0) {
+                    let html = '';
+                    data.coordinators.forEach(coord => {
+                        html += `
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #f9fafb; border-radius: 6px; margin-bottom: 8px;">
+                                <div>
+                                    <strong>${coord.faculty_name}</strong>
+                                    <div style="font-size: 12px; color: #666;">Assigned: ${new Date(coord.assigned_at).toLocaleDateString()}</div>
+                                </div>
+                                <button type="button" onclick="removeCoordinator('${coord.assignment_id}')" 
+                                    style="background: #fee2e2; color: #991b1b; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                    <i class="material-icons" style="font-size: 16px; vertical-align: middle;">delete</i> Remove
+                                </button>
+                            </div>
+                        `;
+                    });
+                    container.innerHTML = html;
+                } else {
+                    container.innerHTML = '<div style="text-align: center; padding: 20px; color: #999;">No coordinators assigned</div>';
+                }
+            } catch (error) {
+                console.error('Error loading coordinators:', error);
+                container.innerHTML = '<div style="text-align: center; padding: 20px; color: #f00;">Error loading coordinators</div>';
+            }
+        }
+
+        async function addCoordinator() {
+            const select = document.getElementById('coordinatorSelect');
+            const facultyId = select.value;
+            
+            if (!facultyId) {
+                alert('Please select a faculty member');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/admin/programs/${currentProgramId}/coordinators`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ faculty_id: facultyId })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    select.value = '';
+                    loadCoordinators(currentProgramId);
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Failed to add coordinator');
+                console.error(error);
+            }
+        }
+
+        async function removeCoordinator(assignmentId) {
+            if (!confirm('Remove this coordinator?')) return;
+            
+            try {
+                const response = await fetch(`/api/admin/programs/${currentProgramId}/coordinators/${assignmentId}`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    loadCoordinators(currentProgramId);
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Failed to remove coordinator');
+                console.error(error);
+            }
+        }
+
+        // Load faculties on page load
+        window.addEventListener('DOMContentLoaded', loadFaculties);
+
     </script>
 </body>
 
