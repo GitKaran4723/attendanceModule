@@ -16,6 +16,7 @@ from models import (
     Holiday, AttendanceRecord
 )
 from auth import coordinator_required, get_current_user
+from timezone_utils import format_ist_time
 
 
 def calculate_distance(lat1, lon1, lat2, lon2):
@@ -135,10 +136,10 @@ def register_coordinator_routes(app):
         today = date.today()
         timings = []
         
-        # Get department location (from college config or program)
-        # For now, using a default location - should be configurable
-        dept_lat = 12.9716  # Example: Bangalore
-        dept_lon = 77.5946
+        # Department location - Bangalore University BCA Department
+        dept_lat = 12.945405
+        dept_lon = 77.508098
+        buffer_radius = 100  # 100 meters buffer zone
         
         for faculty in faculties:
             attendance = FacultyAttendance.query.filter_by(
@@ -149,12 +150,22 @@ def register_coordinator_routes(app):
             if attendance:
                 # Calculate distance from department
                 distance = None
+                location_status = 'unknown'  # unknown, valid, warning, invalid
+                
                 if attendance.check_in_latitude and attendance.check_in_longitude:
                     distance = calculate_distance(
                         dept_lat, dept_lon,
                         attendance.check_in_latitude,
                         attendance.check_in_longitude
                     )
+                    
+                    # Determine location validation status
+                    if distance <= buffer_radius:
+                        location_status = 'valid'  # Within 100m
+                    elif distance <= 200:
+                        location_status = 'warning'  # 100-200m
+                    else:
+                        location_status = 'invalid'  # Beyond 200m
                 
                 # Determine status
                 if attendance.check_out_time:
@@ -167,13 +178,14 @@ def register_coordinator_routes(app):
                 timings.append({
                     'faculty_id': faculty.faculty_id,
                     'faculty_name': f"{faculty.first_name} {faculty.last_name}",
-                    'check_in_time': attendance.check_in_time.strftime('%I:%M %p') if attendance.check_in_time else None,
+                    'check_in_time': format_ist_time(attendance.check_in_time),
                     'check_in_latitude': attendance.check_in_latitude,
                     'check_in_longitude': attendance.check_in_longitude,
                     'check_in_accuracy': attendance.check_in_accuracy,
                     'accuracy_level': get_accuracy_level(attendance.check_in_accuracy),
-                    'check_out_time': attendance.check_out_time.strftime('%I:%M %p') if attendance.check_out_time else None,
+                    'check_out_time': format_ist_time(attendance.check_out_time),
                     'distance_from_dept': round(distance, 2) if distance else None,
+                    'location_status': location_status,
                     'status': status,
                     'hours_worked': attendance.get_hours_worked()
                 })

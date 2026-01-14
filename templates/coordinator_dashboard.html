@@ -227,8 +227,39 @@
 
         .gps-coords {
             font-size: 0.875rem;
-            color: var(--text-secondary);
+            color: #2563eb;
             font-family: 'Courier New', monospace;
+            cursor: pointer;
+            text-decoration: underline;
+            transition: color 0.2s ease;
+        }
+
+        .gps-coords:hover {
+            color: #1d4ed8;
+        }
+
+        .location-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+
+        .location-valid {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .location-warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .location-invalid {
+            background: #fee2e2;
+            color: #991b1b;
         }
 
         .modal {
@@ -486,9 +517,32 @@
                             html += '<tr>';
                             html += `<td><span class="faculty-name" onclick="showFacultyDetails('${timing.faculty_id}')">${timing.faculty_name}</span></td>`;
                             html += `<td>${timing.check_in_time || '-'}</td>`;
-                            html += `<td class="gps-coords">${timing.check_in_latitude && timing.check_in_longitude ? `${timing.check_in_latitude.toFixed(4)}, ${timing.check_in_longitude.toFixed(4)}` : '-'}</td>`;
+
+                            // GPS Location with clickable link
+                            if (timing.check_in_latitude && timing.check_in_longitude) {
+                                const mapsUrl = `https://www.google.com/maps?q=${timing.check_in_latitude},${timing.check_in_longitude}`;
+                                html += `<td><a href="${mapsUrl}" target="_blank" class="gps-coords" title="Open in Google Maps">${timing.check_in_latitude.toFixed(6)}, ${timing.check_in_longitude.toFixed(6)}</a></td>`;
+                            } else {
+                                html += `<td class="gps-coords">-</td>`;
+                            }
+
                             html += `<td><span class="accuracy-badge accuracy-${timing.accuracy_level}">${timing.accuracy_level}</span></td>`;
-                            html += `<td>${timing.distance_from_dept ? timing.distance_from_dept + 'm' : '-'}</td>`;
+
+                            // Distance with location validation badge
+                            if (timing.distance_from_dept !== null) {
+                                let locationBadge = '';
+                                if (timing.location_status === 'valid') {
+                                    locationBadge = '<span class="location-badge location-valid">✓ Valid</span>';
+                                } else if (timing.location_status === 'warning') {
+                                    locationBadge = '<span class="location-badge location-warning">⚠ Warning</span>';
+                                } else if (timing.location_status === 'invalid') {
+                                    locationBadge = '<span class="location-badge location-invalid">✗ Invalid</span>';
+                                }
+                                html += `<td>${timing.distance_from_dept}m ${locationBadge}</td>`;
+                            } else {
+                                html += `<td>-</td>`;
+                            }
+
                             html += `<td>${timing.check_out_time || '-'}</td>`;
                             html += `<td><span class="status-badge status-${timing.status === 'In Department' ? 'in' : timing.status === 'Checked Out' ? 'out' : 'absent'}">${timing.status}</span></td>`;
                             html += `<td>${timing.hours_worked.toFixed(2)}h</td>`;

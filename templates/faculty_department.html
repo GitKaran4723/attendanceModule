@@ -198,6 +198,43 @@
             color: #6b7280;
         }
 
+        .location-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-top: 5px;
+        }
+
+        .location-valid {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .location-warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .location-invalid {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .gps-link {
+            color: #2563eb;
+            text-decoration: none;
+            font-family: 'Courier New', monospace;
+            font-size: 0.75rem;
+            display: inline-block;
+            margin-top: 5px;
+        }
+
+        .gps-link:hover {
+            text-decoration: underline;
+        }
+
         .stats-container {
             background: white;
             padding: 15px;
@@ -491,8 +528,36 @@
                                     <div class="detail-item">
                                         <span class="detail-label">Hours</span>
                                         <span class="detail-value">${t.hours_worked ? t.hours_worked.toFixed(1) : '0.0'}h</span>
-                                    </div>
-                                </div>
+                                    </div>`;
+
+                        // GPS Location (full width)
+                        if (t.check_in_latitude && t.check_in_longitude) {
+                            const mapsUrl = `https://www.google.com/maps?q=${t.check_in_latitude},${t.check_in_longitude}`;
+                            html += `<div class="detail-item" style="grid-column: 1 / -1;">
+                                        <span class="detail-label">GPS Location</span>
+                                        <a href="${mapsUrl}" target="_blank" class="gps-link" title="Open in Google Maps">
+                                            📍 ${t.check_in_latitude.toFixed(6)}, ${t.check_in_longitude.toFixed(6)}
+                                        </a>
+                                    </div>`;
+                        }
+
+                        // Distance with validation badge (full width)
+                        if (t.distance_from_dept !== null) {
+                            let locationBadge = '';
+                            if (t.location_status === 'valid') {
+                                locationBadge = '<span class="location-badge location-valid">✓ Within 100m</span>';
+                            } else if (t.location_status === 'warning') {
+                                locationBadge = '<span class="location-badge location-warning">⚠ 100-200m away</span>';
+                            } else if (t.location_status === 'invalid') {
+                                locationBadge = '<span class="location-badge location-invalid">✗ Beyond 200m</span>';
+                            }
+                            html += `<div class="detail-item" style="grid-column: 1 / -1;">
+                                        <span class="detail-label">Distance from Department</span>
+                                        <span class="detail-value">${t.distance_from_dept}m ${locationBadge}</span>
+                                    </div>`;
+                        }
+
+                        html += `</div>
                                 <div style="margin-top: 10px;">
                                     <span class="status-badge status-${statusClass}">${t.status}</span>
                                 </div>

@@ -1207,15 +1207,16 @@ class FacultyAttendance(db.Model, TimestampMixin):
     
     def to_dict(self):
         """Convert to dictionary"""
+        from timezone_utils import format_ist_time
         return {
             'attendance_id': self.attendance_id,
             'faculty_id': self.faculty_id,
             'date': self.date.isoformat() if self.date else None,
-            'check_in_time': self.check_in_time.isoformat() if self.check_in_time else None,
+            'check_in_time': format_ist_time(self.check_in_time, '%Y-%m-%dT%H:%M:%S') if self.check_in_time else None,
             'check_in_latitude': self.check_in_latitude,
             'check_in_longitude': self.check_in_longitude,
             'check_in_accuracy': self.check_in_accuracy,
-            'check_out_time': self.check_out_time.isoformat() if self.check_out_time else None,
+            'check_out_time': format_ist_time(self.check_out_time, '%Y-%m-%dT%H:%M:%S') if self.check_out_time else None,
             'check_out_latitude': self.check_out_latitude,
             'check_out_longitude': self.check_out_longitude,
             'check_out_accuracy': self.check_out_accuracy,

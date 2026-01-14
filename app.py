@@ -4102,9 +4102,10 @@ def faculty_attendance_report():
             record = attendance_records[current_day]
             if record.check_in_time:
                 status = "Present"
-                check_in = record.check_in_time.strftime('%H:%M')
+                from timezone_utils import format_ist_time
+                check_in = format_ist_time(record.check_in_time, '%H:%M')
             if record.check_out_time:
-                check_out = record.check_out_time.strftime('%H:%M')
+                check_out = format_ist_time(record.check_out_time, '%H:%M')
                 
         # Future dates should be blank/upcoming
         if current_day > today and status == "Absent":
