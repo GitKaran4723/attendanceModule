@@ -358,8 +358,8 @@
             // Detect USN pattern and show login type selector
             function checkUSNPattern() {
                 const username = usernameInput.value.trim().toUpperCase();
-                // USN pattern starts with U03NK
-                if (username.startsWith('U03')) {
+                // USN pattern starts with U03 or P03
+                if (username.startsWith('U03') || username.startsWith('P03')) {
                     loginTypeSelector.style.display = 'block';
                 } else {
                     loginTypeSelector.style.display = 'none';
