@@ -4757,13 +4757,15 @@ def api_submit_attendance():
         db.session.add(session_obj)
         db.session.flush()  # Get the session_id
         
-        # Generate diary number
-        from models import WorkDiary
-        session_obj.diary_number = WorkDiary.generate_diary_number()
-        
         # Validate and create attendance records
         subject = Subject.query.get(subject_id)
         section = Section.query.get(section_id) if section_id else None
+        
+        # Generate program-specific diary number
+        program_code = None
+        if section and section.program:
+            program_code = section.program.program_code
+        session_obj.diary_number = AttendanceSession.generate_diary_number(program_code)
         
         valid_student_ids = set()
         

@@ -699,6 +699,60 @@ class AttendanceSession(db.Model, TimestampMixin, SoftDeleteMixin):
     records = db.relationship("AttendanceRecord", back_populates="attendance_session", 
                             lazy="dynamic", cascade="all, delete-orphan")
 
+    @staticmethod
+    def generate_diary_number(program_code=None):
+        """
+        Generate unique diary number for attendance sessions per program.
+        Format: PROGRAM-NUMBER (e.g., BCA-1, BCA-2, MCA-1, MCA-2)
+        If no program_code provided, falls back to simple sequential number.
+        
+        Args:
+            program_code: Program code (e.g., 'BCA', 'MCA')
+        
+        Returns:
+            str: Unique diary number
+        """
+        if program_code:
+            # Get the last attendance session diary number for this program
+            last_session = AttendanceSession.query.filter(
+                AttendanceSession.diary_number.like(f'{program_code}-%')
+            ).order_by(
+                AttendanceSession.created_at.desc()
+            ).first()
+            
+            if last_session and last_session.diary_number:
+                try:
+                    # Extract number from diary_number (e.g., "BCA-5" -> 5)
+                    last_num = int(last_session.diary_number.split('-')[-1])
+                    new_num = last_num + 1
+                except (ValueError, IndexError):
+                    # If parsing fails, count all sessions for this program and add 1
+                    new_num = AttendanceSession.query.filter(
+                        AttendanceSession.diary_number.like(f'{program_code}-%')
+                    ).count() + 1
+            else:
+                new_num = 1
+            
+            return f"{program_code}-{new_num}"
+        else:
+            # Fallback: global sequential number
+            last_session = AttendanceSession.query.filter(
+                AttendanceSession.diary_number.isnot(None)
+            ).order_by(
+                AttendanceSession.created_at.desc()
+            ).first()
+            
+            if last_session and last_session.diary_number:
+                try:
+                    last_num = int(last_session.diary_number.split('-')[-1]) if '-' in last_session.diary_number else int(last_session.diary_number)
+                    new_num = last_num + 1
+                except (ValueError, IndexError):
+                    new_num = AttendanceSession.query.filter(AttendanceSession.diary_number.isnot(None)).count() + 1
+            else:
+                new_num = 1
+            
+            return str(new_num)
+
     def to_dict(self):
         """Convert attendance session object to dictionary for JSON responses"""
         return {
