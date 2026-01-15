@@ -226,7 +226,7 @@
                 <p>{{ subject.subject_code }} • {{ subject.program.program_name if subject.program else 'No Program' }}
                     • Semester {{ subject.semester_id }}</p>
             </div>
-           
+
             <div class="two-column-layout">
                 <!-- Available Students -->
                 <div class="column-card">
@@ -244,7 +244,7 @@
 
                             </div>
                             <div class="student-info">
-                                
+
                                 <div class="student-name" title="{{ student.name }}">{{ student.name }}</div>
                                 <div class="student-meta">
                                     {% if student.usn %}
@@ -285,8 +285,12 @@
                                     {% if item.student.usn %}
                                     <span class="meta-badge usn">{{ item.student.usn }}</span>
                                     {% endif %}
-                                    <span class="meta-badge enrollment">{{ item.enrollment.enrollment_type|title
-                                        }}</span>
+                                    {% if item.student.section %}
+                                    <span class="meta-badge section">{{ item.student.section.section_name }}</span>
+                                    {% endif %}
+                                    {% if item.enrollment.academic_year %}
+                                    <span class="meta-badge enrollment">{{ item.enrollment.academic_year }}</span>
+                                    {% endif %}
                                 </div>
                             </div>
                             <button class="btn-remove"

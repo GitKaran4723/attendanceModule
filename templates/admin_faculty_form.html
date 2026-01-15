@@ -264,7 +264,8 @@
 
             .btn-group {
                 flex-direction: column;
-            }}
+            }
+        }
 
         /* Prevent bottom nav overlap */
         .admin-container {
@@ -468,7 +469,7 @@
 
                                 <div id="controls_{{ subject.subject_id }}" class="subject-controls"
                                     style="margin-top: 12px; display: {% if faculty and subject.subject_id in faculty_subject_ids %}flex{% else %}none{% endif %}; gap: 12px; flex-wrap: wrap; padding-top: 12px; border-top: 1px dashed #eee;">
-                                    <div style="flex: 1; min-width: 200px;">
+                                    <div style="flex: 1; min-width: 200px; display: none;">
                                         <label class="form-label" style="font-size: 12px;">Program</label>
                                         <select class="form-select" style="padding: 8px; font-size: 14px;"
                                             id="program_select_{{ subject.subject_id }}"
@@ -482,7 +483,7 @@
                                             {% endfor %}
                                         </select>
                                     </div>
-                                    <div style="flex: 1; min-width: 200px;">
+                                    <div style="flex: 1; min-width: 200px; display: none;">
                                         <label class="form-label" style="font-size: 12px;">Section</label>
                                         <select name="section_{{ subject.subject_id }}" class="form-select"
                                             style="padding: 8px; font-size: 14px;"
@@ -599,7 +600,7 @@
 
         const subjects = [
             {% for subject in subjects %}
-        { id: '{{ subject.subject_id }}', semester: {{ subject.semester_id }}, program_id: '{{ subject.program_id }}' },
+        { id: '{{ subject.subject_id }}', semester: { { subject.semester_id } }, program_id: '{{ subject.program_id }}' },
         {% endfor %}
         ];
 
@@ -618,7 +619,8 @@
                 filterSections(subjectId);
             } else {
                 controls.style.display = 'none';
-            }}
+            }
+        }
 
         function filterSections(subjectId) {
             const programSelect = document.getElementById('program_select_' + subjectId);
@@ -645,7 +647,8 @@
                     if (s.section_id == currentValue) option.selected = true;
                     sectionSelect.appendChild(option);
                 });
-            }}
+            }
+        }
 
         // Initialize state for edit mode
         window.addEventListener('DOMContentLoaded', () => {
@@ -653,7 +656,8 @@
                 const checkbox = document.getElementById('subject_' + s.id);
                 if (checkbox && checkbox.checked) {
                     filterSections(s.id);
-                }});
+                }
+            });
         });
         {% if faculty %}
         async function resetFacultyPassword() {
@@ -670,7 +674,8 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
-                    }});
+                    }
+                });
 
                 const result = await response.json();
 
@@ -678,10 +683,12 @@
                     alert(`✓ Success!\n\n${result.message}\n\nThe faculty member can now login with:\nUsername: ${result.username}\nPassword: ${result.username}`);
                 } else {
                     alert(`Error: ${result.error}`);
-                }} catch (error) {
+                }
+            } catch (error) {
                 alert(`Failed to reset password: ${error.message}`);
                 console.error(error);
-            }}
+            }
+        }
         {% endif %}
     </script>
 </body>

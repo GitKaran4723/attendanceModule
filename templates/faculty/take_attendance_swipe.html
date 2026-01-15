@@ -412,6 +412,16 @@
                 <input type="text" id="topicInput" class="form-control" placeholder="e.g. Introduction to Trees">
             </div>
 
+            <!-- Date picker for past attendance (hidden by default) -->
+            <div class="form-group" id="attendanceDateGroup" style="display: none;">
+                <label class="form-label">Attendance Date *</label>
+                <input type="date" id="attendanceDate" class="form-control">
+                <small style="color: #666; font-size: 12px; margin-top: 4px; display: block;">
+                    <i class="material-icons" style="font-size: 14px; vertical-align: middle;">info</i>
+                    Select the date for which you want to take attendance
+                </small>
+            </div>
+
             <div class="form-group" style="display: flex; gap: 12px;">
                 <div style="flex: 1;">
                     <label class="form-label">Class Start Time *</label>
@@ -425,8 +435,8 @@
 
             <div
                 style="background: #e8f5e9; padding: 12px; border-radius: 8px; font-size: 13px; color: #2e7d32; margin-bottom: 16px;">
-                <strong>📝 Note:</strong> Attendance entry time will be recorded automatically as <strong
-                    id="currentTimestamp"></strong>
+                <strong>📝 Note:</strong> <span id="attendanceNote">Attendance entry time will be recorded automatically
+                    as <strong id="currentTimestamp"></strong></span>
             </div>
 
             <div style="display: flex; gap: 12px; margin-top: 24px; align-items: center;">
@@ -510,6 +520,106 @@
         let attendance = {}; // {studentId: true/false}
         let currentIndex = 0;
         let allocationsData = {{ allocations_json | safe }};
+        let sessionData = {}; // Store session metadata
+
+        // LocalStorage key for draft
+        const DRAFT_KEY = 'attendance_draft_faculty';
+
+        // Save draft to localStorage
+        function saveDraft() {
+            const draft = {
+                sessionData: sessionData,
+                attendance: attendance,
+                currentIndex: currentIndex,
+                timestamp: new Date().toISOString()
+            };
+            localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+            console.log('Draft saved to localStorage');
+        }
+
+        // Load draft from localStorage
+        function loadDraft() {
+            const draftStr = localStorage.getItem(DRAFT_KEY);
+            if (draftStr) {
+                try {
+                    const draft = JSON.parse(draftStr);
+                    const draftTime = new Date(draft.timestamp);
+                    const hoursSince = (new Date() - draftTime) / (1000 * 60 * 60);
+
+                    // Only restore if draft is less than 24 hours old
+                    if (hoursSince < 24) {
+                        return draft;
+                    } else {
+                        // Clear old draft
+                        localStorage.removeItem(DRAFT_KEY);
+                    }
+                } catch (e) {
+                    console.error('Error loading draft:', e);
+                    localStorage.removeItem(DRAFT_KEY);
+                }
+            }
+            return null;
+        }
+
+        // Clear draft from localStorage
+        function clearDraft() {
+            localStorage.removeItem(DRAFT_KEY);
+            console.log('Draft cleared from localStorage');
+        }
+
+        // Check if past attendance is enabled on page load
+        async function checkPastAttendanceEnabled() {
+            try {
+                const response = await fetch('/api/settings/allow_past_attendance');
+                const data = await response.json();
+
+                if (data.success && data.value === 'true') {
+                    // Show date picker
+                    document.getElementById('attendanceDateGroup').style.display = 'block';
+
+                    // Set default to today
+                    const today = new Date().toISOString().split('T')[0];
+                    document.getElementById('attendanceDate').value = today;
+                    document.getElementById('attendanceDate').max = today;
+
+                    // Add event listener to update note when date changes
+                    document.getElementById('attendanceDate').addEventListener('change', updateAttendanceNote);
+                    updateAttendanceNote(); // Initial update
+                }
+            } catch (error) {
+                console.error('Error checking past attendance setting:', error);
+            }
+        }
+
+        // Update the attendance note based on selected date
+        function updateAttendanceNote() {
+            const dateInput = document.getElementById('attendanceDate');
+            const noteSpan = document.getElementById('attendanceNote');
+
+            if (dateInput && dateInput.value && document.getElementById('attendanceDateGroup').style.display !== 'none') {
+                const selectedDate = new Date(dateInput.value + 'T00:00:00');
+                const now = new Date();
+                const formattedDate = selectedDate.toLocaleDateString('en-IN', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric'
+                });
+                const formattedTime = now.toLocaleTimeString('en-IN', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: true
+                });
+
+                noteSpan.innerHTML = `Attendance will be recorded for <strong>${formattedDate}</strong> at <strong>${formattedTime}</strong>`;
+            } else {
+                noteSpan.innerHTML = `Attendance entry time will be recorded automatically as <strong id="currentTimestamp"></strong>`;
+                updateTimestamp(); // Update the current timestamp
+            }
+        }
+
+        // Call on page load
+        window.addEventListener('DOMContentLoaded', checkPastAttendanceEnabled);
 
         // Update timestamp display every second
         function updateTimestamp() {
@@ -530,7 +640,7 @@
         let currentSubjectType = null;
         let currentSectionId = null;
 
-        function handleSubjectChange() {
+        async function handleSubjectChange() {
             const subjectSelect = document.getElementById('subjectSelect');
             const sectionSelect = document.getElementById('sectionSelect');
             const sectionGroup = document.getElementById('sectionGroup');
@@ -538,38 +648,75 @@
 
             if (!selectedOption || !selectedOption.value) {
                 currentSubjectType = null;
+                sectionSelect.innerHTML = '<option value="">Select Section</option>';
                 return;
             }
 
+            const subjectId = selectedOption.value;
             currentSubjectType = selectedOption.getAttribute('data-subject-type');
-            const semesterId = selectedOption.getAttribute('data-semester-id');
 
-            // Hide section group for electives
-            if (currentSubjectType === 'elective') {
-                sectionGroup.style.display = 'none';
-            } else {
-                sectionGroup.style.display = 'block';
+            try {
+                // Call new API to get sections for this subject
+                const response = await fetch(`/api/subjects/${subjectId}/sections`);
+                const data = await response.json();
 
-                // Filter sections by semester
-                const options = sectionSelect.querySelectorAll('option');
-                let matches = 0;
-                options.forEach(opt => {
-                    if (!opt.value) return; // Skip "Select Section"
-                    const sectionSem = opt.getAttribute('data-semester');
-                    if (semesterId && sectionSem === semesterId) {
-                        opt.style.display = 'block';
-                        matches++;
-                    } else {
-                        opt.style.display = 'none';
-                    }
-                });
-
-                // Reset selection if current selection is hidden
-                sectionSelect.value = "";
-
-                if (matches === 0) {
-                    console.warn('No sections found for semester:', semesterId);
+                if (!data.success) {
+                    console.error('Error loading sections:', data.error);
+                    return;
                 }
+
+                // Clear existing options
+                sectionSelect.innerHTML = '<option value="">Select Section</option>';
+
+                // Check if subject carries sections
+                if (!data.subject_carries_section) {
+                    // Subject doesn't use sections (e.g., electives)
+                    sectionGroup.style.display = 'none';
+
+                    // If there's a virtual section, auto-select it
+                    if (data.virtual_sections && data.virtual_sections.length > 0) {
+                        const virtualSection = data.virtual_sections[0];
+                        const opt = document.createElement('option');
+                        opt.value = virtualSection.section_id;
+                        opt.textContent = virtualSection.section_name;
+                        opt.selected = true;
+                        sectionSelect.appendChild(opt);
+                    }
+                } else {
+                    // Subject uses sections
+                    sectionGroup.style.display = 'block';
+
+                    // Add core sections
+                    if (data.core_sections && data.core_sections.length > 0) {
+                        data.core_sections.forEach(section => {
+                            const opt = document.createElement('option');
+                            opt.value = section.section_id;
+                            opt.textContent = section.section_name;
+                            opt.setAttribute('data-semester', section.current_semester);
+                            sectionSelect.appendChild(opt);
+                        });
+                    }
+
+                    // Add virtual sections (if any) in a separate optgroup
+                    if (data.virtual_sections && data.virtual_sections.length > 0) {
+                        const optgroup = document.createElement('optgroup');
+                        optgroup.label = 'Virtual Sections';
+                        data.virtual_sections.forEach(section => {
+                            const opt = document.createElement('option');
+                            opt.value = section.section_id;
+                            opt.textContent = section.section_name;
+                            optgroup.appendChild(opt);
+                        });
+                        sectionSelect.appendChild(optgroup);
+                    }
+
+                    if (data.core_sections.length === 0 && data.virtual_sections.length === 0) {
+                        console.warn('No sections found for subject:', subjectId);
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching sections:', error);
+                sectionGroup.style.display = 'block';
             }
         }
 
@@ -595,6 +742,17 @@
             const sectionId = sectionSelect.value;
             const topic = topicInput.value;
 
+            // Store session metadata
+            sessionData = {
+                subject_id: subjectId,
+                section_id: sectionId,
+                topic: topic,
+                class_start_time: startTime.value,
+                class_end_time: endTime.value,
+                subject_name: subjectSelect.options[subjectSelect.selectedIndex].getAttribute('data-subject-name'),
+                section_name: currentSubjectType === 'elective' ? 'Elective' : sectionSelect.options[sectionSelect.selectedIndex].text
+            };
+
             // Update Header Stats (Initial)
             updateHeaderStats(0);
 
@@ -616,11 +774,23 @@
                     students = data;
                     attendance = {};
                     currentIndex = 0;
+
+                    // Check for existing draft
+                    const draft = loadDraft();
+                    if (draft && draft.sessionData.subject_id === subjectId && draft.sessionData.section_id === sectionId) {
+                        if (confirm('Found unsaved attendance data. Do you want to restore it?')) {
+                            attendance = draft.attendance;
+                            currentIndex = draft.currentIndex;
+                            console.log('Restored draft attendance');
+                        }
+                    }
+
                     if (students.length === 0) {
                         alert('No students found for this selection.');
                     } else {
                         switchView('swipeView');
-                        loadCard(0);
+                        loadCard(currentIndex);
+                        saveDraft(); // Save initial state
                     }
                 }
             } catch (e) {
@@ -792,6 +962,9 @@
             // 3. Mark data
             attendance[students[currentIndex].student_id] = isPresent;
 
+            // Save draft after each mark
+            saveDraft();
+
             // Update Header Count
             const currentPresent = Object.values(attendance).filter(v => v).length;
             updateHeaderStats(currentPresent);
@@ -840,7 +1013,7 @@
                 item.onclick = () => toggleReviewStatus(s.student_id);
                 item.innerHTML = `
                     <div>
-                        <div style="font-weight: 600; font-size: 15px;">${s.first_name} ${s.last_name}</div>
+                        <div style="font-weight: 600; font-size: 15px;">${s.name}</div>
                         <div style="font-size: 12px; color: #64748b;">${s.usn || s.roll_number}</div>
                     </div>
                 <div style="font-weight: 700; font-size: 12px; padding: 6px 12px; border-radius: 20px; ${isPresent ? 'background:#dcfce7; color:#22c55e;' : 'background:#fee2e2; color:#ef4444;'}">
@@ -856,6 +1029,7 @@
 
         function toggleReviewStatus(sid) {
             attendance[sid] = !attendance[sid];
+            saveDraft(); // Save after toggle
             showReview();
         }
 
@@ -886,6 +1060,12 @@
                 }))
             };
 
+            // Include attendance date if the date picker is visible (past attendance enabled)
+            const attendanceDateInput = document.getElementById('attendanceDate');
+            if (document.getElementById('attendanceDateGroup').style.display !== 'none' && attendanceDateInput.value) {
+                payload.attendance_date = attendanceDateInput.value;
+            }
+
             try {
                 const resp = await fetch('/api/attendance/submit', {
                     method: 'POST',
@@ -895,6 +1075,9 @@
                 const res = await resp.json();
 
                 if (res.success) {
+                    // Clear draft on successful submission
+                    clearDraft();
+
                     alert('Attendance submitted successfully!');
 
                     // Generate and Download PDF

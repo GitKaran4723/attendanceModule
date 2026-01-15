@@ -203,6 +203,20 @@
             </div>
 
             <div class="glass-card">
+                <h3 style="margin: 0 0 20px; font-size: 16px; color: #4a5568;">Personal Information</h3>
+
+                <div class="form-group">
+                    <label class="form-label">Date of Birth</label>
+                    <input type="date" name="date_of_birth" class="form-control"
+                        value="{{ student.date_of_birth.strftime('%Y-%m-%d') if student.date_of_birth else '' }}">
+                    <small style="color: #f59e0b; font-size: 11px;">
+                        <i class="fas fa-info-circle"></i> Changing your DOB will update your password to the new date
+                        (DD-MM-YYYY format)
+                    </small>
+                </div>
+            </div>
+
+            <div class="glass-card">
                 <h3 style="margin: 0 0 20px; font-size: 16px; color: #4a5568;">Contact Information</h3>
 
                 <div class="form-group">
@@ -264,7 +278,8 @@
 
             const data = {
                 phone: formData.get('phone'),
-                address: formData.get('address')
+                address: formData.get('address'),
+                date_of_birth: formData.get('date_of_birth')
             };
 
             btn.disabled = true;

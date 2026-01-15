@@ -436,8 +436,17 @@
                                     {{ subject.credits }} Credits
                                 </span>
                             </div>
-                            <div style="margin-top: 8px;">
+                            <div
+                                style="margin-top: 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
                                 <span class="type-badge">{{ subject.subject_type or 'theory' }}</span>
+                                {% if subject.subject_category in ['language', 'specialization', 'elective'] %}
+                                <span class="type-badge"
+                                    style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%); color: #059669; border: 1px solid rgba(5, 150, 105, 0.2);">
+                                    <i class="material-icons"
+                                        style="font-size: 14px; vertical-align: middle;">people</i>
+                                    {{ subject.student_enrollments.filter_by(is_deleted=False).count() }} enrolled
+                                </span>
+                                {% endif %}
                             </div>
                         </div>
                     </div>

@@ -522,48 +522,123 @@
             </div>
         </div>
 
-        <!-- Analytics Section -->
-        <div class="section-title">
-            <span>Subject Wise Attendance</span>
-            <button onclick="refreshAnalytics()" style="background:none; border:none; color:#718096;"><i
-                    class="fas fa-sync-alt"></i></button>
-        </div>
-
-        <div class="glass-card" style="padding: 0; overflow: hidden;">
-            <div style="overflow-x: auto;">
-                <table class="analytics-table" id="analyticsTable">
-                    <thead>
-                        <tr>
-                            <th style="padding-left: 20px;">Subject</th>
-                            <th class="text-center">Cond.</th>
-                            <th class="text-center">Attd.</th>
-                            <th style="padding-right: 20px;">%</th>
-                        </tr>
-                    </thead>
-                    <tbody id="analyticsBody">
-                        <tr>
-                            <td colspan="4" style="text-align:center; padding: 20px;">Loading data...</td>
-                        </tr>
-                    </tbody>
-                </table>
+        <!-- Low Attendance Warning -->
+        {% if total_sessions == 0 %}
+        <div
+            style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; padding: 20px; border-radius: 16px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <i class="fas fa-info-circle" style="font-size: 24px;"></i>
+                <div>
+                    <div style="font-weight: 700; font-size: 16px; margin-bottom: 4px;">Classes Not Yet Conducted</div>
+                    <div style="font-size: 13px; opacity: 0.9;">No classes have been conducted yet. Your attendance will
+                        be calculated once classes begin.</div>
+                </div>
             </div>
         </div>
+        {% elif overall_percentage < 75 %} <style>
+            @keyframes urgentPulse {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); }
+            50% { transform: scale(1.02); box-shadow: 0 0 0 10px rgba(220, 38, 38, 0); }
+            }
+            .urgent-warning {
+            animation: urgentPulse 2s infinite;
+            }
+            </style>
+            <div class="urgent-warning"
+                style="background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%); color: white; padding: 24px; border-radius: 16px; margin-bottom: 20px; border: 3px solid #fca5a5; position: relative; overflow: hidden;">
+                <!-- Animated background pattern -->
+                <div
+                    style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(0,0,0,0.1) 10px, rgba(0,0,0,0.1) 20px); opacity: 0.3;">
+                </div>
 
-        <!-- Holidays Section -->
-        <div class="section-title">
-            <span>Upcoming Holidays</span>
-        </div>
-        <div class="glass-card" id="holidaysList">
-            <div style="text-align:center; padding: 10px; color: #718096;">Loading holidays...</div>
-        </div>
+                <div style="position: relative; z-index: 1;">
+                    <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px;">
+                        <div
+                            style="background: rgba(255,255,255,0.2); padding: 16px; border-radius: 50%; animation: urgentPulse 1.5s infinite;">
+                            <i class="fas fa-exclamation-triangle" style="font-size: 32px;"></i>
+                        </div>
+                        <div style="flex: 1;">
+                            <div
+                                style="font-weight: 900; font-size: 22px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">
+                                🚨 CRITICAL: Low Attendance Alert
+                            </div>
+                            <div
+                                style="font-size: 16px; font-weight: 600; background: rgba(0,0,0,0.3); display: inline-block; padding: 6px 12px; border-radius: 6px;">
+                                Current: {{ overall_percentage }}% | Required: 75%
+                            </div>
+                        </div>
+                    </div>
 
-        <!-- Recent Absences -->
-        <div class="section-title">
-            <span>Recent Absences (Last 3 Days)</span>
-        </div>
-        <div class="glass-card" id="absencesList">
-            <div style="text-align:center; padding: 10px; color: #718096;">Loading...</div>
-        </div>
+                    <div
+                        style="background: rgba(255,255,255,0.95); color: #991b1b; padding: 16px; border-radius: 12px; border-left: 5px solid #dc2626; margin-bottom: 12px;">
+                        <div
+                            style="font-weight: 800; font-size: 15px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-ban" style="font-size: 18px;"></i>
+                            <span>EXAM ELIGIBILITY AT RISK</span>
+                        </div>
+                        <div style="font-size: 14px; line-height: 1.6; color: #7f1d1d;">
+                            You need <strong>minimum 75% attendance</strong> to be eligible to write exams.
+                            Your current attendance is <strong>{{ overall_percentage }}%</strong>.
+                        </div>
+                    </div>
+
+                    <div
+                        style="background: rgba(254, 202, 202, 0.3); padding: 14px; border-radius: 10px; border: 2px dashed rgba(255,255,255,0.5);">
+                        <div style="font-weight: 700; font-size: 14px; margin-bottom: 6px;">
+                            ⚡ IMMEDIATE ACTION REQUIRED:
+                        </div>
+                        <ul style="margin: 8px 0 0 20px; padding: 0; font-size: 13px; line-height: 1.8;">
+                            <li><strong>Attend ALL upcoming classes</strong> without fail</li>
+                            <li>Meet with your class teacher immediately</li>
+                            <li>Parents: Please ensure regular attendance</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Analytics Section -->
+            <div class="section-title">
+                <span>Subject Wise Attendance</span>
+                <button onclick="refreshAnalytics()" style="background:none; border:none; color:#718096;"><i
+                        class="fas fa-sync-alt"></i></button>
+            </div>
+
+            <div class="glass-card" style="padding: 0; overflow: hidden;">
+                <div style="overflow-x: auto;">
+                    <table class="analytics-table" id="analyticsTable">
+                        <thead>
+                            <tr>
+                                <th style="padding-left: 20px;">Subject</th>
+                                <th class="text-center">Cond.</th>
+                                <th class="text-center">Attd.</th>
+                                <th style="padding-right: 20px;">%</th>
+                            </tr>
+                        </thead>
+                        <tbody id="analyticsBody">
+                            <tr>
+                                <td colspan="4" style="text-align:center; padding: 20px;">Loading data...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Holidays Section -->
+            <div class="section-title">
+                <span>Upcoming Holidays</span>
+            </div>
+            <div class="glass-card" id="holidaysList">
+                <div style="text-align:center; padding: 10px; color: #718096;">Loading holidays...</div>
+            </div>
+
+            <!-- Recent Absences -->
+            <div class="section-title">
+                <span>Recent Absences (Last 3 Days)</span>
+            </div>
+            <div class="glass-card" id="absencesList">
+                <div style="text-align:center; padding: 10px; color: #718096;">Loading...</div>
+            </div>
     </div>
 
 

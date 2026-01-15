@@ -432,6 +432,62 @@ def api_students():
     return jsonify([s.to_dict() for s in students])
 
 
+@app.route('/api/student/profile', methods=['PUT'])
+@login_required
+def update_student_profile():
+    """
+    Update student profile information.
+    When date_of_birth is updated, automatically update password to match DOB in DDMMYYYY format.
+    """
+    from werkzeug.security import generate_password_hash
+    from datetime import datetime
+    
+    current_user_obj = get_current_user()
+    
+    # Only students can update their own profile
+    if not hasattr(current_user_obj, 'student') or not current_user_obj.student:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+    
+    student = current_user_obj.student
+    data = request.get_json()
+    
+    try:
+        # Update basic fields
+        if 'phone' in data:
+            student.phone = data['phone']
+        
+        if 'address' in data:
+            student.address = data['address']
+        
+        # Handle date of birth update
+        if 'date_of_birth' in data and data['date_of_birth']:
+            dob_str = data['date_of_birth']
+            
+            # Parse the date
+            try:
+                new_dob = datetime.strptime(dob_str, '%Y-%m-%d').date()
+                student.date_of_birth = new_dob
+                
+                # Update password to match new DOB in DD-MM-YYYY format
+                password_str = new_dob.strftime('%d-%m-%Y')
+                current_user_obj.password_hash = generate_password_hash(password_str)
+                
+            except ValueError:
+                return jsonify({'success': False, 'error': 'Invalid date format'}), 400
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Profile updated successfully',
+            'password_updated': 'date_of_birth' in data and data['date_of_birth']
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/api/attendance/session', methods=['POST'])
 @faculty_required
 def api_create_attendance_session():
@@ -464,6 +520,152 @@ def api_create_attendance_session():
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 400
+
+
+@app.route('/api/subjects/<subject_id>/sections', methods=['GET'])
+@login_required
+def get_subject_sections(subject_id):
+    """
+    Get sections for a subject, separated into core and virtual sections.
+    This endpoint is used when taking attendance to dynamically load sections
+    based on the selected subject.
+    
+    Returns:
+        - core_sections: Regular departmental sections (is_elective=False)
+        - virtual_sections: Virtual sections for electives (is_elective=True, linked to subject)
+        - subject_carries_section: Whether the subject uses sections
+        - subject_category: Type of subject (compulsory, language, specialization, elective)
+    """
+    try:
+        subject = Subject.query.get(subject_id)
+        if not subject:
+            return jsonify({'error': 'Subject not found'}), 404
+        
+        core_sections = []
+        virtual_sections = []
+        
+        # Get core sections (regular departmental sections)
+        if subject.program_id and subject.semester_id:
+            core_sections_query = Section.query.filter_by(
+                program_id=subject.program_id,
+                current_semester=subject.semester_id,
+                is_elective=False,
+                is_deleted=False
+            ).all()
+            core_sections = [s.to_dict() for s in core_sections_query]
+        
+        # Get virtual sections (for electives/specializations without sections)
+        virtual_sections_query = Section.query.filter_by(
+            linked_subject_id=subject_id,
+            is_elective=True,
+            is_deleted=False
+        ).all()
+        virtual_sections = [s.to_dict() for s in virtual_sections_query]
+        
+        # If subject doesn't carry sections but no virtual section exists, create one
+        if not subject.carries_section and not virtual_sections:
+            virtual_section = get_or_create_virtual_section(subject)
+            if virtual_section:
+                virtual_sections = [virtual_section.to_dict()]
+        
+        return jsonify({
+            'core_sections': core_sections,
+            'virtual_sections': virtual_sections,
+            'subject_carries_section': subject.carries_section,
+            'subject_category': subject.subject_category,
+            'success': True
+        })
+    except Exception as e:
+        return jsonify({'error': str(e), 'success': False}), 500
+
+
+@app.route('/api/settings/<setting_key>', methods=['GET'])
+@login_required
+def get_setting(setting_key):
+    """
+    Get a system setting value by key.
+    Used to check if features like past attendance are enabled.
+    """
+    from models import SystemSettings
+    
+    setting = SystemSettings.query.filter_by(setting_key=setting_key).first()
+    
+    if setting:
+        return jsonify({
+            'key': setting.setting_key,
+            'value': setting.setting_value,
+            'description': setting.description,
+            'success': True
+        })
+    else:
+        return jsonify({
+            'key': setting_key,
+            'value': None,
+            'success': True
+        })
+
+
+@app.route('/admin/settings')
+@admin_required
+def admin_settings():
+    """
+    Admin settings page to configure system-wide features.
+    """
+    return render_template('admin_settings.html')
+
+
+@app.route('/api/admin/settings', methods=['POST'])
+@admin_required
+def update_setting():
+    """
+    Update a system setting.
+    """
+    from models import SystemSettings
+    from datetime import datetime
+    from flask_login import current_user
+    
+    data = request.get_json()
+    setting_key = data.get('setting_key')
+    setting_value = data.get('setting_value')
+    
+    if not setting_key:
+        return jsonify({'success': False, 'error': 'Setting key is required'}), 400
+    
+    try:
+        # Check if setting exists
+        setting = SystemSettings.query.filter_by(setting_key=setting_key).first()
+        
+        if setting:
+            # Update existing setting
+            setting.setting_value = setting_value
+            setting.updated_at = datetime.now()
+            if hasattr(current_user, 'user_id'):
+                setting.updated_by = current_user.user_id
+        else:
+            # Create new setting
+            setting = SystemSettings(
+                setting_key=setting_key,
+                setting_value=setting_value,
+                description=f'Setting for {setting_key}',
+                updated_at=datetime.now()
+            )
+            if hasattr(current_user, 'user_id'):
+                setting.updated_by = current_user.user_id
+            db.session.add(setting)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Setting updated successfully',
+            'setting': {
+                'setting_key': setting.setting_key,
+                'setting_value': setting.setting_value
+            }
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 # ============================================
@@ -523,10 +725,37 @@ def faculty_work_diary():
         particulars = session.topic_taught or "Regular Class"
         sem_info = f"({section.current_semester if section else '?'} Sem)"
         
-        # Count students present
-        # Count students present
-        present_count = AttendanceRecord.query.filter_by(attendance_session_id=session.attendance_session_id, status='present').count()
-        total_count = AttendanceRecord.query.filter_by(attendance_session_id=session.attendance_session_id).count()
+        # Count students present and total
+        # For subjects requiring enrollment (specialization/elective), only count enrolled students
+        if subject and subject.subject_category in ['specialization', 'elective']:
+            # Get enrolled student IDs for this subject
+            enrolled_student_ids = db.session.query(StudentSubjectEnrollment.student_id).filter_by(
+                subject_id=subject.subject_id,
+                is_deleted=False
+            ).all()
+            enrolled_ids = [e[0] for e in enrolled_student_ids]
+            
+            # Count only enrolled students
+            present_count = AttendanceRecord.query.filter(
+                AttendanceRecord.attendance_session_id == session.attendance_session_id,
+                AttendanceRecord.status == 'present',
+                AttendanceRecord.student_id.in_(enrolled_ids)
+            ).count()
+            
+            total_count = AttendanceRecord.query.filter(
+                AttendanceRecord.attendance_session_id == session.attendance_session_id,
+                AttendanceRecord.student_id.in_(enrolled_ids)
+            ).count()
+        else:
+            # For regular subjects (compulsory/language), count all students in the section
+            present_count = AttendanceRecord.query.filter_by(
+                attendance_session_id=session.attendance_session_id,
+                status='present'
+            ).count()
+            
+            total_count = AttendanceRecord.query.filter_by(
+                attendance_session_id=session.attendance_session_id
+            ).count()
 
         diaries.append({
             'sl_no': idx + 1,
@@ -4500,11 +4729,18 @@ def api_submit_attendance():
             
             # If no schedule exists, create a temporary one
             if not schedule:
+                # Use the attendance date if provided, otherwise use today
+                attendance_date_str = data.get('attendance_date')
+                if attendance_date_str:
+                    attendance_date = datetime.strptime(attendance_date_str, '%Y-%m-%d').date()
+                else:
+                    attendance_date = datetime.now().date()
+                
                 schedule = ClassSchedule(
                     subject_id=subject_id,
                     section_id=section_id,
                     faculty_id=faculty.faculty_id,
-                    day_of_week=datetime.now().strftime('%A'),
+                    date=attendance_date,
                     start_time=datetime.strptime(class_start_time, '%H:%M').time() if class_start_time else None,
                     end_time=datetime.strptime(class_end_time, '%H:%M').time() if class_end_time else None
                 )
