@@ -468,8 +468,8 @@ def update_student_profile():
                 new_dob = datetime.strptime(dob_str, '%Y-%m-%d').date()
                 student.date_of_birth = new_dob
                 
-                # Update password to match new DOB in DD-MM-YYYY format
-                password_str = new_dob.strftime('%d-%m-%Y')
+                # Update password to match new DOB in DDMMYYYY format (without dashes)
+                password_str = new_dob.strftime('%d%m%Y')
                 current_user_obj.password_hash = generate_password_hash(password_str)
                 
             except ValueError:
@@ -821,26 +821,62 @@ def generate_work_diary_docx():
         return "Faculty record not found", 404
     
     # Determine which faculty's diary to generate
+    # Use ClassSchedule.date (class conducted date) as the primary filter
+    # This is important because it represents when the class was actually conducted,
+    # not when the attendance was submitted (which may differ for past attendance)
     if faculty_param == "current" or not can_view_all_diaries():
         # Current faculty only
         selected_faculty = f"{faculty_record.first_name} {faculty_record.last_name}"
-        query = AttendanceSession.query.join(ClassSchedule).filter(
+        
+        # Query sessions that have a schedule with a date
+        query_with_schedule = AttendanceSession.query.join(
+            ClassSchedule,
+            AttendanceSession.schedule_id == ClassSchedule.schedule_id
+        ).filter(
             AttendanceSession.is_deleted == False,
             AttendanceSession.taken_by_user_id == current_user.user_id,
             ClassSchedule.date >= start_date,
             ClassSchedule.date <= end_date
         )
+        
+        # Also include sessions without schedules (fallback to taken_at date)
+        query_without_schedule = AttendanceSession.query.filter(
+            AttendanceSession.is_deleted == False,
+            AttendanceSession.taken_by_user_id == current_user.user_id,
+            AttendanceSession.schedule_id == None,
+            db.func.date(AttendanceSession.taken_at) >= start_date,
+            db.func.date(AttendanceSession.taken_at) <= end_date
+        )
+        
+        # Combine both queries
+        sessions = query_with_schedule.union(query_without_schedule).order_by(
+            AttendanceSession.taken_at.desc()
+        ).limit(500).all()
     else:
         # Admin/coordinator can view all or specific faculty
         selected_faculty = faculty_param if faculty_param != "All" else "All"
-        query = AttendanceSession.query.join(ClassSchedule).filter(
+        
+        query_with_schedule = AttendanceSession.query.join(
+            ClassSchedule,
+            AttendanceSession.schedule_id == ClassSchedule.schedule_id
+        ).filter(
             AttendanceSession.is_deleted == False,
             ClassSchedule.date >= start_date,
             ClassSchedule.date <= end_date
         )
+        
+        query_without_schedule = AttendanceSession.query.filter(
+            AttendanceSession.is_deleted == False,
+            AttendanceSession.schedule_id == None,
+            db.func.date(AttendanceSession.taken_at) >= start_date,
+            db.func.date(AttendanceSession.taken_at) <= end_date
+        )
+        
+        sessions = query_with_schedule.union(query_without_schedule).order_by(
+            AttendanceSession.taken_at.desc()
+        ).limit(500).all()
     
-    # Get sessions
-    sessions = query.order_by(AttendanceSession.taken_at.desc()).limit(500).all()
+    # Note: sessions variable is now populated, no need for separate query line
     
     # Build months structure (still using month grouping internally)
     # If no sessions found, create empty structure for the date range
@@ -5859,16 +5895,39 @@ def api_student_subject_history(subject_id):
         
         target_section_id = enrollment.section_id if enrollment and enrollment.section_id else student_record.section_id
         
-        # Get Teacher Name from Allocation
-        allocation = SubjectAllocation.query.filter_by(
-            subject_id=subject_id,
-            section_id=target_section_id
+        # Get Teacher Name - Check both section-specific and global allocations
+        # Try to find allocation for this specific section OR a global allocation (section_id is NULL)
+        allocation = SubjectAllocation.query.filter(
+            SubjectAllocation.subject_id == subject_id,
+            db.or_(
+                SubjectAllocation.section_id == target_section_id,
+                SubjectAllocation.section_id == None
+            )
         ).first()
         
-        teacher_name = "Not Assigned"
+        teacher_name = None
         if allocation and allocation.faculty:
             faculty = allocation.faculty
             teacher_name = faculty.name or f"{faculty.first_name} {faculty.last_name}"
+        
+        # If no allocation found, get teacher from the most recent attendance session
+        if not teacher_name:
+            recent_session = db.session.query(AttendanceSession).join(
+                ClassSchedule, AttendanceSession.schedule_id == ClassSchedule.schedule_id
+            ).filter(
+                ClassSchedule.subject_id == subject_id,
+                ClassSchedule.section_id == target_section_id,
+                AttendanceSession.is_deleted == False
+            ).order_by(AttendanceSession.taken_at.desc()).first()
+            
+            if recent_session and recent_session.taken_by:
+                faculty = Faculty.query.filter_by(user_id=recent_session.taken_by.user_id).first()
+                if faculty:
+                    teacher_name = faculty.name or f"{faculty.first_name} {faculty.last_name}"
+        
+        # Final fallback
+        if not teacher_name:
+            teacher_name = "Not Assigned"
         
         # Get all attendance sessions for this subject/section
         # Join with ClassSchedule and AttendanceRecord

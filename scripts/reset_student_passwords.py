@@ -1,5 +1,5 @@
 """
-Script to reset student passwords to DD-MM-YYYY format
+Script to reset student passwords to DDMMYYYY format (without dashes)
 """
 import sqlite3
 from werkzeug.security import generate_password_hash
@@ -34,8 +34,8 @@ for student_id, roll_number, dob, user_id, username in students:
         # Parse DOB (Stored as YYYY-MM-DD)
         dob_date = datetime.strptime(dob, '%Y-%m-%d')
         
-        # Format as DD-MM-YYYY
-        new_password = dob_date.strftime('%d-%m-%Y')
+        # Format as DDMMYYYY (without dashes)
+        new_password = dob_date.strftime('%d%m%Y')
         
         # Hash password
         password_hash = generate_password_hash(new_password, method='pbkdf2:sha256')
@@ -62,3 +62,6 @@ conn.close()
 
 print("=" * 60)
 print(f"Done! Updated {updated} passwords. Skipped {skipped}.")
+print(f"\nStudents can now login with:")
+print(f"  Username: Their USN (e.g., U03NK25S0180)")
+print(f"  Password: Their DOB in DDMMYYYY format (e.g., 15032003)")
