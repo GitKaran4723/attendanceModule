@@ -1131,7 +1131,7 @@
                 const s = students.find(s => s.student_id === rec.student_id);
                 return [
                     s.roll_number || s.usn,
-                    `${s.first_name} ${s.last_name}`,
+                    `${s.name}`,
                     rec.status.toUpperCase()
                 ];
             });
