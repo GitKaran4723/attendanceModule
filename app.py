@@ -4198,17 +4198,50 @@ def faculty_dashboard_view():
     ).all()
     
     def calculate_session_duration(session):
+        """
+        Calculate duration of a class session in hours.
+        
+        CRITICAL: This function is used to calculate weekly/monthly teaching hours.
+        Duration is calculated from schedule.start_time and schedule.end_time.
+        
+        Returns:
+            float: Duration in hours (e.g., 1.5 for 90 minutes)
+                   Defaults to 1.0 hour if times are missing or calculation fails
+        """
         try:
-            if session.schedule and session.schedule.start_time and session.schedule.end_time:
-                # Calculate duration from time objects
-                dummy_date = date.today()
-                start = datetime.combine(dummy_date, session.schedule.start_time)
-                end = datetime.combine(dummy_date, session.schedule.end_time)
-                duration = (end - start).total_seconds() / 3600
-                return round(duration, 2)
-        except:
-            pass
-        return 1.0  # Default to 1 hour if calculation fails
+            # Check if session has a linked schedule
+            if not session.schedule:
+                print(f"[DURATION WARNING] Session {session.attendance_session_id} has no schedule linked!")
+                return 1.0
+            
+            # Check if schedule has start and end times
+            if not session.schedule.start_time or not session.schedule.end_time:
+                print(f"[DURATION WARNING] Schedule {session.schedule.schedule_id} missing times: "
+                      f"start={session.schedule.start_time}, end={session.schedule.end_time}")
+                return 1.0
+            
+            # Calculate duration from time objects
+            dummy_date = date.today()
+            start = datetime.combine(dummy_date, session.schedule.start_time)
+            end = datetime.combine(dummy_date, session.schedule.end_time)
+            duration = (end - start).total_seconds() / 3600
+            
+            # Validate duration is positive and reasonable (0.5 to 8 hours)
+            if duration <= 0:
+                print(f"[DURATION ERROR] Negative duration for session {session.attendance_session_id}: {duration}h")
+                return 1.0
+            
+            if duration > 8:
+                print(f"[DURATION WARNING] Unusually long session {session.attendance_session_id}: {duration}h")
+            
+            return round(duration, 2)
+            
+        except Exception as e:
+            print(f"[DURATION ERROR] Failed to calculate duration for session {session.attendance_session_id}: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return 1.0  # Default to 1 hour if calculation fails
+    
     
     hours_week = sum([calculate_session_duration(s) for s in week_sessions])
     hours_month = sum([calculate_session_duration(s) for s in month_sessions])
@@ -4245,7 +4278,7 @@ def faculty_dashboard_view():
     recent_sessions = AttendanceSession.query.filter(
         AttendanceSession.taken_by_user_id == current_user.user_id,
         AttendanceSession.is_deleted == False
-    ).order_by(AttendanceSession.taken_at.desc()).limit(5).all()
+    ).order_by(AttendanceSession.taken_at.desc()).limit(10).all()
     
     # 4. Check-in/Out Status
     from models import FacultyAttendance
@@ -4730,20 +4763,57 @@ def api_faculty_subjects_for_section(section_id):
 @faculty_required
 def api_submit_attendance():
     """
-    Submit attendance for a class session with validation
-    Ensures students can only be marked in sessions for their section or enrolled subjects
+    Submit attendance for a class session with validation.
+    
+    WORKFLOW:
+    1. Validate required fields (subject_id, start_time, end_time, records)
+    2. Create or find ClassSchedule with proper start/end times
+    3. Create AttendanceSession linked to the schedule
+    4. Create individual AttendanceRecord entries for each student
+    5. Generate unique diary number for the session
+    
+    CRITICAL: start_time and end_time are REQUIRED for accurate teaching hours calculation.
     """
     try:
         data = request.get_json()
         subject_id = data.get('subject_id')
         section_id = data.get('section_id')
         topic = data.get('topic', '')
-        class_start_time = data.get('class_start_time')
-        class_end_time = data.get('class_end_time')
+        class_start_time = data.get('class_start_time')  # REQUIRED: Format 'HH:MM'
+        class_end_time = data.get('class_end_time')      # REQUIRED: Format 'HH:MM'
         records = data.get('records', [])
         
-        if not subject_id or not records:
-            return jsonify({'success': False, 'error': 'Missing required fields'}), 400
+        # VALIDATION: Check required fields
+        if not subject_id:
+            return jsonify({'success': False, 'error': 'Subject is required'}), 400
+        
+        if not records:
+            return jsonify({'success': False, 'error': 'No attendance records provided'}), 400
+        
+        # CRITICAL VALIDATION: Ensure start and end times are provided
+        if not class_start_time or not class_end_time:
+            return jsonify({
+                'success': False, 
+                'error': 'Class start time and end time are required for accurate hour tracking'
+            }), 400
+        
+        # Validate time format
+        try:
+            start_time_obj = datetime.strptime(class_start_time, '%H:%M').time()
+            end_time_obj = datetime.strptime(class_end_time, '%H:%M').time()
+            
+            # Validate that end time is after start time
+            if end_time_obj <= start_time_obj:
+                return jsonify({
+                    'success': False,
+                    'error': 'End time must be after start time'
+                }), 400
+                
+        except ValueError as e:
+            return jsonify({
+                'success': False,
+                'error': f'Invalid time format. Use HH:MM format (e.g., 09:30)'
+            }), 400
         
         # Get current faculty
         current_user = get_current_user()
@@ -4752,57 +4822,82 @@ def api_submit_attendance():
         if not faculty:
             return jsonify({'success': False, 'error': 'Faculty not found'}), 404
         
-        # Create or get schedule for this session
+        # Determine attendance date (support for past attendance)
+        attendance_date_str = data.get('attendance_date')
+        if attendance_date_str:
+            try:
+                attendance_date = datetime.strptime(attendance_date_str, '%Y-%m-%d').date()
+            except ValueError:
+                return jsonify({'success': False, 'error': 'Invalid date format'}), 400
+        else:
+            attendance_date = datetime.now().date()
+        
+        # STEP 1: Create or find ClassSchedule
+        # This schedule provides: subject, section, faculty, date, and CRITICAL: start_time, end_time
         schedule = None
+        
         if section_id:
-            # Try to find existing schedule
+            # Try to find existing schedule for this exact date and time
             schedule = ClassSchedule.query.filter_by(
                 subject_id=subject_id,
                 section_id=section_id,
                 faculty_id=faculty.faculty_id,
+                date=attendance_date,
                 is_deleted=False
             ).first()
             
-            # If no schedule exists, create a temporary one
+            # If schedule exists but times don't match, create a new one (different class session)
+            if schedule and (schedule.start_time != start_time_obj or schedule.end_time != end_time_obj):
+                schedule = None  # Force creation of new schedule
+            
+            # Create new schedule if not found
             if not schedule:
-                # Use the attendance date if provided, otherwise use today
-                attendance_date_str = data.get('attendance_date')
-                if attendance_date_str:
-                    attendance_date = datetime.strptime(attendance_date_str, '%Y-%m-%d').date()
-                else:
-                    attendance_date = datetime.now().date()
+                print(f"[ATTENDANCE] Creating new ClassSchedule: subject={subject_id}, section={section_id}, "
+                      f"date={attendance_date}, start={class_start_time}, end={class_end_time}")
                 
                 schedule = ClassSchedule(
                     subject_id=subject_id,
                     section_id=section_id,
                     faculty_id=faculty.faculty_id,
                     date=attendance_date,
-                    start_time=datetime.strptime(class_start_time, '%H:%M').time() if class_start_time else None,
-                    end_time=datetime.strptime(class_end_time, '%H:%M').time() if class_end_time else None
+                    start_time=start_time_obj,  # CRITICAL: Always set for duration calculation
+                    end_time=end_time_obj        # CRITICAL: Always set for duration calculation
                 )
                 db.session.add(schedule)
-                db.session.flush()  # Get the schedule_id
+                db.session.flush()  # Get the schedule_id immediately
+                print(f"[ATTENDANCE] Created schedule_id: {schedule.schedule_id}")
+            else:
+                print(f"[ATTENDANCE] Using existing schedule_id: {schedule.schedule_id}")
+        else:
+            # No section_id provided - this shouldn't happen with current UI, but handle it
+            return jsonify({'success': False, 'error': 'Section is required'}), 400
         
-        # Create attendance session
+        # STEP 2: Create AttendanceSession linked to the schedule
+        # The session records WHEN attendance was taken (taken_at timestamp)
         session_obj = AttendanceSession(
-            schedule_id=schedule.schedule_id if schedule else None,
+            schedule_id=schedule.schedule_id,  # REQUIRED: Links to schedule for duration calculation
             taken_by_user_id=current_user.user_id,
+            taken_at=datetime.utcnow(),  # When faculty submitted this attendance
             topic_taught=topic,
-            status='finalized'
+            status='finalized'  # Immediately finalized (not draft)
         )
         db.session.add(session_obj)
         db.session.flush()  # Get the session_id
         
-        # Validate and create attendance records
+        print(f"[ATTENDANCE] Created AttendanceSession: session_id={session_obj.attendance_session_id}")
+        
+        # STEP 3: Generate unique diary number
         subject = Subject.query.get(subject_id)
         section = Section.query.get(section_id) if section_id else None
         
-        # Generate program-specific diary number
         program_code = None
         if section and section.program:
             program_code = section.program.program_code
-        session_obj.diary_number = AttendanceSession.generate_diary_number(program_code)
         
+        session_obj.diary_number = AttendanceSession.generate_diary_number(program_code)
+        print(f"[ATTENDANCE] Generated diary_number: {session_obj.diary_number}")
+        
+        # STEP 4: Validate students and create attendance records
         valid_student_ids = set()
         
         # Get valid students for this session
@@ -4818,6 +4913,8 @@ def api_submit_attendance():
         ).all()
         valid_student_ids.update([e.student_id for e in enrolled_students])
         
+        print(f"[ATTENDANCE] Valid students for this session: {len(valid_student_ids)}")
+        
         # Create attendance records only for valid students
         created_count = 0
         skipped_count = 0
@@ -4828,6 +4925,7 @@ def api_submit_attendance():
             
             # VALIDATION: Only create record if student is valid for this session
             if student_id not in valid_student_ids:
+                print(f"[ATTENDANCE] Skipping invalid student_id: {student_id}")
                 skipped_count += 1
                 continue
             
@@ -4839,7 +4937,10 @@ def api_submit_attendance():
             db.session.add(attendance_record)
             created_count += 1
         
+        # Commit all changes
         db.session.commit()
+        
+        print(f"[ATTENDANCE] Success! Created {created_count} records, skipped {skipped_count}")
         
         return jsonify({
             'success': True,
@@ -4847,14 +4948,19 @@ def api_submit_attendance():
             'session_id': session_obj.attendance_session_id,
             'diary_number': session_obj.diary_number,
             'created_count': created_count,
-            'skipped_count': skipped_count
+            'skipped_count': skipped_count,
+            'schedule_id': schedule.schedule_id,
+            'class_duration_hours': round((datetime.combine(datetime.today(), end_time_obj) - 
+                                          datetime.combine(datetime.today(), start_time_obj)).total_seconds() / 3600, 2)
         })
         
     except Exception as e:
         db.session.rollback()
         import traceback
         traceback.print_exc()
+        print(f"[ATTENDANCE ERROR] {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
 
 
 @app.route('/api/section/<section_id>/students')
