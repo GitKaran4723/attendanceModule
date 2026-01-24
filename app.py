@@ -4185,15 +4185,16 @@ def faculty_dashboard_view():
     start_of_month = today.replace(day=1)
     
     # Query sessions for this faculty
-    week_sessions = AttendanceSession.query.filter(
+    # IMPORTANT: Filter by schedule.date (when class occurred), not taken_at (when attendance was submitted)
+    week_sessions = AttendanceSession.query.join(ClassSchedule).filter(
         AttendanceSession.taken_by_user_id == current_user.user_id,
-        AttendanceSession.taken_at >= datetime.combine(start_of_week, time.min),
+        ClassSchedule.date >= start_of_week,  # Use schedule date, not taken_at
         AttendanceSession.is_deleted == False
     ).all()
     
-    month_sessions = AttendanceSession.query.filter(
+    month_sessions = AttendanceSession.query.join(ClassSchedule).filter(
         AttendanceSession.taken_by_user_id == current_user.user_id,
-        AttendanceSession.taken_at >= datetime.combine(start_of_month, time.min),
+        ClassSchedule.date >= start_of_month,  # Use schedule date, not taken_at
         AttendanceSession.is_deleted == False
     ).all()
     
@@ -4297,11 +4298,15 @@ def faculty_dashboard_view():
         present_count = AttendanceRecord.query.filter_by(attendance_session_id=sess.attendance_session_id, status='present').count()
         total_count = AttendanceRecord.query.filter_by(attendance_session_id=sess.attendance_session_id).count()
         
+        # Format the date to show schedule date and start time (not attendance submission time)
+        schedule_date = sess.schedule.date if sess.schedule else sess.taken_at.date()
+        schedule_time = sess.schedule.start_time if sess.schedule and sess.schedule.start_time else sess.taken_at.time()
+        
         recent_data.append({
             'session_id': sess.attendance_session_id,
             'subject_name': sess.schedule.subject.subject_name if sess.schedule and sess.schedule.subject else "N/A",
             'section_name': sess.schedule.section.section_name if sess.schedule and sess.schedule.section else "N/A",
-            'date': sess.taken_at.strftime('%d %b, %H:%M'),
+            'date': f"{schedule_date.strftime('%d %b')}, {schedule_time.strftime('%H:%M')}",  # Show schedule date and time
             'present_count': present_count,
             'total_count': total_count
         })

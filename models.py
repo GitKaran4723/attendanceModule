@@ -625,20 +625,25 @@ class SubjectAllocation(db.Model, TimestampMixin, SoftDeleteMixin):
 
 class ClassSchedule(db.Model, TimestampMixin, SoftDeleteMixin):
     """
-    Class schedule/timetable entries
+    Class schedule/timetable entries - represents a scheduled class session.
+    Can be either:
+    1. Permanent schedule: Pre-planned timetable entries
+    2. Temporary schedule: Created during ad-hoc attendance taking
+    
+    IMPORTANT: start_time and end_time are used to calculate teaching hours for faculty dashboard.
     """
     __tablename__ = "class_schedules"
 
-    schedule_id = db.Column(db.String(36), primary_key=True, default=gen_uuid)
-    subject_id = db.Column(db.String(36), db.ForeignKey("subjects.subject_id"), nullable=False)
-    faculty_id = db.Column(db.String(36), db.ForeignKey("faculties.faculty_id"), nullable=False)
-    section_id = db.Column(db.String(36), db.ForeignKey("sections.section_id"), nullable=False)
-    room_id = db.Column(db.String(64))
-    date = db.Column(db.Date, nullable=False, index=True)
-    start_time = db.Column(db.Time)
-    end_time = db.Column(db.Time)
-    class_type = db.Column(db.String(16))  # theory/practical
-    semester_id = db.Column(db.String(36), db.ForeignKey("semesters.semester_id"), nullable=True)
+    schedule_id = db.Column(db.String(36), primary_key=True, default=gen_uuid)  # Unique identifier for this schedule
+    subject_id = db.Column(db.String(36), db.ForeignKey("subjects.subject_id"), nullable=False)  # Which subject is being taught
+    faculty_id = db.Column(db.String(36), db.ForeignKey("faculties.faculty_id"), nullable=False)  # Which faculty is teaching
+    section_id = db.Column(db.String(36), db.ForeignKey("sections.section_id"), nullable=False)  # Which section is attending
+    room_id = db.Column(db.String(64))  # Optional: Room/location where class is held
+    date = db.Column(db.Date, nullable=False, index=True)  # Date of the class (REQUIRED for tracking)
+    start_time = db.Column(db.Time)  # Class start time (CRITICAL: Used for duration calculation)
+    end_time = db.Column(db.Time)  # Class end time (CRITICAL: Used for duration calculation)
+    class_type = db.Column(db.String(16))  # Type of class: theory/practical/lab
+    semester_id = db.Column(db.String(36), db.ForeignKey("semesters.semester_id"), nullable=True)  # Optional: Academic semester reference
 
     # Relationships
     subject = db.relationship("Subject", back_populates="schedules")
@@ -675,22 +680,32 @@ class ClassSchedule(db.Model, TimestampMixin, SoftDeleteMixin):
 # ---------------------------------------------------------------------
 class AttendanceSession(db.Model, TimestampMixin, SoftDeleteMixin):
     """
-    An attendance session represents one instance of taking attendance
-    for a scheduled class. Multiple students will have records under this session.
+    An attendance session represents one instance of taking attendance for a scheduled class.
+    Multiple students will have AttendanceRecord entries under this session.
+    
+    RELATIONSHIP WITH SCHEDULE:
+    - Every session MUST be linked to a ClassSchedule (schedule_id is NOT NULL)
+    - The schedule provides: subject, section, faculty, date, start_time, end_time
+    - Duration for teaching hours is calculated from schedule.start_time and schedule.end_time
+    
+    WORKFLOW:
+    1. Faculty takes attendance → ClassSchedule is created/found
+    2. AttendanceSession is created and linked to the schedule
+    3. Individual student records (AttendanceRecord) are created under this session
     """
     __tablename__ = "attendance_sessions"
 
-    attendance_session_id = db.Column(db.String(36), primary_key=True, default=gen_uuid)
+    attendance_session_id = db.Column(db.String(36), primary_key=True, default=gen_uuid)  # Unique identifier for this attendance session
     schedule_id = db.Column(db.String(36), db.ForeignKey("class_schedules.schedule_id"), 
-                           nullable=False, index=True)
-    taken_by_user_id = db.Column(db.String(36), db.ForeignKey("users.user_id"), nullable=False)
-    taken_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+                           nullable=False, index=True)  # REQUIRED: Links to ClassSchedule (provides subject, section, times)
+    taken_by_user_id = db.Column(db.String(36), db.ForeignKey("users.user_id"), nullable=False)  # Faculty who took attendance
+    taken_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)  # When attendance was recorded (timestamp)
     status = db.Column(db.Enum("draft", "finalized", name="attendance_status_enum"), 
-                      nullable=False, default="draft")
-    approved_by = db.Column(db.String(36), db.ForeignKey("users.user_id"), nullable=True)
-    approved_at = db.Column(db.DateTime)
-    topic_taught = db.Column(db.String(255)) # content delivered in class
-    diary_number = db.Column(db.String(20), unique=True, index=True) # Unique identifier for each class entry (e.g., BCA-2024-001)
+                      nullable=False, default="draft")  # Status: draft (in-progress) or finalized (submitted)
+    approved_by = db.Column(db.String(36), db.ForeignKey("users.user_id"), nullable=True)  # Optional: Admin/HOD who approved
+    approved_at = db.Column(db.DateTime)  # Optional: When attendance was approved
+    topic_taught = db.Column(db.String(255))  # Optional: Topic/content covered in this class
+    diary_number = db.Column(db.String(20), unique=True, index=True)  # Unique diary entry number (e.g., BCA-1, BCA-2)
 
     # Relationships
     schedule = db.relationship("ClassSchedule", back_populates="attendance_sessions")
